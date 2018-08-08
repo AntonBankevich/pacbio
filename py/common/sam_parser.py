@@ -283,10 +283,23 @@ def ParseCigar(cigar, len, pos=0):
                 yield (cur, curr)
                 cur += 1
                 curr += 1
-        elif c in    'DPN':
+        elif c in 'DPN':
             curr += n
         elif c in "IS":
             cur += n
+
+def CigarToList(cigar):
+    if cigar == "=":
+        yield ("=", 0)
+        return
+    if cigar == "X":
+        return
+    for n, c in pattern.findall(cigar):
+        if n:
+            n = int(n)
+        else:
+            n = 1
+        yield (c, n)
 
 ############################# test
 
