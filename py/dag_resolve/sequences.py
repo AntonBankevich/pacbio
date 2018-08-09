@@ -1,13 +1,17 @@
+import sys
+sys.path.append("py")
 from common import sam_parser, SeqIO
 
 
 class ContigCollection():
-    def __init__(self):
+    def __init__(self, contigs_list = []):
         self.contigs = dict()
+        for contig in contigs_list:
+            self.add(contig)
         self.main = None
 
     def add(self, contig):
-        if "main" in contig.info:
+        if "main" in contig.info.misc:
             self.main = contig
         self.contigs[contig.id] = contig
 
@@ -19,17 +23,17 @@ class ContigCollection():
         return res
 
     def incoming(self):
-        return self.filter(lambda contig: "in" in contig.info)
+        return self.filter(lambda contig: "in" in contig.info.misc)
 
     def outgoing(self):
-        return self.filter(lambda contig: "out" in contig.info)
+        return self.filter(lambda contig: "out" in contig.info.misc)
 
     def main(self):
         return self.main
 
     def print_names(self, handler):
         for contig in self:
-            handler.write(contig.id + " " + " ".join(contig.info) + "\n")
+            handler.write(contig.id + " " + " ".join(contig.info.misc) + "\n")
 
     def __iter__(self):
         return self.contigs.values().__iter__()
@@ -37,10 +41,16 @@ class ContigCollection():
     def __getitem__(self, contig_id):
         return self.contigs[contig_id]
 
+class TmpInfo:
+    def __init__(self, l):
+        self.misc = l
+
 class Contig:
     def __init__(self, seq, id, info):
         self.seq = seq
         self.id = id
+        if isinstance(info, list):
+            info = TmpInfo(list)
         self.info = info
 
     def end(self, len):
@@ -138,7 +148,7 @@ class ReadCollection:
         rname = rec.query_name.split()[0]
         if rname not in self.reads:
             return None
-        self.reads[rname].AddSamAlignment(rec, self.contigs[rec.tname])
+        return self.reads[rname].AddSamAlignment(rec, self.contigs[rec.tname])
 
     def add(self, read):
         self.reads[read.id] = read

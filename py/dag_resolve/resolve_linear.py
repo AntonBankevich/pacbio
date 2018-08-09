@@ -93,7 +93,7 @@ def construct_alignments(contigs_names, initial_contigs_file, reads_file, dir):
     sys.stderr.write("Filtering out irrelevant\n")
     aligned = set()
     for rec in sam_parser.Samfile(open(alignment, "r")):
-        if not rec.is_unmapped and "main" in contigs[rec.tname].info:
+        if not rec.is_unmapped and "main" in contigs[rec.tname].info.misc:
             aligned.add(rec.query_name)
 
     sys.stderr.write("Collecting reads\n")
@@ -127,7 +127,7 @@ def construct_alignments(contigs_names, initial_contigs_file, reads_file, dir):
         rec = Polish(sorted_reads, contigs.main, os.path.join(dir, "tmp"))
         rec.id += "_polished_copy_" + contig.id
         SeqIO.write(rec, polished, "fasta")
-        polished_contig = sequences.Contig(rec.seq, rec.id, "")
+        polished_contig = sequences.Contig(rec.seq, rec.id, [])
         cov_dir = os.path.join(dir, "coverage_" + polished_contig.id)
         print cov_dir
         coverage_list = CountCoverage(polished_contig, MakeAlignment(sorted_reads, polished_contig, cov_dir))
