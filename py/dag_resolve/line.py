@@ -1,10 +1,10 @@
-from dag_resolve import graph
+from dag_resolve import repeat_graph
 from dag_resolve import sequences
 from typing import Generator
 
 class LineSegment:
     def __init__(self, line, pos, edge, seq, reads):
-        # type: (Line, int, graph.Edge, basestring, sequences.ReadCollection) -> LineSegment
+        # type: (Line, int, repeat_graph.Edge, basestring, sequences.ReadCollection) -> LineSegment
         self.line = line
         self.pos = pos
         self.edge = edge
@@ -13,16 +13,16 @@ class LineSegment:
 
 class Line:
     def __init__(self, edge):
-        # type: (graph.Edge) -> Line
+        # type: (repeat_graph.Edge) -> Line
         assert edge.info.unique
         self.chain = [LineSegment(self, 0, edge, edge.seq, edge.reads)]
 
     def extendRight(self, edge, seq, reads):
-        # type: (graph.Edge, basestring, sequences.ReadCollection) -> None
+        # type: (repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
         self.chain.append(LineSegment(self, self.chain[-1].pos + 1, edge, seq, reads))
 
     def extendLeft(self, edge, seq, reads):
-        # type: (graph.Edge, basestring, sequences.ReadCollection) -> None
+        # type: (repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
         self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, reads))
 
     def rightSegment(self):
@@ -34,7 +34,7 @@ class Line:
         return self.chain[0]
 
     def find(self, edge):
-        # type: (graph.Edge) -> Generator[LineSegment]
+        # type: (repeat_graph.Edge) -> Generator[LineSegment]
         for seg in self.chain:
             if seg.edge.id == edge.id:
                 yield seg
@@ -45,7 +45,7 @@ class Line:
 
 class LineStorage:
     def __init__(self, g):
-        # type: (graph.Graph) -> LineStorage
+        # type: (repeat_graph.Graph) -> LineStorage
         self.g = g
         self.lines = []
         self.resolved_edges = dict()
@@ -66,7 +66,7 @@ class LineStorage:
         self.resolved_edges[seg.edge.id].append(seg)
 
     def resolvableVerticesLeft(self):
-        # type: () -> Generator[graph.Vertex]
+        # type: () -> Generator[repeat_graph.Vertex]
         for v in self.g.V:
             resolved = True
             for e in v.inc:
@@ -77,7 +77,7 @@ class LineStorage:
                 yield v
 
     def extendRight(self, line, edge, seq, reads):
-        # type: (Line, graph.Edge, basestring, sequences.ReadCollection) -> None
+        # type: (Line, repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
         line.extendRight(edge, seq, reads)
         self.addSegment(line.rightSegment())
 

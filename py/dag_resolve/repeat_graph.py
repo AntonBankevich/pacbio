@@ -17,6 +17,9 @@ class Vertex:
         self.inc = []
         self.out = []
         self.label = label
+    def __eq__(self, other):
+        # type: (Vertex) -> bool
+        return self.id == other.id
 
 class Edge(sequences.Contig):
     def __init__(self, id, start, end, consensus, info = None):
@@ -25,6 +28,10 @@ class Edge(sequences.Contig):
         self.start = start
         self.end = end
         self.reads = sequences.ReadCollection(sequences.ContigCollection([self]))
+
+    def __eq__(self, other):
+        # type: (Edge) -> bool
+        return self.id == other.id
 
 class Graph:
     def __init__(self):
