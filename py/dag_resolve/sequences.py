@@ -1,12 +1,13 @@
 import sys
 sys.path.append("py")
-from common import sam_parser, SeqIO
+from common import sam_parser, SeqIO, basic
 from typing import Generator
 
 
 class ContigCollection():
     def __init__(self, contigs_list = []):
-        self.contigs = dict()
+        # type: (Generator[Contig]) -> ContigCollection
+        self.contigs = dict() # type: dict[str, Contig]
         for contig in contigs_list:
             self.add(contig)
         self.main = None
@@ -49,25 +50,38 @@ class ContigCollection():
         # type: (int) -> Contig
         return self.contigs[contig_id]
 
+    def loadFromFasta(self, handler):
+        # type: (file) -> ContigCollection
+        for rec in SeqIO.parse_fasta(handler):
+            self.add(Contig(rec.seq, basic.parseNegativeNumber(rec.id)))
+        return self
+
+    def print_fasta(self, handler):
+        # type: (file) -> None
+        for contig in self.contigs.values():
+            contig.print_fasta(handler)
+
 class TmpInfo:
     def __init__(self, l):
         self.misc = l
 
 class Contig:
-    def __init__(self, seq, id, info):
+    def __init__(self, seq, id, info = []):
         # type: (basestring, int, TmpInfo) -> Contig
         self.seq = seq
         self.id = id
         if isinstance(info, list):
-            info = TmpInfo(list)
+            info = TmpInfo(info)
         self.info = info
 
-    def end(self, len):
+    def suffix(self, len):
         # type: (int) -> Segment
+        len = min(len, self.__len__())
         return Segment(self, self.__len__() - len, self.__len__())
 
-    def start(self, len):
+    def prefix(self, len):
         # type: (int) -> Segment
+        len = min(len, self.__len__())
         return Segment(self, 0, len)
 
     def as_segment(self):
@@ -99,7 +113,7 @@ class Segment:
 
     def subcontig(self):
         # type: () -> Contig
-        return Contig(self.contig.seq[self.left:self.right], self.contig.id + "[" + str(self.left) + "," + str(self.right) + "]", self.contig.info)
+        return Contig(self.contig.seq[self.left:self.right], str(self.contig.id) + "[" + str(self.left) + "," + str(self.right) + "]", self.contig.info)
 
     def __str__(self):
         # type: () -> basestring
@@ -162,9 +176,9 @@ class Read:
         return self.inter(Segment(contig, len(contig) - 200, len(contig)))
 
 class ReadCollection:
-    def __init__(self, contigs):
-        # type: (list[Contig]) -> ReadCollection
-        self.reads = dict()
+    def __init__(self, contigs = ContigCollection()):
+        # type: (ContigCollection) -> ReadCollection
+        self.reads = dict() # type: dict[basestring, Read]
         self.contigs = contigs
 
     def addNewRead(self, rec):
@@ -175,13 +189,13 @@ class ReadCollection:
         return read
 
     def addNewAlignment(self, rec):
-        # type: (sam_parser.SAM_entry) -> None
+        # type: (sam_parser.SAMEntryInfo) -> None
         if rec.is_unmapped:
             return
         rname = rec.query_name.split()[0]
         if rname not in self.reads:
             return
-        self.reads[rname].AddSamAlignment(rec, self.contigs[rec.tname])
+        self.reads[rname].AddSamAlignment(rec, self.contigs[int(rec.tname)])
 
     def add(self, read):
         # type: (Read) -> None
@@ -208,8 +222,11 @@ class ReadCollection:
         return self.reads.values().__iter__()
 
     def __getitem__(self, read_id):
-        # type: (int) -> Read
-        return self.reads[read_id]
+        # type: (basestring) -> Read
+        return self.reads[read_id.split()[0]]
+
+    def __len__(self):
+        return len(self.reads)
 
     def print_fasta(self, hander):
         # type: (file) -> None
@@ -222,3 +239,14 @@ class ReadCollection:
             handler.write(read.id + "\n")
             for rec in read.alignments:
                 handler.write(str(rec) + "\n")
+
+    def asSeqRecords(self):
+        # type: () -> Generator[SeqIO.SeqRecord]
+        for read in self.reads.values():
+            yield SeqIO.SeqRecord(read.seq, read.id)
+
+    def loadFromFasta(self, handler):
+        # type: (file) -> ReadCollection
+        for rec in SeqIO.parse_fasta(handler):
+            self.add(Read(rec))
+        return self

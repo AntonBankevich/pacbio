@@ -1,4 +1,4 @@
-from common import basic
+from common import basic, sam_parser, SeqIO
 from dag_resolve import sequences
 from typing import Generator
 
@@ -14,8 +14,8 @@ class Vertex:
     def __init__(self, id, label = None):
         # type: (int, basestring) -> Vertex
         self.id = id
-        self.inc = []
-        self.out = []
+        self.inc = [] # type: list[Edge]
+        self.out = [] # type: list[Edge]
         self.label = label
     def __eq__(self, other):
         # type: (Vertex) -> bool
@@ -33,16 +33,29 @@ class Edge(sequences.Contig):
         # type: (Edge) -> bool
         return self.id == other.id
 
+# class VertexPort:
+#     def __init__(self, v):
+#         # type: (Vertex) -> object
+#         self.v = v
+#         self.adjacent = []
+#
+# class Orientation:
+#     def __init__(self, reverse):
+#         # type: (object) -> object
+#         self.reverse = reverse
+# class OrientedEdge:
+#     def __init__(self, edge, orientation):
+
 class Graph:
     def __init__(self):
         # type: () -> Graph
-        self.V = dict()
-        self.E = dict()
-        self.source = self.addVertex(10000, "source")
-        self.sink = self.addVertex(10001, "sink")
+        self.V = dict() # type: dict[int, Vertex]
+        self.E = dict() # type: dict[int, Edge]
+        self.source = self.addVertex(10000, "source") # type: Vertex
+        self.sink = self.addVertex(10001, "sink") # type: Vertex
 
     def addVertex(self, v_id, label = None):
-        # type: (int, basestring) -> Vertex
+        # type: (int, str) -> Vertex
         vertex = Vertex(v_id, label)
         self.V[v_id] = vertex
         return vertex
@@ -56,14 +69,14 @@ class Graph:
         start = self.V[start_id]
         end = self.V[end_id]
         edge = Edge(edge_id, start, end, consensus, info)
-        self.E[edge_id] = edge
+        self.E[edge.id] = edge
         start.out.append(edge)
         end.inc.append(edge)
         return edge
 
     def loadFromDot(self, contigs, dot):
-        # type: (sequences.ContigCollection, DotParser) -> None
-        for eid, start, end, l, info in dot.parse():
+        # type: (sequences.ContigCollection, DotParser) -> Graph
+        for eid, start, end, l, info in dot:
             if start == "source":
                 start = self.source.id
             if start == "sink":
@@ -72,7 +85,19 @@ class Graph:
             if eid < 0:
                 seq = basic.RC(seq)
             self.addEdge(eid, start, end, seq, info)
+        return self
 
+    def fillAlignments(self, read_recs, sam):
+        # type: (typing.Generator[SeqIO.SeqRecord], sam_parser.Samfile) -> None
+        reads = sequences.ReadCollection(sequences.ContigCollection())
+        for rec in read_recs:
+            reads.addNewRead(rec)
+        for rec in sam:
+            if rec.is_unmapped:
+                continue
+            edge_id = int(rec.tname)
+            self.E[edge_id].reads.add(reads[rec.query_name])
+            self.E[edge_id].reads.addNewAlignment(rec)
 
 
 
@@ -81,16 +106,18 @@ class DotParser:
         # type: (file) -> DotParser
         self.dot = dot
 
-    def parse(self):
-        # type: () -> Generator[tuple]
+    def parse(self, edge_ids = None):
+        # type: (list[int]) -> Generator[tuple]
         for s in self.dot.readlines():
-            if len(s) < 2 or s[1] != "->":
+            if s.find("->") == -1:
                 continue
             v_from = basic.parseNumber(s)
             v_to = basic.parseNumber(s, s.find("->"))
-            eid = basic.parseNumber(s, s.find("id"))
+            eid = basic.parseNegativeNumber(s, s.find("id"))
             l = basic.parseNumber(s, s.find("\\l"))
             unique = (s.find("black") != -1)
-            yield eid, v_from, v_to, l, EdgeInfo(s, unique)
+            print v_from, v_to, eid, l, unique, eid in edge_ids
+            if edge_ids is None or eid in edge_ids:
+                yield eid, v_from, v_to, l, EdgeInfo(s, unique)
 
 

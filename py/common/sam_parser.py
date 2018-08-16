@@ -7,6 +7,7 @@
 import sys
 import itertools
 import re
+from typing import Generator
 
 
 def CIGAR_to_List(cigar):
@@ -198,7 +199,7 @@ class Samfile:
         for line in self.handler:
             if not self.processLine(line.strip()):
                 self.handler = itertools.chain([line], self.handler)
-                break;
+                break
 
     def processLine(self, line):
         line = line.strip()
@@ -225,12 +226,16 @@ class Samfile:
         return False
 
     def __iter__(self):
+        # type: () -> Generator[SAMEntryInfo]
         for line in self.handler:
             line = line.strip()
             # line is reference sequence dictionary
             if not self.processLine(line):
                 entry = self.GetSAMEntry(line)
-                tid = self.target_map[entry.target_name]
+                if entry.target_name in self.target_map:
+                    tid = self.target_map[entry.target_name]
+                else:
+                    tid = None
                 yield SAMEntryInfo(tid, entry.target_name, entry.pos, entry.alen, entry.seq, entry.flag, entry.query_name, entry.qual, entry.cigar, entry.tlen)
 
 
@@ -265,6 +270,7 @@ class SamChain:
 pattern = re.compile('([0-9]*)([MIDNSHP])')
 
 def ParseCigar(cigar, len, pos=0):
+    # type: (str, int, int) -> Generator[tuple[int, int]]
     if cigar == "=":
         for i in range(len):
             yield (i, i + pos)

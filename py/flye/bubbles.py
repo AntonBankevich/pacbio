@@ -14,12 +14,16 @@ import math
 import multiprocessing
 import signal
 
+import sys
+
 import flye.fasta_parser as fp
 import flye.config as config
 from flye.alignment import shift_gaps, SynchronizedSamReader
 
 
 logger = logging.getLogger()
+logger.addHandler(logging.StreamHandler(sys.stderr))
+logger.setLevel(logging.DEBUG)
 
 
 class ProfileInfo:

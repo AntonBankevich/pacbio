@@ -1,19 +1,16 @@
-############################################################################
-# Copyright (c) 2015 Saint Petersburg State University
-# All Rights Reserved
-# See file LICENSE for details.
-############################################################################
-
 import itertools
 import sys
 import gzip
+from typing import Generator
 
 class Reader:
     def __init__(self, handler):
+        # type: (file) -> Reader
         self.handler = handler
-        self.cash = None
+        self.cash = None # type: str
 
     def Push(self, value):
+        # type: (str) -> None
         assert(self.cash is None)
         self.cash = value
 
@@ -29,16 +26,19 @@ class Reader:
         self.cash = None
 
     def Top(self):
+        # type: () -> str
         self.FillCash()
         return self.cash
 
     def Readline(self):
+        # type: () -> str
         self.FillCash()
         result = self.cash
         self.cash = None
         return result
 
     def ReadUntill(self, f):
+        # type: (function) -> str
         result = []
         while True:
             next_line = self.Readline()
@@ -49,6 +49,7 @@ class Reader:
         return "".join(result)
 
     def ReadUntillFill(self, buf_size):
+        # type: (int) -> str
         cnt = 0
         result = []
         while True:
@@ -60,6 +61,7 @@ class Reader:
                 return "".join(result)
 
     def EOF(self):
+        # type: () -> bool
         return self.Top() == ""
 
 
@@ -71,6 +73,7 @@ class SeqRecord:
         self.id = id
         self.seq = seq
         self.qual = qual
+        self.info = None
 
     def __len__(self):
         return len(self.seq)
@@ -98,9 +101,15 @@ def parse(handler, file_name):
         return parse_fastq(handler)
 
 def parse_fasta(handler):
+    # type: (file) -> Generator[SeqRecord]
     reader = Reader(handler)
     while not reader.EOF():
         rec_id = reader.Readline().strip()
+        info = None
+        pos = rec_id.find(" ")
+        if pos != -1:
+            info = rec_id[pos + 1:]
+            rec_id = rec_id[:pos]
         assert(rec_id[0] == '>')
         rec_seq = reader.ReadUntill(lambda s: s.startswith(">"))
         yield SeqRecord(rec_seq, rec_id[1:])
@@ -118,7 +127,7 @@ def parse_fastq(handler):
 
 def write(rec, handler, file_type):
     if file_type == "fasta":
-        handler.write(">" + rec.id + "\n")
+        handler.write(">" + str(rec.id) + "\n")
         handler.write(rec.seq + "\n")
     elif file_type == "fastq":
         handler.write("@" + rec.id + "\n")
