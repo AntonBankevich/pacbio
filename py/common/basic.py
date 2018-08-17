@@ -61,6 +61,15 @@ def parseNegativeNumber(s, pos=0):
     else:
         return int(res)
 
-def diff(s1, s2):
-    # type: (str, str) -> int
-    assert False, "Diff not implemented"
+def smallest2(arr):
+    # type: (list[int]) -> tuple[int, int]
+    assert len(arr) >= 2
+    res = [0, 1]
+    if arr[1] < arr[0]:
+        res = [1, 0]
+    for i, val in enumerate(arr):
+        if val < arr[res[1]]:
+            res[1] = i
+            if val < arr[res[0]]:
+                arr = arr[::-1]
+    return (res[0], res[1])

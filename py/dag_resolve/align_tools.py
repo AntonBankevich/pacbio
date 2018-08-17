@@ -55,6 +55,13 @@ class AlignedSequences:
         else:
             return None
 
+    def mapSegment(self, l, r):
+        # type: (int, int) -> tuple[int, int]
+        l_match = self.findNextMatch(l)
+        r_match = self.findPreviousMatch(r)
+        assert l <= l_match and l_match <= r_match and r_match <= r
+        return self.alignment[l_match] - (l_match - l), self.alignment[r_match] + (r - r_match)
+
     def findSeqPos(self, pos):
         # type: (int) -> tuple[int, int]
         if not self.aligned:
@@ -83,14 +90,20 @@ class Consensus:
         self.seq = seq
         self.cov = cov
 
-    def printQuality(self, handler, th = 10):
+    def printQuality(self, handler, cov_threshold = 10):
         # type: (file, int) -> None
         for c, a in zip(self.seq, self.cov):
-            if a < th:
+            if a < cov_threshold:
                 handler.write(c.lower())
             else:
                 handler.write(c.upper())
         handler.write("\n")
+
+    def cut(self, cov_threshold = 10):
+        l = 0
+        while l < len(self.seq) and self.cov[l] >= cov_threshold:
+            l += 1
+        return self.seq[:l]
 
 
 class Aligner:

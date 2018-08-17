@@ -25,7 +25,7 @@ if __name__ == "__main__":
     sys.stderr.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment)
     sys.stderr.write("Resolving repeats\n")
-    res = resolver.GraphResolver(graph, resolver.VertexResolver(graph, al), resolver.EdgeResolver(graph))
+    res = resolver.GraphResolver(graph, resolver.VertexResolver(graph, al), resolver.EdgeResolver(graph, al))
     res.resolve()
     sys.stderr.write("Printing results\n")
     res.lineStorage.printToFile(sys.stdout)

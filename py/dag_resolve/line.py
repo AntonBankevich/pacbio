@@ -3,18 +3,45 @@ from dag_resolve import sequences
 from typing import Generator
 
 class DivergenceState:
-    def __init__(self, div, neighborhood):
+    def __init__(self, div, seq):
         # type: (Divergence, str) -> DivergenceState
         self.divergence = div
-        self.neighborhood = neighborhood
+        self.seq = seq
 
     def isAmbiguous(self):
         # type: () -> bool
-        return self.neighborhood is None
+        return self.seq is None
+
+    def __eq__(self, other):
+        # type: (DivergenceState) -> bool
+        return self.seq == other.seq and self.divergence == other.divergence
+
+
+class Phasing:
+    def __init__(self, states = []):
+        # type: (list[DivergenceState]) -> Phasing
+        self.states = states
+
+    def add(self, state):
+        # type: (DivergenceState) -> None
+        self.states.append(state)
+
+    def __getitem__(self, item):
+        # type: (int) -> DivergenceState
+        return self.states[item]
+
+    def __iter__(self):
+        # type: () -> Generator[DivergenceState]
+        return self.states.__iter__()
+
+    def __len__(self):
+        # type: () -> int
+        return self.states.__len__()
+
 
 class Divergence:
-    def __init__(self, edge, pos, states):
-        # type: (repeat_graph.Edge, int, list[basestring]) -> Divergence
+    def __init__(self, edge, pos, states = []):
+        # type: (repeat_graph.Edge, tuple[int, int], list[str]) -> Divergence
         self.edge = edge
         self.pos = pos
         self.states = []
@@ -22,15 +49,23 @@ class Divergence:
         for state in states:
             self.states.append(DivergenceState(self, state))
 
+    def addState(self, state):
+        # type: (str) -> DivergenceState
+        self.states.append(DivergenceState(self, state))
+        return self.states[-1]
+
+    def __eq__(self, other):
+        # type: (Divergence) -> bool
+        return self.edge.id == other.edge.id and self.pos == other.pos
 
 class LineSegment:
-    def __init__(self, line, pos, edge, seq, states, reads):
-        # type: (Line, int, repeat_graph.Edge, str, list[DivergenceState], sequences.ReadCollection) -> LineSegment
+    def __init__(self, line, pos, edge, seq, phasing, reads):
+        # type: (Line, int, repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> LineSegment
         self.line = line
         self.pos = pos
         self.edge = edge
         self.seq = seq
-        self.states = states
+        self.phasing = phasing
         self.reads = reads
 
 class Line:
