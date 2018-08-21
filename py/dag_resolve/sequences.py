@@ -6,7 +6,7 @@ from typing import Generator
 
 class ContigCollection():
     def __init__(self, contigs_list = []):
-        # type: (Generator[Contig]) -> ContigCollection
+        # type: (list[Contig]) -> ContigCollection
         self.contigs = dict() # type: dict[str, Contig]
         for contig in contigs_list:
             self.add(contig)
@@ -19,7 +19,7 @@ class ContigCollection():
         self.contigs[contig.id] = contig
 
     def filter(self, condition):
-        # type: (function) -> ContigCollection
+        # type: (callable(Contig)) -> ContigCollection
         res = ContigCollection()
         for contig in self.contigs.values():
             if condition(contig):
@@ -67,7 +67,7 @@ class TmpInfo:
 
 class Contig:
     def __init__(self, seq, id, info = []):
-        # type: (basestring, int, TmpInfo) -> Contig
+        # type: (str, int, TmpInfo) -> Contig
         self.seq = seq
         self.id = id
         if isinstance(info, list):
@@ -116,8 +116,8 @@ class Segment:
         return Contig(self.contig.seq[self.left:self.right], str(self.contig.id) + "[" + str(self.left) + "," + str(self.right) + "]", self.contig.info)
 
     def __str__(self):
-        # type: () -> basestring
-        return self.contig.id + "[" + str(self.left) + ":" + str(self.right) + "]"
+        # type: () -> str
+        return str(self.contig.id) + "[" + str(self.left) + ":" + str(self.right) + "]"
 
 
 class AlignmentPiece:
@@ -143,7 +143,7 @@ class Read:
         return len(self.seq)
 
     def AddSamAlignment(self, rec, contig):
-        # type: (sam_parser.SAM_entry, Contig) -> None
+        # type: (sam_parser.SAMEntryInfo, Contig) -> None
         cigar_list = list(sam_parser.CigarToList(rec.cigar))
         ls = 0
         rs = 0
@@ -178,8 +178,13 @@ class Read:
 class ReadCollection:
     def __init__(self, contigs = ContigCollection()):
         # type: (ContigCollection) -> ReadCollection
-        self.reads = dict() # type: dict[basestring, Read]
+        self.reads = dict() # type: dict[str, Read]
         self.contigs = contigs
+
+    def extend(self, other_collection):
+        # type: (ReadCollection) -> None
+        for read in other_collection.reads.values():
+            self.add(read)
 
     def addNewRead(self, rec):
         # type: (SeqIO.SeqRecord) -> Read
@@ -202,7 +207,7 @@ class ReadCollection:
         self.reads[read.id] = read
 
     def filter(self, condition):
-        # type: (function) -> ReadCollection
+        # type: (callable(Read)) -> ReadCollection
         res = ReadCollection(self.contigs)
         for read in self.reads.values():
             if condition(read):
@@ -218,7 +223,7 @@ class ReadCollection:
         return self.filter(lambda read: read.contain(segment))
 
     def __iter__(self):
-        # type: () -> Generator[Read]
+        # type: () -> Iterator[Read]
         return self.reads.values().__iter__()
 
     def __getitem__(self, read_id):

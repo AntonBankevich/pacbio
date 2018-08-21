@@ -21,6 +21,7 @@ import flye.config as config
 
 
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 MINIMAP_BIN = "bin/flye-minimap2"
 
 Alignment = namedtuple("Alignment", ["qry_id", "trg_id", "qry_start", "qry_end",

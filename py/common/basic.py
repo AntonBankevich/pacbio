@@ -1,3 +1,4 @@
+import heapq
 import sys
 
 import os
@@ -67,9 +68,16 @@ def smallest2(arr):
     res = [0, 1]
     if arr[1] < arr[0]:
         res = [1, 0]
-    for i, val in enumerate(arr):
+    for i, val in enumerate(arr[2:], 2):
         if val < arr[res[1]]:
             res[1] = i
             if val < arr[res[0]]:
                 arr = arr[::-1]
     return (res[0], res[1])
+
+def merge(*iterables):
+    prev = None
+    for cur in heapq.merge(*iterables):
+        if cur != prev:
+            yield cur
+            prev = cur

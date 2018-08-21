@@ -23,7 +23,7 @@ from flye.alignment import shift_gaps, SynchronizedSamReader
 
 logger = logging.getLogger()
 logger.addHandler(logging.StreamHandler(sys.stderr))
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 class ProfileInfo:

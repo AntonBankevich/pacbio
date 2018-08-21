@@ -67,9 +67,7 @@ class Reader:
 
 class SeqRecord:
     def __init__(self, seq, id, qual = None):
-        if qual != None and len(qual) != len(seq):
-            sys.stdout.write("oppa" + id + "oppa")
-        assert qual == None or len(qual) == len(seq)
+        assert qual is None or len(qual) == len(seq)
         self.id = id
         self.seq = seq
         self.qual = qual

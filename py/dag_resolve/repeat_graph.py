@@ -21,6 +21,9 @@ class Vertex:
         # type: (Vertex) -> bool
         return self.id == other.id
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 class Edge(sequences.Contig):
     def __init__(self, id, start, end, consensus, info = None):
         # type: (int, Vertex, Vertex, basestring, EdgeInfo) -> Edge
@@ -32,6 +35,9 @@ class Edge(sequences.Contig):
     def __eq__(self, other):
         # type: (Edge) -> bool
         return self.id == other.id
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 # class VertexPort:
 #     def __init__(self, v):
@@ -75,7 +81,7 @@ class Graph:
         return edge
 
     def loadFromDot(self, contigs, dot):
-        # type: (sequences.ContigCollection, DotParser) -> Graph
+        # type: (sequences.ContigCollection, Generator[tuple]) -> Graph
         for eid, start, end, l, info in dot:
             if start == "source":
                 start = self.source.id
@@ -88,7 +94,7 @@ class Graph:
         return self
 
     def fillAlignments(self, read_recs, sam):
-        # type: (typing.Generator[SeqIO.SeqRecord], sam_parser.Samfile) -> None
+        # type: (Generator[SeqIO.SeqRecord], sam_parser.Samfile) -> None
         reads = sequences.ReadCollection(sequences.ContigCollection())
         for rec in read_recs:
             reads.addNewRead(rec)
@@ -107,7 +113,7 @@ class DotParser:
         self.dot = dot
 
     def parse(self, edge_ids = None):
-        # type: (list[int]) -> Generator[tuple]
+        # type: (dict[int, list[str]]) -> Generator[tuple]
         for s in self.dot.readlines():
             if s.find("->") == -1:
                 continue
@@ -118,6 +124,10 @@ class DotParser:
             unique = (s.find("black") != -1)
             print v_from, v_to, eid, l, unique, eid in edge_ids
             if edge_ids is None or eid in edge_ids:
+                if "sink" in edge_ids[eid]:
+                    yield eid, v_from, -1, l, EdgeInfo(s, unique)
+                if "source" in edge_ids[eid]:
+                    yield eid, v_from, -2, l, EdgeInfo(s, unique)
                 yield eid, v_from, v_to, l, EdgeInfo(s, unique)
 
 

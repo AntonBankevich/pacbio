@@ -1,5 +1,7 @@
 import os
 
+from typing import Optional
+
 from common import basic, sam_parser, SeqIO
 from dag_resolve import repeat_graph, sequences
 from flye import polysh_job
@@ -14,10 +16,15 @@ class AlignedSequences:
         self.first = None # type: int
         self.last = None # type: int
         self.aligned = False # type: bool
+        self.rc = False # type: bool
 
     def addCigar(self, cigar, pos):
         # type: (str, int) -> None
-        for seq_pos, contig_pos in sam_parser.ParseCigar(cigar, len(self.seq_to), pos):
+        for seq_pos, contig_pos in sam_parser.ParseCigar(cigar, len(self.seq_to), pos - 1):
+            # if contig_pos >= len(self.alignment):
+            #     print contig_pos, len(self.alignment), self.rc, pos
+            #     print cigar
+            #     print list(sam_parser.ParseCigar(cigar, len(self.seq_to), pos))
             self.alignment[contig_pos] = seq_pos
             self.updateBounds(contig_pos)
 
@@ -30,7 +37,7 @@ class AlignedSequences:
             self.aligned = True
 
     def findNextMatch(self, pos):
-        # type: (int) -> int
+        # type: (int) -> Optional[int]
         if not self.aligned:
             return None
         if pos <= self.first:
@@ -43,7 +50,7 @@ class AlignedSequences:
             return None
 
     def findPreviousMatch(self, pos):
-        # type: (int) -> int
+        # type: (int) -> Optional[int]
         if not self.aligned:
             return None
         if pos >= self.last:
@@ -57,10 +64,52 @@ class AlignedSequences:
 
     def mapSegment(self, l, r):
         # type: (int, int) -> tuple[int, int]
+        assert self.aligned
+        if l < self.first:
+            return None
+        if r > self.last:
+            return None
         l_match = self.findNextMatch(l)
         r_match = self.findPreviousMatch(r)
+        if l_match > r_match:
+            return None
+        if l <= l_match and l_match <= r_match and r_match <= r:
+            pass
+        else:
+            print l, l_match, r_match, r, self.first, self.last
+            for i in range(min([l, l_match, r_match, r], 1 + max([l, l_match, r_match, r]))):
+                print i, self.alignment[i]
         assert l <= l_match and l_match <= r_match and r_match <= r
         return self.alignment[l_match] - (l_match - l), self.alignment[r_match] + (r - r_match)
+
+    def checkHomo(self, pos):
+        if pos == 0 or self.seq_to[pos] != self.seq_to[pos -1]:
+            return False
+        if self.alignment[pos] != -1 and self.alignment[pos - 1] != -1:
+            for i in xrange(self.alignment[pos - 1], self.alignment[pos] + 1):
+                if self.seq_from[i] != self.seq_to[pos]:
+                    return False
+        return True
+
+    def divPositions(self, first, last):
+        homo_start = first
+        homo_active = False
+        for i in xrange(first, last):
+            if not self.checkHomo(i):
+                homo_start = i
+                homo_active = False
+            elif homo_active:
+                yield i
+                continue
+            if self.alignment[i] == -1 or \
+                    (self.alignment[i - 1] != -1 and self.alignment[i] != self.alignment[i - 1] + 1) or \
+                            self.seq_to[i] != self.seq_from[self.alignment[i]]:
+                if self.checkHomo(i):
+                    for j in xrange(homo_start, i + 1):
+                        yield j
+                else:
+                    yield i
+
 
     def findSeqPos(self, pos):
         # type: (int) -> tuple[int, int]
@@ -90,7 +139,7 @@ class Consensus:
         self.seq = seq
         self.cov = cov
 
-    def printQuality(self, handler, cov_threshold = 10):
+    def printQuality(self, handler, cov_threshold = 15):
         # type: (file, int) -> None
         for c, a in zip(self.seq, self.cov):
             if a < cov_threshold:
@@ -99,7 +148,7 @@ class Consensus:
                 handler.write(c.upper())
         handler.write("\n")
 
-    def cut(self, cov_threshold = 10):
+    def cut(self, cov_threshold = 15):
         l = 0
         while l < len(self.seq) and self.cov[l] >= cov_threshold:
             l += 1
@@ -119,7 +168,7 @@ class Aligner:
         return name
 
     def align(self, reads, consensus):
-        # type: (sequences.ReadCollection, sequences.ContigCollection, int) -> sam_parser.Samfile
+        # type: (sequences.ReadCollection, sequences.ContigCollection) -> sam_parser.Samfile
         dir = self.next_dir()
         contigs_file = os.path.join(dir, "contigs.fasta")
         reads_file = os.path.join(dir, "reads.fasta")
@@ -143,15 +192,20 @@ class Aligner:
         res = [] # type: list[AlignedSequences]
         for i in range(len(seqs)):
             reads.add(sequences.Read(SeqIO.SeqRecord(seqs[i], str(i))))
-            res.append(AlignedSequences(seqs[i], contig))
+            res.append(AlignedSequences(seqs[i], contig.seq))
         for rec in self.align(reads, collection):
-            assert not rec.rc
-            tid = int(rec.tname)
+            tid = int(rec.query_name)
+            if res[tid].aligned and res[tid].rc != rec.rc:
+                continue
+                # assert False, "Strait and reverse alignments of the same read"
+            if not res[tid].aligned and rec.rc:
+                res[tid].rc = True
+                res[tid].seq_from = basic.RC(res[tid].seq_from)
             res[tid].addCigar(rec.cigar, rec.pos)
         return res
 
     def polish(self, reads, consensus):
-        # type: (sequences.ReadCollection, str) -> str
+        # type: (sequences.ReadCollection, sequences.Contig) -> str
         dir = self.next_dir()
         consensus_file_name = os.path.join(dir, "ref.fasta")
         consensus_file = open(consensus_file_name, "w")
@@ -165,10 +219,10 @@ class Aligner:
         return list(SeqIO.parse_fasta(open(res, "r")))[0].seq
 
     def polishAndAnalyse(self, reads, consensus):
-        # type: (sequences.ReadCollection, str) -> Consensus
+        # type: (sequences.ReadCollection, Contig) -> Consensus
         seq = sequences.Contig(self.polish(reads, consensus), "Noname")
         res = [0] * (len(seq) + 1)
-        for rec in self.align(reads, seq):
+        for rec in self.align(reads, sequences.ContigCollection([seq])):
             if rec.is_unmapped:
                 continue
             res[rec.pos - 1] += 1
@@ -231,7 +285,9 @@ class AccurateAligner:
 
     def align(self, query, pattern, match_position = None):
         # type: (str, str, int) -> int
-        assert len(query) <= len(pattern)
+        # assert len(query) <= len(pattern)
+        query = query.upper()
+        pattern = pattern.upper()
         res = []# type: list[list[SquareRecord]]
         for i in xrange(len(query) + 1):
             res.append([])
@@ -314,6 +370,8 @@ class AccurateAligner:
         #         alignment[1].append(pattern[cur_pattern - 1])
         # print "".join(alignment[0])
         # print "".join(alignment[1])
+
+        # print "Accurate alignment:", query, pattern, best
         return min(best, self.inf)
 
 

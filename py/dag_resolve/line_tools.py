@@ -3,35 +3,52 @@ from dag_resolve import sequences
 from typing import Generator
 
 class DivergenceState:
-    def __init__(self, div, seq):
+    def __init__(self, div, seq, id):
         # type: (Divergence, str) -> DivergenceState
         self.divergence = div
         self.seq = seq
+        self.id = id
 
     def isAmbiguous(self):
         # type: () -> bool
         return self.seq is None
 
+    def char(self):
+        if self.isAmbiguous():
+            return "-"
+        return str(self.id)
+
     def __eq__(self, other):
         # type: (DivergenceState) -> bool
         return self.seq == other.seq and self.divergence == other.divergence
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 class Phasing:
-    def __init__(self, states = []):
+    def __init__(self, states = None):
         # type: (list[DivergenceState]) -> Phasing
+        if states is None:
+            states = []
         self.states = states
 
     def add(self, state):
-        # type: (DivergenceState) -> None
+        # type: (DivergenceState) -> DivergenceState
         self.states.append(state)
+        return self.states[-1]
+
+    def printToFile(self, handler):
+        # type: (file) -> None
+        for state in self.states:
+            handler.write(state.char())
+        handler.write("\n")
 
     def __getitem__(self, item):
         # type: (int) -> DivergenceState
         return self.states[item]
 
     def __iter__(self):
-        # type: () -> Generator[DivergenceState]
+        # type: () -> Iterator[DivergenceState]
         return self.states.__iter__()
 
     def __len__(self):
@@ -44,19 +61,29 @@ class Divergence:
         # type: (repeat_graph.Edge, tuple[int, int], list[str]) -> Divergence
         self.edge = edge
         self.pos = pos
-        self.states = []
-        self.ambiguous = DivergenceState(self, None)
+        self.states = [] # type: list[DivergenceState]
+        self.ambiguous = DivergenceState(self, None, -1)
         for state in states:
-            self.states.append(DivergenceState(self, state))
+            self.addState(state)
 
     def addState(self, state):
         # type: (str) -> DivergenceState
-        self.states.append(DivergenceState(self, state))
+        self.states.append(DivergenceState(self, state, len(self.states)))
         return self.states[-1]
 
     def __eq__(self, other):
         # type: (Divergence) -> bool
         return self.edge.id == other.edge.id and self.pos == other.pos
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def printToFile(self, handler):
+        # type: (file) -> None
+        handler.write(str(self.edge.id) + ": " + str(self.pos) + "\n")
+        for state in self.states:
+            handler.write(state.seq + " ")
+        handler.write("\n")
 
 class LineSegment:
     def __init__(self, line, pos, edge, seq, phasing, reads):
@@ -95,6 +122,9 @@ class Line:
         for seg in self.chain:
             if seg.edge.id == edge.id:
                 yield seg
+
+    def shortStr(self):
+        return "[" + ",".join(map(lambda seg: str(seg.edge.id), self.chain)) + "]"
 
     def __getitem__(self, item):
         # type: (int) -> LineSegment
@@ -139,9 +169,7 @@ class LineStorage:
     def printToFile(self, handler):
         # type: (file) -> None
         for line in self.lines:
-            for seg in line.chain:
-                handler.write(str(seg.edge.id) + " ")
-            handler.write("\n")
+            handler.write(line.shortStr() + "\n")
 
 
 
