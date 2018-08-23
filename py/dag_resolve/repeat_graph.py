@@ -93,15 +93,17 @@ class Graph:
             self.addEdge(eid, start, end, seq, info)
         return self
 
-    def fillAlignments(self, read_recs, sam):
+    def fillAlignments(self, read_recs, sam, fill_unique = True):
         # type: (Generator[SeqIO.SeqRecord], sam_parser.Samfile) -> None
-        reads = sequences.ReadCollection(sequences.ContigCollection())
+        reads = sequences.ReadCollection(sequences.ContigCollection(self.E.values()))
         for rec in read_recs:
             reads.addNewRead(rec)
         for rec in sam:
             if rec.is_unmapped:
                 continue
             edge_id = int(rec.tname)
+            if not fill_unique and rec.pos > 5000 and rec.pos + rec.alen + 5000 <= self.E[edge_id].__len__():
+                continue
             self.E[edge_id].reads.add(reads[rec.query_name])
             self.E[edge_id].reads.addNewAlignment(rec)
 
@@ -122,7 +124,6 @@ class DotParser:
             eid = basic.parseNegativeNumber(s, s.find("id"))
             l = basic.parseNumber(s, s.find("\\l"))
             unique = (s.find("black") != -1)
-            print v_from, v_to, eid, l, unique, eid in edge_ids
             if edge_ids is None or eid in edge_ids:
                 if "sink" in edge_ids[eid]:
                     yield eid, v_from, -1, l, EdgeInfo(s, unique)

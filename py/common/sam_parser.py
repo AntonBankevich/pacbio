@@ -269,7 +269,7 @@ class SamChain:
 
 pattern = re.compile('([0-9]*)([MIDNSHP])')
 
-def ParseCigar(cigar, len, pos=0):
+def ParseCigar(cigar, len, pos=0, full_read = False):
     # type: (str, int, int) -> Generator[tuple[int, int]]
     if cigar == "=":
         for i in range(len):
@@ -292,6 +292,8 @@ def ParseCigar(cigar, len, pos=0):
         elif c in 'DPN':
             curr += n
         elif c in "IS":
+            cur += n
+        elif c == 'H' and full_read:
             cur += n
 
 def CigarToList(cigar):

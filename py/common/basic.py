@@ -3,6 +3,8 @@ import sys
 
 import os
 
+from typing import Callable, Union
+
 rc = dict()
 rc['A'] = 'T'
 rc['C'] = 'G'
@@ -28,7 +30,7 @@ def ensure_dir_existance(dir):
         os.makedirs(dir)
 
 def parseNumber(s, pos=0):
-    # type: (str, int) -> int
+    # type: (str, int) -> Union[None, float, int]
     while pos < len(s) and s[pos] not in "0123456789":
         pos += 1
     if pos == len(s):
@@ -43,7 +45,7 @@ def parseNumber(s, pos=0):
         return int(res)
 
 def parseNegativeNumber(s, pos=0):
-    # type: (str, int) -> int
+    # type: (str, int) -> Union[None, float, int]
     while pos < len(s) and s[pos] not in "0123456789":
         pos += 1
     minus = False
@@ -62,17 +64,17 @@ def parseNegativeNumber(s, pos=0):
     else:
         return int(res)
 
-def smallest2(arr):
-    # type: (list[int]) -> tuple[int, int]
+def best2(arr, better = lambda x, y: x < y):
+    # type: (list[int], Callable[[int, int], bool]) -> tuple[int,int]
     assert len(arr) >= 2
     res = [0, 1]
-    if arr[1] < arr[0]:
+    if better(arr[1], arr[0]):
         res = [1, 0]
     for i, val in enumerate(arr[2:], 2):
-        if val < arr[res[1]]:
+        if better(val, arr[res[1]]):
             res[1] = i
-            if val < arr[res[0]]:
-                arr = arr[::-1]
+            if better(val, arr[res[0]]):
+                res = res[::-1]
     return (res[0], res[1])
 
 def merge(*iterables):
@@ -81,3 +83,20 @@ def merge(*iterables):
         if cur != prev:
             yield cur
             prev = cur
+
+class OStreamWrapper:
+    def __init__(self, *streams):
+        self.streams = list(streams)
+
+    def write(self, string):
+        for stream in self.streams:
+            stream.write(string)
+
+    def writelines(self, lines):
+        for line in lines:
+            for stream in self.streams:
+                stream.write(line)
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()

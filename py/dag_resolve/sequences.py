@@ -68,7 +68,7 @@ class TmpInfo:
 class Contig:
     def __init__(self, seq, id, info = []):
         # type: (str, int, TmpInfo) -> Contig
-        self.seq = seq
+        self.seq = seq.upper()
         self.id = id
         if isinstance(info, list):
             info = TmpInfo(info)
@@ -121,22 +121,23 @@ class Segment:
 
 
 class AlignmentPiece:
-    def __init__(self, seg_from, seg_to, cigar = None):
-        # type: (Segment, Segment, basestring) -> AlignmentPiece
+    def __init__(self, seg_from, seg_to, rc, cigar = None):
+        # type: (Segment, Segment, bool, str) -> AlignmentPiece
         self.seg_from = seg_from
         self.seg_to = seg_to
+        self.rc = rc
         self.cigar = cigar
 
     def __str__(self):
-        # type: () -> basestring
+        # type: () -> str
         return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ")"
 
 class Read:
     def __init__(self, rec):
         # type: (SeqIO.SeqRecord) -> Read
         self.id = rec.id
-        self.seq = rec.seq
-        self.alignments = []
+        self.seq = rec.seq.upper()
+        self.alignments = [] # type: list[AlignmentPiece]
 
     def __len__(self):
         # type: () -> int
@@ -151,7 +152,14 @@ class Read:
             ls = cigar_list[0][1]
         if cigar_list[-1][0] in "HS":
             rs = cigar_list[-1][1]
-        self.alignments.append(AlignmentPiece(Segment(self, ls, len(self.seq) - rs), Segment(contig, rec.pos, rec.pos + rec.alen), rec.cigar))
+        if not rec.rc:
+            self.alignments.append(AlignmentPiece(Segment(self, ls, len(self.seq) - rs), Segment(contig, rec.pos, rec.pos + rec.alen), rec.rc, rec.cigar))
+        else:
+            self.alignments.append(AlignmentPiece(Segment(self, len(self.seq) - ls, rs), Segment(contig, rec.pos, rec.pos + rec.alen), rec.rc, rec.cigar))
+
+    def __str__(self):
+        return "Read:" + str(self.id) + "[" + ".".join(map(str, self.alignments)) + "]"
+
 
     def inter(self, other):
         # type: (Segment) -> bool
@@ -185,6 +193,7 @@ class ReadCollection:
         # type: (ReadCollection) -> None
         for read in other_collection.reads.values():
             self.add(read)
+        return self
 
     def addNewRead(self, rec):
         # type: (SeqIO.SeqRecord) -> Read
@@ -202,6 +211,25 @@ class ReadCollection:
             return
         self.reads[rname].AddSamAlignment(rec, self.contigs[int(rec.tname)])
 
+    def loadFromSam(self, sam):
+        # type: (sam_parser.Samfile) -> None
+        for rec in sam:
+            if rec.is_unmapped:
+                continue
+            if rec.query_name not in self.reads:
+                new_read = Read(SeqIO.SeqRecord(None, rec.query_name))
+                self.add(new_read)
+            else:
+                new_read = self.reads[rec.query_name]
+            if not rec.secondary and new_read.seq is None:
+                if rec.rc:
+                    new_read.seq = basic.RC(rec.seq)
+                else:
+                    new_read.seq = rec.seq
+            self.addNewAlignment(rec)
+        for read in self.reads.values():
+            assert read.seq is not None, "Read " + read.id + " was aligned but had no primary alignments"
+
     def add(self, read):
         # type: (Read) -> None
         self.reads[read.id] = read
@@ -213,6 +241,26 @@ class ReadCollection:
             if condition(read):
                 res.add(read)
         return res
+
+    def copy(self):
+        # type: () -> ReadCollection
+        return self.filter(lambda read: True)
+
+    def remove(self, read):
+        # type: (Read) -> None
+        if read.id in self.reads:
+            del self.reads[read.id]
+
+    def minus(self, other):
+        # type: (ReadCollection) -> ReadCollection
+        return self.filter(lambda read: read.id not in other)
+
+    def minusAll(self, others):
+        # type: (list[ReadCollection]) -> ReadCollection
+        tmp = ReadCollection(self.contigs)
+        for other in others:
+            tmp.extend(other)
+        return self.minus(tmp)
 
     def inter(self, segment):
         # type: (Segment) -> ReadCollection

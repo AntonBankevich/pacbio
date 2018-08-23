@@ -2,7 +2,7 @@ import sys
 import os
 
 sys.path.append("py")
-from common import basic
+from common import basic, SeqIO
 from dag_resolve import repeat_graph, sequences, align_tools, resolver
 
 if __name__ == "__main__":
@@ -17,6 +17,8 @@ if __name__ == "__main__":
     dir = sys.argv[5]
     basic.ensure_dir_existance(dir)
     # sys.stderr = open(os.path.join(dir, "stderr.log"), "w")
+    log = open(os.path.join(dir, "log.info"), "w")
+    sys.stdout = basic.OStreamWrapper(sys.stdout, log)
     sys.stdout.write("Collecting contig collection\n")
     edge_sequences = sequences.ContigCollection().loadFromFasta(open(edge_sequences, "r"))
     sys.stdout.write("Loading dot\n")
@@ -27,9 +29,10 @@ if __name__ == "__main__":
     reads = sequences.ReadCollection().loadFromFasta(open(reads, "r"))
     alignment = al.align(reads, sequences.ContigCollection(graph.E.values()))
     sys.stdout.write("Filling alignments\n")
-    graph.fillAlignments(reads.asSeqRecords(), alignment)
+    graph.fillAlignments(reads.asSeqRecords(), alignment, False)
     sys.stdout.write("Resolving repeats\n")
     res = resolver.GraphResolver(graph, resolver.VertexResolver(graph, al), resolver.EdgeResolver(graph, al))
     res.resolve()
     sys.stdout.write("Printing results\n")
     res.lineStorage.printToFile(sys.stdout)
+    log.close()

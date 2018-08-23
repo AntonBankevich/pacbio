@@ -67,9 +67,10 @@ class Reader:
 
 class SeqRecord:
     def __init__(self, seq, id, qual = None):
+        # type: (str, str, str) -> SeqRecord
         assert qual is None or len(qual) == len(seq)
         self.id = id
-        self.seq = seq
+        self.seq = seq.upper()
         self.qual = qual
         self.info = None
 

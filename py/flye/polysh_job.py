@@ -11,6 +11,7 @@ import polish as pol
 from flye import config
 
 logger = logging.getLogger()
+logger.setLevel(logging.ERROR)
 class Job(object):
     """
     Describes an abstract list of jobs with persistent

@@ -1,11 +1,14 @@
+import itertools
 import os
 
 from typing import Optional
 
 from common import basic, sam_parser, SeqIO
 from dag_resolve import repeat_graph, sequences
+from dag_resolve.params import clean
 from flye import polysh_job
 from flye.alignment import make_alignment
+
 
 class AlignedSequences:
     def __init__(self, seq_from, seq_to):
@@ -18,9 +21,19 @@ class AlignedSequences:
         self.aligned = False # type: bool
         self.rc = False # type: bool
 
+    def printToFile(self, handler):
+        handler.write("Aligned sequences: " + str(self.first) + " " + str(self.last) + " " +
+                      str(self.alignment[self.first]) + " " + str(self.alignment[self.last]) + "\n")
+        handler.write(self.seq_to[self.first:self.last + 1] + "\n")
+        handler.write(self.seq_from[self.alignment[self.first]:self.alignment[self.last] + 1] + "\n")
+
+    def __getitem__(self, item):
+        # type: (int) -> int
+        return self.alignment[item]
+
     def addCigar(self, cigar, pos):
         # type: (str, int) -> None
-        for seq_pos, contig_pos in sam_parser.ParseCigar(cigar, len(self.seq_to), pos - 1):
+        for seq_pos, contig_pos in sam_parser.ParseCigar(cigar, len(self.seq_to), pos - 1, True):
             # if contig_pos >= len(self.alignment):
             #     print contig_pos, len(self.alignment), self.rc, pos
             #     print cigar
@@ -134,10 +147,14 @@ class AlignedSequences:
         return (self.findPreviousMatch(l), self.findNextMatch(r))
 
 class Consensus:
-    def __init__(self, seq, cov):
+    def __init__(self, seq, cov, full_seq = None):
         # type: (str, list[int]) -> Consensus
         self.seq = seq
         self.cov = cov
+        if full_seq is None:
+            self.full_seq = seq
+        else:
+            self.full_seq = full_seq
 
     def printQuality(self, handler, cov_threshold = 15):
         # type: (file, int) -> None
@@ -148,12 +165,16 @@ class Consensus:
                 handler.write(c.upper())
         handler.write("\n")
 
-    def cut(self, cov_threshold = 15):
+    def cut(self, cov_threshold = 15, length = None):
         l = 0
         while l < len(self.seq) and self.cov[l] >= cov_threshold:
             l += 1
-        return self.seq[:l]
+        if length is not None:
+            l = min(l, length)
+        return Consensus(self.seq[:l], self.cov[:l], self.seq)
 
+    def __len__(self):
+        return len(self.seq)
 
 class Aligner:
     def __init__(self, dir, threads = 16):
@@ -167,6 +188,29 @@ class Aligner:
         basic.ensure_dir_existance(name)
         return name
 
+    def CheckSequences(self, reads, reads_file):
+        # type: (sequences.ReadCollection, str) -> bool
+        if not os.path.exists(reads_file):
+            return False
+        try:
+            for rec, read in itertools.izip_longest(SeqIO.parse_fasta(open(reads_file, "r")), reads):
+                if str(rec.id) != str(read.id) or rec.seq != read.seq:
+                    return False
+            return True
+        except:
+            return False
+
+    def CheckAndWriteSequences(self, reads, reads_file):
+        # type: (sequences.ReadCollection, str) -> bool
+        if self.CheckSequences(reads, reads_file):
+            return True
+        else:
+            f = open(reads_file, "w")
+            for read in reads:
+                SeqIO.write(read, f, "fasta")
+            f.close()
+            return False
+
     def align(self, reads, consensus):
         # type: (sequences.ReadCollection, sequences.ContigCollection) -> sam_parser.Samfile
         dir = self.next_dir()
@@ -176,13 +220,12 @@ class Aligner:
         alignment_file = os.path.join(dir, "alignment.sam")
         basic.ensure_dir_existance(dir)
         basic.ensure_dir_existance(alignment_dir)
-        reads_handler = open(reads_file, "w")
-        reads.print_fasta(reads_handler)
-        reads_handler.close()
-        contigs_handler = open(contigs_file, "w")
-        consensus.print_fasta(contigs_handler)
-        contigs_handler.close()
-        make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
+        same_reads = self.CheckAndWriteSequences(reads, reads_file)
+        same_contigs = self.CheckAndWriteSequences(consensus, contigs_file)
+        if same_reads and same_contigs and not clean and os.path.exists(alignment_file):
+            print "Alignment reused"
+        else:
+            make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
     def matchingAlignment(self, seqs, contig):
@@ -197,11 +240,26 @@ class Aligner:
             tid = int(rec.query_name)
             if res[tid].aligned and res[tid].rc != rec.rc:
                 continue
-                # assert False, "Strait and reverse alignments of the same read"
+                # assert False, "Straight and reverse alignments of the same read"
             if not res[tid].aligned and rec.rc:
                 res[tid].rc = True
                 res[tid].seq_from = basic.RC(res[tid].seq_from)
             res[tid].addCigar(rec.cigar, rec.pos)
+        return res
+
+    def ReadToAlignedSequences(self, read, contig):
+        # type: (sequences.Read, sequences.Contig) -> AlignedSequences
+        res = AlignedSequences(read.seq, contig.seq)
+        for rec in read.alignments:
+            if rec.seg_to.contig.id != contig.id:
+                continue
+            if res.aligned and res.rc != rec.rc:
+                continue
+                # assert False, "Straight and reverse alignments of the same read"
+            if not res.aligned and rec.rc:
+                res.rc = True
+                res.seq_from = basic.RC(res.seq_from)
+            res.addCigar(rec.cigar, rec.seg_to.left)
         return res
 
     def polish(self, reads, consensus):
@@ -218,9 +276,43 @@ class Aligner:
         res = polysh_job.polish_from_disk(dir, consensus_file_name, reads_file_name)
         return list(SeqIO.parse_fasta(open(res, "r")))[0].seq
 
-    def polishAndAnalyse(self, reads, consensus):
-        # type: (sequences.ReadCollection, Contig) -> Consensus
-        seq = sequences.Contig(self.polish(reads, consensus), "Noname")
+    def polishNoConsensus(self, reads, edge):
+        # type: (sequences.ReadCollection, repeat_graph.Edge) -> str
+        dir = self.next_dir()
+        consensus_file_name = os.path.join(dir, "ref.fasta")
+        consensus_file = open(consensus_file_name, "w")
+        best_match = 0
+        best = ""
+        best_id = None
+        for read in reads:
+            # print read.id
+            for alignment in read.alignments:
+                # print alignment.__str__()
+                if alignment.seg_to.contig.id == edge.id:
+                    if not alignment.rc:
+                        if alignment.seg_to.left < 100 and len(read) - alignment.seg_from.left > 3500 and alignment.seg_from.left > best_match:
+                            best = read.seq[alignment.seg_from.left:]
+                            best_id = read.id
+                    # else:
+                    #     if alignment.seg_from.right > len(best):
+                    #         best = basic.RC(read.seq[:alignment.seg_from.right])
+                    #         best_id = read.id
+        consensus = SeqIO.SeqRecord(best, best_id)
+        SeqIO.write(consensus, consensus_file, "fasta")
+        consensus_file.close()
+        reads_file_name = os.path.join(dir, "reads.fasta")
+        reads_file = open(reads_file_name, "w")
+        reads.print_fasta(reads_file)
+        reads_file.close()
+        res = polysh_job.polish_from_disk(dir, consensus_file_name, reads_file_name)
+        return list(SeqIO.parse_fasta(open(res, "r")))[0].seq
+
+    def polishAndAnalyse(self, reads, consensus, polishing_base = None):
+        # type: (sequences.ReadCollection, Edge, sequences.Contig) -> Consensus
+        if polishing_base is not None:
+            seq = sequences.Contig(self.polish(reads, polishing_base), "Noname")
+        else:
+            seq = sequences.Contig(self.polishNoConsensus(reads, consensus), "Noname")
         res = [0] * (len(seq) + 1)
         for rec in self.align(reads, sequences.ContigCollection([seq])):
             if rec.is_unmapped:

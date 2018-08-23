@@ -43,6 +43,20 @@ class Phasing:
             handler.write(state.char())
         handler.write("\n")
 
+    def ambibuousRate(self):
+        res = 0
+        for state in self.states:
+            if state.isAmbiguous():
+                res += 1
+        return float(state) / len(self.states)
+
+    def called(self):
+        res = 0
+        for state in self.states:
+            if not state.isAmbiguous():
+                res += 1
+        return res
+
     def __getitem__(self, item):
         # type: (int) -> DivergenceState
         return self.states[item]
@@ -78,7 +92,7 @@ class Divergence:
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def printToFile(self, handler):
+    def printToFile(self, handler, delim = " "):
         # type: (file) -> None
         handler.write(str(self.edge.id) + ": " + str(self.pos) + "\n")
         for state in self.states:
@@ -101,13 +115,13 @@ class Line:
         assert edge.info.unique
         self.chain = [LineSegment(self, 0, edge, edge.seq, [], edge.reads)] # type: list[LineSegment]
 
-    def extendRight(self, edge, seq, reads):
+    def extendRight(self, edge, seq, phasing, reads):
         # type: (repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
-        self.chain.append(LineSegment(self, self.chain[-1].pos + 1, edge, seq, reads))
+        self.chain.append(LineSegment(self, self.chain[-1].pos + 1, edge, seq, phasing, reads))
 
     def extendLeft(self, edge, seq, reads):
         # type: (repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
-        self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, reads))
+        self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, phasing, reads))
 
     def rightSegment(self):
         # type: () -> LineSegment
@@ -161,9 +175,9 @@ class LineStorage:
                 return False
         return True
 
-    def extendRight(self, line, edge, seq, reads):
-        # type: (Line, repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
-        line.extendRight(edge, seq, reads)
+    def extendRight(self, line, edge, seq, phasing, reads):
+        # type: (Line, repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
+        line.extendRight(edge, seq, phasing, reads)
         self.addSegment(line.rightSegment())
 
     def printToFile(self, handler):
