@@ -160,6 +160,18 @@ class Read:
     def __str__(self):
         return "Read:" + str(self.id) + "[" + ".".join(map(str, self.alignments)) + "]"
 
+    def contigAlignment(self, contig):
+        left = None
+        right = None
+        for alignment in self.alignments:
+            if alignment.seg_to.contig.id != contig.id:
+                continue
+            if left is None or left > alignment.seg_to.left:
+                left = alignment.seg_to.left
+            if right is None or right < alignment.seg_to.right:
+                right = alignment.seg_to.right
+        return left, right
+
 
     def inter(self, other):
         # type: (Segment) -> bool

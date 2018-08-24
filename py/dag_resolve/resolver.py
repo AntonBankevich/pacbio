@@ -117,12 +117,12 @@ class EdgeResolver:
 
     def determinePhasing(self, read, consensus, div_list):
         # type: (sequences.Read, sequences.Contig, list[line_tools.Divergence]) -> line_tools.Phasing
-        print "Determining phasing of read", read.id
+        # print "Determining phasing of read", read.id
         seq = read.seq
         res = line_tools.Phasing()
         alignment = self.aligner.ReadToAlignedSequences(read, consensus)
-        print "from-to:", alignment.first, alignment.last
         # alignment = self.aligner.matchingAlignment([read.seq], consensus)[0]
+        print "from-to:", read.__str__()
         if not alignment.aligned:
             print "WARNING: ALIGNED READ DID NOT ALIGN:", read.id
             return line_tools.Phasing()
@@ -146,15 +146,15 @@ class EdgeResolver:
                         res.add(div.states[i])
                         break
             toprint.append(res[-1].char())
-        sys.stdout.write("".join(toprint) + "\n")
+        sys.stdout.write("".join(toprint[::-1]) + "\n")
         return res
 
     def callRead(self, read, consensus, div_list, phasings):
         # type: (sequences.Read, sequences.Contig, list[line_tools.Divergence], list[line_tools.Phasing]) -> Tuple[Optional[int], bool]
         print "Calling read", read.id
         read_phasing = self.determinePhasing(read, consensus, div_list)
-        for phasing in phasings:
-            phasing.printToFile(sys.stdout)
+        # for phasing in phasings:
+        #     phasing.printToFile(sys.stdout)
         dists = []
         phasings_diff = self.comparePhasings(read_phasing, phasings)
         for diff in phasings_diff:
@@ -169,7 +169,7 @@ class EdgeResolver:
         if dists[best[0]] > 0.2 or dists[best[1]] < 0.2 or dists[best[1]] < dists[best[0]] * 1.5:
             print "Fail"
             return None, False
-        if read_phasing.called() >= 20 and dists[best[0]] < 0.1 and dists[best[0]] < 1. / len(phasings) and dists[best[1]] > 0.3:
+        if read_phasing.called() >= 8 and dists[best[0]] < 0.1 and dists[best[0]] < 1. / len(phasings) and dists[best[1]] > 0.5:
             print "Call full success:", best[0]
             return best[0], True
         else:
@@ -233,7 +233,7 @@ class EdgeResolver:
                                    read.seq[alignment.seg_from.right - alignment.seg_to.right + pos:]
                             best_match = alignment.seg_from.right
                             best_id = read.id
-        # best = tail.alignment.seq_from[:tail.alignment[tail.alignment.last]] + tail.alignment.seq_to[tail.alignment.last:]
+        best = tail.alignment.seq_from[:tail.alignment[tail.alignment.last]] + tail.alignment.seq_to[tail.alignment.last:]
         return sequences.Contig(best, best_id)
 
 #This method is not used
@@ -257,19 +257,22 @@ class EdgeResolver:
         phased_reads = sequences.ReadCollection(sequences.ContigCollection([e]))
         for tail in tails:
             phased_reads.extend(tail.reads)
-        print len(e.reads), len(phased_reads)
         undecided = e.reads.minus(phased_reads)
+        print len(e.reads), len(phased_reads), len(undecided)
         cur_depth = self.alignAndCutTails(tails)
+        # edge_consensus = self.aligner.CalculateConsensusCoverage(e, e.reads)
+        # edge_consensus.printCoverage(sys.stdout, 50)
         while True:
             print "Starting new iteration with current depth:", cur_depth
-            print len(phased_reads), "reads already classified.", len(undecided), "reads left to classify"
+            print len(e.reads) - len(undecided), "reads already classified.", len(undecided), "reads left to classify"
             line_reads = []  # type: list[sequences.ReadCollection]
             for tail in tails:
                 line_reads.append(sequences.ReadCollection(sequences.ContigCollection([e])))
             print "Tail lengths: ", map(lambda tail: len(tail.tail_consensus), tails)
             divergences, phasings = self.findDivergence(tails)
-            if len(divergences) > 5:
-                interesting_reads = undecided.inter(e.prefix(cur_depth))
+            if len(divergences) >= 5:
+                interesting_reads = list(undecided.inter(e.prefix(cur_depth)).reads.values())
+                interesting_reads = sorted(interesting_reads, key = lambda read: read.contigAlignment(e)[1])
                 print "Attempting to classify", len(interesting_reads), "reads"
                 # print "Aligning reads to tails"
                 # tail_alignment = self.AlignToTails(tails, interesting_reads)
@@ -280,17 +283,18 @@ class EdgeResolver:
                     #     print read
                     # read_to_tail = tail_alignment.reads[read.id]
                     call_result, permanent = self.callRead(read, e, divergences, phasings)
-                    # if call_result is not None:
-                    #     if permanent:
-                    #         tails[call_result].reads.add(read)
-                    #         undecided.remove(read)
-                    #     else:
-                    #         line_reads[call_result].add(read)
                     if call_result is not None:
-                        line_reads[call_result].add(read)
+                        if permanent:
+                            tails[call_result].reads.add(read)
+                            line_reads[call_result].add(read)
+                            undecided.remove(read)
+                        else:
+                            line_reads[call_result].add(read)
+                    # if call_result is not None:
+                    #     line_reads[call_result].add(read)
                 print "Calling results for", len(tails), "tails"
                 for tail, reads in zip(tails, line_reads):
-                    print tail.line.shortStr(), len(reads)
+                    print tail.line.shortStr(), len(reads), "of", len(interesting_reads)
             for tail, read_collection in zip(tails, line_reads):
                 read_collection.extend(tail.reads)
                 # tail.tail_consensus = self.aligner.polishAndAnalyse(read_collection, e.prefix(cur_depth + 3000).subcontig())
@@ -330,7 +334,7 @@ class GraphResolver:
 
     def resolve(self):
         print self.graph.V
-        potentially_resolvable = set([v1.id for v1 in self.graph.V.values() if len(v1.out) == 1])
+        potentially_resolvable = set([v1.id for v1 in self.graph.V.values() if v1.id not in [self.graph.source.id, self.graph.sink.id]])
         while True:
             unresolvable = set()
             cnt = 0

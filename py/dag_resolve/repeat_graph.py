@@ -85,8 +85,8 @@ class Graph:
         for eid, start, end, l, info in dot:
             if start == "source":
                 start = self.source.id
-            if start == "sink":
-                start = self.sink.id
+            if end == "sink":
+                end = self.sink.id
             seq = contigs[abs(eid)].seq
             if eid < 0:
                 seq = basic.RC(seq)
@@ -102,7 +102,7 @@ class Graph:
             if rec.is_unmapped:
                 continue
             edge_id = int(rec.tname)
-            if not fill_unique and rec.pos > 5000 and rec.pos + rec.alen + 5000 <= self.E[edge_id].__len__():
+            if not fill_unique and self.E[edge_id].info.unique and rec.pos > 5000 and rec.pos + rec.alen + 5000 <= self.E[edge_id].__len__():
                 continue
             self.E[edge_id].reads.add(reads[rec.query_name])
             self.E[edge_id].reads.addNewAlignment(rec)
@@ -126,9 +126,11 @@ class DotParser:
             unique = (s.find("black") != -1)
             if edge_ids is None or eid in edge_ids:
                 if "sink" in edge_ids[eid]:
-                    yield eid, v_from, -1, l, EdgeInfo(s, unique)
+                    yield eid, v_from, "sink", l, EdgeInfo(s, unique)
+                    continue
                 if "source" in edge_ids[eid]:
-                    yield eid, v_from, -2, l, EdgeInfo(s, unique)
+                    yield eid, "source", v_to, l, EdgeInfo(s, unique)
+                    continue
                 yield eid, v_from, v_to, l, EdgeInfo(s, unique)
 
 

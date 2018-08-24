@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from common import basic, sam_parser, SeqIO
-from dag_resolve import repeat_graph, sequences
+from dag_resolve import repeat_graph, sequences, params
 from dag_resolve.params import clean
 from flye import polysh_job
 from flye.alignment import make_alignment
@@ -156,7 +156,7 @@ class Consensus:
         else:
             self.full_seq = full_seq
 
-    def printQuality(self, handler, cov_threshold = 15):
+    def printQuality(self, handler, cov_threshold = params.reliable_coverage):
         # type: (file, int) -> None
         for c, a in zip(self.seq, self.cov):
             if a < cov_threshold:
@@ -165,7 +165,12 @@ class Consensus:
                 handler.write(c.upper())
         handler.write("\n")
 
-    def cut(self, cov_threshold = 15, length = None):
+    def printCoverage(self, handler, step):
+        # type: (file, int) -> None
+        for i, val in list(enumerate(self.cov))[::step]:
+            handler.write(str((i, val)) + "\n")
+
+    def cut(self, cov_threshold = params.reliable_coverage, length = None):
         l = 0
         while l < len(self.seq) and self.cov[l] >= cov_threshold:
             l += 1
@@ -290,7 +295,8 @@ class Aligner:
                 # print alignment.__str__()
                 if alignment.seg_to.contig.id == edge.id:
                     if not alignment.rc:
-                        if alignment.seg_to.left < 100 and len(read) - alignment.seg_from.left > 3500 and alignment.seg_from.left > best_match:
+                        if alignment.seg_to.left < 100 and len(read) - alignment.seg_from.left > 2000 and alignment.seg_from.left > best_match:
+                            best_match = alignment.seg_from.left
                             best = read.seq[alignment.seg_from.left:]
                             best_id = read.id
                     # else:
@@ -319,6 +325,19 @@ class Aligner:
                 continue
             res[rec.pos - 1] += 1
             res[rec.pos + rec.alen - 1] -= 1
+        for i in range(1, len(res)):
+            res[i] += res[i - 1]
+        return Consensus(seq.seq, res)
+
+    def CalculateConsensusCoverage(self, seq, reads):
+        # type: (sequences.Contig, sequences.ReadCollection) -> Consensuss
+        res = [0] * (len(seq) + 1)
+        for read in reads:
+            for alignment in read.alignments:
+                if alignment.seg_to.contig.id != seq.id:
+                    continue
+                res[alignment.seg_to.left - 1] += 1
+                res[alignment.seg_to.right - 1] -= 1
         for i in range(1, len(res)):
             res[i] += res[i - 1]
         return Consensus(seq.seq, res)
