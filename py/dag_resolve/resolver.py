@@ -1,11 +1,12 @@
+import itertools
 import sys
 
-from common import basic
-from dag_resolve import repeat_graph, line_tools, sequences, align_tools
-import itertools
-from typing import Generator, Iterator, Optional
+from typing import Optional
 
-radius = 10
+from common import basic
+from dag_resolve import repeat_graph, line_tools, sequences, align_tools, params
+from dag_resolve.params import radius
+
 
 class LineTail:
     def __init__(self, line, edge, tail_consensus, read_collection):
@@ -122,7 +123,7 @@ class EdgeResolver:
         res = line_tools.Phasing()
         alignment = self.aligner.ReadToAlignedSequences(read, consensus)
         # alignment = self.aligner.matchingAlignment([read.seq], consensus)[0]
-        print "from-to:", read.__str__()
+        # print "from-to:", read.__str__()
         if not alignment.aligned:
             print "WARNING: ALIGNED READ DID NOT ALIGN:", read.id
             return line_tools.Phasing()
@@ -137,6 +138,7 @@ class EdgeResolver:
                 continue
             nighborhood = seq[pos[0] - radius // 2: pos[1] + radius // 2 + 1]
             weights = [align_tools.AccurateAligner().align(nighborhood, state.seq) for state in div.states]
+            # print weights
             sorted_weights = sorted(weights)
             if sorted_weights[0] * 1.3 > sorted_weights[1]:
                 res.add(div.ambiguous)
@@ -149,7 +151,7 @@ class EdgeResolver:
         sys.stdout.write("".join(toprint[::-1]) + "\n")
         return res
 
-    def callRead(self, read, consensus, div_list, phasings):
+    def callRead(self, read, consensus, div_list, phasings, min_div_number = 5):
         # type: (sequences.Read, sequences.Contig, list[line_tools.Divergence], list[line_tools.Phasing]) -> Tuple[Optional[int], bool]
         print "Calling read", read.id
         read_phasing = self.determinePhasing(read, consensus, div_list)
@@ -159,7 +161,7 @@ class EdgeResolver:
         phasings_diff = self.comparePhasings(read_phasing, phasings)
         for diff in phasings_diff:
             called_div_number = len(diff) - diff.count(-1)
-            if called_div_number < 5:
+            if called_div_number < min_div_number:
                 dists.append(1)
             else:
                 dists.append(float(diff.count(0)) / called_div_number)
@@ -169,11 +171,27 @@ class EdgeResolver:
         if dists[best[0]] > 0.2 or dists[best[1]] < 0.2 or dists[best[1]] < dists[best[0]] * 1.5:
             print "Fail"
             return None, False
+        for phase in read_phasing:
+            phase.divergence.statistics.called += 1
+            if phase.isAmbiguous():
+                phase.divergence.statistics.ambig += 1
         if read_phasing.called() >= 8 and dists[best[0]] < 0.1 and dists[best[0]] < 1. / len(phasings) and dists[best[1]] > 0.5:
             print "Call full success:", best[0]
+            for i, val in enumerate(phasings_diff[best[0]]):
+                read_phasing[i].divergence.statistics.called += 1
+                if val == 1:
+                    read_phasing[i].divergence.statistics.correct += 1
+                elif val == 0:
+                    read_phasing[i].divergence.statistics.wrong += 1
             return best[0], True
         else:
             print "Call conditional success:", best[0]
+            for i, val in enumerate(phasings_diff[best[0]]):
+                read_phasing[i].divergence.statistics.called += 1
+                if val == 1:
+                    read_phasing[i].divergence.statistics.correct += 1
+                elif val == 0:
+                    read_phasing[i].divergence.statistics.wrong += 1
             return best[0], False
 
 
@@ -216,24 +234,55 @@ class EdgeResolver:
 
     def constructPolishingBase(self, reads, tail):
         # type: (sequences.ReadCollection, LineTail) -> sequences.Contig
-        if len(tail.tail_consensus.full_seq) > len(tail) + 300:
-            return sequences.Contig(tail.tail_consensus.full_seq, "old_consensus")
+        # if len(tail.tail_consensus.full_seq) > len(tail) + 300:
+        #     return sequences.Contig(tail.tail_consensus.full_seq, "old_consensus")
+
+        best = tail.alignment.seq_from[:tail.alignment[tail.alignment.last]] + tail.alignment.seq_to[tail.alignment.last:]
+        return sequences.Contig(best, "Auto")
+
         best_match = 0
         best = ""
         best_id = None
+        for read in tail.reads:
+            for alignment in read.alignments:
+                if alignment.seg_to.contig.id != tail.edge.id or alignment.rc:
+                    continue
+                if alignment.seg_to.right > tail.tail_consensus.__len__() - 500 and \
+                                                read.__len__() - alignment.seg_from.right + alignment.seg_to.right > tail.alignment.last + 3000:
+                    pos = tail.alignment.findPreviousMatch(alignment.seg_to.right)
+                    best = tail.alignment.seq_from[:tail.alignment[pos]] + \
+                           read.seq[alignment.seg_from.right - alignment.seg_to.right + pos:]
+                    best_match = read.__len__() - alignment.seg_from.right + alignment.seg_to.right
+                    best_id = read.id
+                    print "Best full:", read.__str__()
+                    print "Final best:", best_id
+                    return sequences.Contig(best, best_id)
+        if best_id is not None and best_match > tail.alignment.last + 2000:
+            print "Final best:", best_id
+            return sequences.Contig(best, best_id)
+        best_id = None
+        best = ""
+        best_match = 0
         for read in reads:
             for alignment in read.alignments:
                 if alignment.seg_to.contig.id == tail.edge.id:
                     if not alignment.rc:
-                        if read.__len__() - alignment.seg_from.right + alignment.seg_to.right - tail.alignment.last > 1000 and \
+                        if alignment.seg_to.left > 500 and alignment.seg_from.left > 300:
+                            continue
+                        if read.__len__() - alignment.seg_from.right + alignment.seg_to.right - tail.alignment.last > 2000 and \
                                         alignment.seg_to.right > tail.alignment.last - 500 and \
-                                        alignment.seg_from.right > best_match:
+                                        alignment.seg_from.right - alignment.seg_from.left > best_match:
                             pos = tail.alignment.findPreviousMatch(alignment.seg_to.right)
                             best = tail.alignment.seq_from[:tail.alignment[pos]] + \
                                    read.seq[alignment.seg_from.right - alignment.seg_to.right + pos:]
                             best_match = alignment.seg_from.right
                             best_id = read.id
-        best = tail.alignment.seq_from[:tail.alignment[tail.alignment.last]] + tail.alignment.seq_to[tail.alignment.last:]
+                            print "Best:", read.__str__()
+        if best_id is None:
+            print sequences.Contig("No next read")
+            return tail.edge.seq
+        print "Final best:", best_id
+        # best = tail.alignment.seq_from[:tail.alignment[tail.alignment.last]] + tail.alignment.seq_to[tail.alignment.last:]
         return sequences.Contig(best, best_id)
 
 #This method is not used
@@ -248,7 +297,6 @@ class EdgeResolver:
             res.loadFromSam(self.aligner.align(reads, sequences.ContigCollection([tail_contig])))
         return res
 
-
     def resolveEdge(self, e, tails):
         # type: (repeat_graph.Edge, list[LineTail]) -> bool
         tails = list(tails)
@@ -262,6 +310,7 @@ class EdgeResolver:
         cur_depth = self.alignAndCutTails(tails)
         # edge_consensus = self.aligner.CalculateConsensusCoverage(e, e.reads)
         # edge_consensus.printCoverage(sys.stdout, 50)
+        min_div_number = 5
         while True:
             print "Starting new iteration with current depth:", cur_depth
             print len(e.reads) - len(undecided), "reads already classified.", len(undecided), "reads left to classify"
@@ -270,6 +319,15 @@ class EdgeResolver:
                 line_reads.append(sequences.ReadCollection(sequences.ContigCollection([e])))
             print "Tail lengths: ", map(lambda tail: len(tail.tail_consensus), tails)
             divergences, phasings = self.findDivergence(tails)
+            cnt_end_div = 0
+            for div in divergences:
+                if div.pos[0] > cur_depth - 3000:
+                    cnt_end_div += 1
+            print "End-div:", cnt_end_div
+            # if cnt_end_div < 5:
+            #     print "Relaxing"
+            #     min_div_number = 2
+            #     params.reliable_coverage = 7
             if len(divergences) >= 5:
                 interesting_reads = list(undecided.inter(e.prefix(cur_depth)).reads.values())
                 interesting_reads = sorted(interesting_reads, key = lambda read: read.contigAlignment(e)[1])
@@ -277,12 +335,14 @@ class EdgeResolver:
                 # print "Aligning reads to tails"
                 # tail_alignment = self.AlignToTails(tails, interesting_reads)
                 # print "Alignment finished. Calling reads."
+                if cur_depth > len(e) - 1000:
+                    interesting_reads = e.reads
                 for read in interesting_reads:
                     # if read.id not in tail_alignment.reads:
                     #     print "WARNING: Read", read.id, "was not aligned to tails. Skipping."
                     #     print read
                     # read_to_tail = tail_alignment.reads[read.id]
-                    call_result, permanent = self.callRead(read, e, divergences, phasings)
+                    call_result, permanent = self.callRead(read, e, divergences, phasings, min_div_number)
                     if call_result is not None:
                         if permanent:
                             tails[call_result].reads.add(read)
@@ -292,6 +352,8 @@ class EdgeResolver:
                             line_reads[call_result].add(read)
                     # if call_result is not None:
                     #     line_reads[call_result].add(read)
+                for div in divergences:
+                    print div.pos, div.statistics.__str__()
                 print "Calling results for", len(tails), "tails"
                 for tail, reads in zip(tails, line_reads):
                     print tail.line.shortStr(), len(reads), "of", len(interesting_reads)
@@ -323,18 +385,24 @@ class GraphResolver:
         edgeResolver.lineStorage = self.lineStorage
 
     def resolveVertexForward(self, v):
+        # type: (repeat_graph.Vertex) -> None
         tails = sorted(self.vertexResolver.resolveVertex(v), key = lambda tail: tail.edge.id)
         for edge, tails_generator in itertools.groupby(tails, lambda tail: tail.edge):
-            tails_list = list(tails_generator)
-            finished = self.edgeResolver.resolveEdge(edge, tails_list)
-            if finished:
-                print "Successfully resolved edge", edge.id, "into", len(tails_list), "lines"
+            tails_list = list(tails_generator) # type: list[LineTail]
+            if edge.id in self.lineStorage.resolved_edges:
+                assert len(tails_list) == 1
+                tails_list[0].line.extendRight(edge, edge.seq, line_tools.Phasing(None), edge.reads)
+                print "Successfully connected line", tails_list[0].line.shortStr()
             else:
-                print "Failed to resolve edge", edge.id
+                finished = self.edgeResolver.resolveEdge(edge, tails_list)
+                if finished:
+                    print "Successfully resolved edge", edge.id, "into", len(tails_list), "lines"
+                else:
+                    print "Failed to resolve edge", edge.id
 
     def resolve(self):
         print self.graph.V
-        potentially_resolvable = set([v1.id for v1 in self.graph.V.values() if v1.id not in [self.graph.source.id, self.graph.sink.id]])
+        potentially_resolvable = set([v.id for v in self.graph.V.values() if v.id not in [self.graph.source.id, self.graph.sink.id]])
         while True:
             unresolvable = set()
             cnt = 0

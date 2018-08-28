@@ -1,6 +1,8 @@
 import itertools
 import os
 
+import sys
+sys.path.append("py")
 from typing import Optional
 
 from common import basic, sam_parser, SeqIO
@@ -487,8 +489,13 @@ class AccurateAligner:
 
 
 
-
-
+if __name__ == "__main__":
+    dir = sys.argv[1]
+    query = sys.argv[2]
+    target = sys.argv[3]
+    aln = Aligner(dir)
+    contigs = sequences.ContigCollection().loadFromFasta(open(target, "r"))
+    sequences.ReadCollection(contigs).loadFromSam(aln.align(sequences.ReadCollection().loadFromFasta(open(query, "r")), contigs)).print_alignments(sys.stdout)
 
 
 

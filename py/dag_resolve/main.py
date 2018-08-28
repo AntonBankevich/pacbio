@@ -30,6 +30,7 @@ if __name__ == "__main__":
     alignment = al.align(reads, sequences.ContigCollection(graph.E.values()))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
+    # graph.E[-14].reads.print_alignments(sys.stdout)
     sys.stdout.write("Resolving repeats\n")
     res = resolver.GraphResolver(graph, resolver.VertexResolver(graph, al), resolver.EdgeResolver(graph, al))
     res.resolve()

@@ -160,6 +160,15 @@ class Read:
     def __str__(self):
         return "Read:" + str(self.id) + "[" + ".".join(map(str, self.alignments)) + "]"
 
+    def setSeq(self, seq):
+        assert self.seq == "", "Changing assigned read sequence"
+        self.seq = seq
+        for al in self.alignments:
+            if al.rc:
+                al.seg_from.left += len(seq)
+            else:
+                al.seg_from.right += len(seq)
+
     def contigAlignment(self, contig):
         left = None
         right = None
@@ -224,23 +233,24 @@ class ReadCollection:
         self.reads[rname].AddSamAlignment(rec, self.contigs[int(rec.tname)])
 
     def loadFromSam(self, sam):
-        # type: (sam_parser.Samfile) -> None
+        # type: (sam_parser.Samfile) -> ReadCollection
         for rec in sam:
             if rec.is_unmapped:
                 continue
             if rec.query_name not in self.reads:
-                new_read = Read(SeqIO.SeqRecord(None, rec.query_name))
+                new_read = Read(SeqIO.SeqRecord("", rec.query_name))
                 self.add(new_read)
             else:
                 new_read = self.reads[rec.query_name]
-            if not rec.secondary and new_read.seq is None:
+            if "H" not in rec.cigar and new_read.seq == "":
                 if rec.rc:
-                    new_read.seq = basic.RC(rec.seq)
+                    new_read.setSeq(basic.RC(rec.seq))
                 else:
-                    new_read.seq = rec.seq
+                    new_read.setSeq(rec.seq)
             self.addNewAlignment(rec)
         for read in self.reads.values():
-            assert read.seq is not None, "Read " + read.id + " was aligned but had no primary alignments"
+            assert read.seq != "", "Read " + read.id + " was aligned but had no primary alignments"
+        return self
 
     def add(self, read):
         # type: (Read) -> None
@@ -287,7 +297,7 @@ class ReadCollection:
         return self.reads.values().__iter__()
 
     def __getitem__(self, read_id):
-        # type: (basestring) -> Read
+        # type: (str) -> Read
         return self.reads[read_id.split()[0]]
 
     def __len__(self):

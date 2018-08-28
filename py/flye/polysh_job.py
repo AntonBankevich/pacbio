@@ -112,7 +112,7 @@ class JobPolishing(Job):
 
 class Args:
     def __init__(self):
-        self.num_iters = 1
+        self.num_iters = 2
         self.platform = "pacbio"
         self.threads = 8
 

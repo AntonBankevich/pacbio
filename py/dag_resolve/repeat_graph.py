@@ -126,11 +126,9 @@ class DotParser:
             unique = (s.find("black") != -1)
             if edge_ids is None or eid in edge_ids:
                 if "sink" in edge_ids[eid]:
-                    yield eid, v_from, "sink", l, EdgeInfo(s, unique)
-                    continue
+                    v_to = "sink"
                 if "source" in edge_ids[eid]:
-                    yield eid, "source", v_to, l, EdgeInfo(s, unique)
-                    continue
+                    v_from = "source"
                 yield eid, v_from, v_to, l, EdgeInfo(s, unique)
 
 

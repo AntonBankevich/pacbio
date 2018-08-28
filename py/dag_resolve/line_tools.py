@@ -69,6 +69,15 @@ class Phasing:
         # type: () -> int
         return self.states.__len__()
 
+class Statistics:
+    def __init__(self):
+        self.correct = 0 # type: int
+        self.wrong = 0 # type: int
+        self.ambig = 0 # type: int
+        self.called = 0 # type: int
+
+    def __str__(self):
+        return str((self.correct, self.wrong, self.ambig, self.called))
 
 class Divergence:
     def __init__(self, edge, pos, states = []):
@@ -79,6 +88,7 @@ class Divergence:
         self.ambiguous = DivergenceState(self, None, -1)
         for state in states:
             self.addState(state)
+        self.statistics = Statistics()
 
     def addState(self, state):
         # type: (str) -> DivergenceState
@@ -116,11 +126,11 @@ class Line:
         self.chain = [LineSegment(self, 0, edge, edge.seq, [], edge.reads)] # type: list[LineSegment]
 
     def extendRight(self, edge, seq, phasing, reads):
-        # type: (repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
+        # type: (repeat_graph.Edge, str, sequences.ReadCollection) -> None
         self.chain.append(LineSegment(self, self.chain[-1].pos + 1, edge, seq, phasing, reads))
 
     def extendLeft(self, edge, seq, reads):
-        # type: (repeat_graph.Edge, basestring, sequences.ReadCollection) -> None
+        # type: (repeat_graph.Edge, str, sequences.ReadCollection) -> None
         self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, phasing, reads))
 
     def rightSegment(self):
