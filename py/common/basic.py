@@ -1,4 +1,5 @@
 import heapq
+import shutil
 import sys
 
 import os
@@ -28,6 +29,11 @@ def ensure_dir_existance(dir):
     # type: (str) -> None
     if not os.path.exists(dir):
         os.makedirs(dir)
+
+def recreate(dir):
+    if os.path.exists(dir):
+        shutil.rmtree(dir)
+    ensure_dir_existance(dir)
 
 def parseNumber(s, pos=0):
     # type: (str, int) -> Union[None, float, int]
@@ -100,3 +106,16 @@ class OStreamWrapper:
     def flush(self):
         for stream in self.streams:
             stream.flush()
+
+def Link(arr, dist):
+    if len(arr) == 0:
+        return
+    arr = sorted([(pos, i) for i, pos in enumerate(arr)])
+    left = arr[0]
+    prev = arr[0]
+    for val in arr[1:]:
+        if val - prev > dist:
+            yield left, prev
+            left = val
+        prev = val
+    yield prev, arr[-1]

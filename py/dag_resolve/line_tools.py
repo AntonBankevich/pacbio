@@ -39,9 +39,11 @@ class Phasing:
 
     def printToFile(self, handler):
         # type: (file) -> None
-        for state in self.states:
-            handler.write(state.char())
+        handler.write(str(self))
         handler.write("\n")
+
+    def __str__(self):
+        return "".join(map(lambda state:state.char(), self.states))
 
     def ambibuousRate(self):
         res = 0
@@ -124,6 +126,8 @@ class Line:
         # type: (repeat_graph.Edge) -> Line
         assert edge.info.unique
         self.chain = [LineSegment(self, 0, edge, edge.seq, [], edge.reads)] # type: list[LineSegment]
+        self.nextLine = None
+        self.id = edge.id
 
     def extendRight(self, edge, seq, phasing, reads):
         # type: (repeat_graph.Edge, str, sequences.ReadCollection) -> None
@@ -153,13 +157,17 @@ class Line:
     def __getitem__(self, item):
         # type: (int) -> LineSegment
         return self.chain[item - self.chain[0].pos]
+    
+    def merge(self, other):
+        # type: (Line) -> None
+        self.nextLine = other
 
 class LineStorage:
     def __init__(self, g):
         # type: (repeat_graph.Graph) -> LineStorage
         self.g = g
         self.lines = [] #type: list[Line]
-        self.resolved_edges = dict() #type: dict[int, LineSegment]
+        self.resolved_edges = dict() #type: dict[int, list[LineSegment]]
         for edge in g.E.values():
             if edge.info.unique:
                 self.addLine(Line(edge))

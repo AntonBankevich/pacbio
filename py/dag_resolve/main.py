@@ -3,7 +3,7 @@ import os
 
 sys.path.append("py")
 from common import basic, SeqIO
-from dag_resolve import repeat_graph, sequences, align_tools, resolver
+from dag_resolve import repeat_graph, sequences, align_tools, resolver, params
 
 if __name__ == "__main__":
     sys.stdout.write("Started\n")
@@ -11,11 +11,16 @@ if __name__ == "__main__":
     dot_file = sys.argv[2]
     reads = sys.argv[3]
     edges = dict()
-    for s in sys.argv[4].split(";"):
-        s = s.split(",")
-        edges[int(s[0])] = s[1:]
+    if sys.argv[4] == "":
+        edges = None
+    else:
+        for s in sys.argv[4].split(";"):
+            s = s.split(",")
+            edges[int(s[0])] = s[1:]
     dir = sys.argv[5]
     basic.ensure_dir_existance(dir)
+    if params.clean:
+        basic.recreate(dir)
     # sys.stderr = open(os.path.join(dir, "stderr.log"), "w")
     log = open(os.path.join(dir, "log.info"), "w")
     sys.stdout = basic.OStreamWrapper(sys.stdout, log)
@@ -30,10 +35,9 @@ if __name__ == "__main__":
     alignment = al.align(reads, sequences.ContigCollection(graph.E.values()))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
-    # graph.E[-14].reads.print_alignments(sys.stdout)
     sys.stdout.write("Resolving repeats\n")
     res = resolver.GraphResolver(graph, resolver.VertexResolver(graph, al), resolver.EdgeResolver(graph, al))
     res.resolve()
     sys.stdout.write("Printing results\n")
-    res.lineStorage.printToFile(sys.stdout)
+    res.printResults(sys.stdout)
     log.close()

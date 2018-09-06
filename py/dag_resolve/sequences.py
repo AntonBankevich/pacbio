@@ -39,7 +39,7 @@ class ContigCollection():
         return self.main
 
     def print_names(self, handler):
-        # type: (file) -> object
+        # type: (file) -> None
         for contig in self:
             handler.write(contig.id + " " + " ".join(contig.info.misc) + "\n")
 
@@ -132,9 +132,9 @@ class AlignmentPiece:
         # type: () -> str
         return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ")"
 
-class Read:
+class AlignedRead:
     def __init__(self, rec):
-        # type: (SeqIO.SeqRecord) -> Read
+        # type: (SeqIO.SeqRecord) -> AlignedRead
         self.id = rec.id
         self.seq = rec.seq.upper()
         self.alignments = [] # type: list[AlignmentPiece]
@@ -157,7 +157,11 @@ class Read:
         else:
             self.alignments.append(AlignmentPiece(Segment(self, len(self.seq) - ls, rs), Segment(contig, rec.pos, rec.pos + rec.alen), rec.rc, rec.cigar))
 
+    def sort(self):
+        self.alignments = sorted(self.alignments, key = lambda alignment: alignment.seg_from.left)
+
     def __str__(self):
+        self.sort()
         return "Read:" + str(self.id) + "[" + ".".join(map(str, self.alignments)) + "]"
 
     def setSeq(self, seq):
@@ -169,7 +173,11 @@ class Read:
             else:
                 al.seg_from.right += len(seq)
 
+    def removeContig(self, contig):
+        self.alignments = filter(lambda alignment: alignment.seg_to.contig.id != contig.id, self.alignments)
+
     def contigAlignment(self, contig):
+        # type: (Contig) -> tuple[int,int]
         left = None
         right = None
         for alignment in self.alignments:
@@ -207,7 +215,7 @@ class Read:
 class ReadCollection:
     def __init__(self, contigs = ContigCollection()):
         # type: (ContigCollection) -> ReadCollection
-        self.reads = dict() # type: dict[str, Read]
+        self.reads = dict() # type: dict[str, AlignedRead]
         self.contigs = contigs
 
     def extend(self, other_collection):
@@ -217,9 +225,9 @@ class ReadCollection:
         return self
 
     def addNewRead(self, rec):
-        # type: (SeqIO.SeqRecord) -> Read
+        # type: (SeqIO.SeqRecord) -> AlignedRead
         rec.id = rec.id.split()[0]
-        read = Read(rec)
+        read = AlignedRead(rec)
         self.reads[rec.id] = read
         return read
 
@@ -232,13 +240,13 @@ class ReadCollection:
             return
         self.reads[rname].AddSamAlignment(rec, self.contigs[int(rec.tname)])
 
-    def loadFromSam(self, sam):
+    def loadFromSam(self, sam, filter = lambda rec: True):
         # type: (sam_parser.Samfile) -> ReadCollection
         for rec in sam:
-            if rec.is_unmapped:
+            if rec.is_unmapped or not filter(rec):
                 continue
             if rec.query_name not in self.reads:
-                new_read = Read(SeqIO.SeqRecord("", rec.query_name))
+                new_read = AlignedRead(SeqIO.SeqRecord("", rec.query_name))
                 self.add(new_read)
             else:
                 new_read = self.reads[rec.query_name]
@@ -253,11 +261,11 @@ class ReadCollection:
         return self
 
     def add(self, read):
-        # type: (Read) -> None
+        # type: (AlignedRead) -> None
         self.reads[read.id] = read
 
     def filter(self, condition):
-        # type: (callable(Read)) -> ReadCollection
+        # type: (callable(AlignedRead)) -> ReadCollection
         res = ReadCollection(self.contigs)
         for read in self.reads.values():
             if condition(read):
@@ -269,7 +277,7 @@ class ReadCollection:
         return self.filter(lambda read: True)
 
     def remove(self, read):
-        # type: (Read) -> None
+        # type: (AlignedRead) -> None
         if read.id in self.reads:
             del self.reads[read.id]
 
@@ -293,11 +301,11 @@ class ReadCollection:
         return self.filter(lambda read: read.contain(segment))
 
     def __iter__(self):
-        # type: () -> Iterator[Read]
+        # type: () -> Iterator[AlignedRead]
         return self.reads.values().__iter__()
 
     def __getitem__(self, read_id):
-        # type: (str) -> Read
+        # type: (str) -> AlignedRead
         return self.reads[read_id.split()[0]]
 
     def __len__(self):
@@ -323,5 +331,5 @@ class ReadCollection:
     def loadFromFasta(self, handler):
         # type: (file) -> ReadCollection
         for rec in SeqIO.parse_fasta(handler):
-            self.add(Read(rec))
+            self.add(AlignedRead(rec))
         return self

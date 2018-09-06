@@ -230,7 +230,7 @@ class Aligner:
         same_reads = self.CheckAndWriteSequences(reads, reads_file)
         same_contigs = self.CheckAndWriteSequences(consensus, contigs_file)
         if same_reads and same_contigs and not clean and os.path.exists(alignment_file):
-            print "Alignment reused"
+            print "Alignment reused:", alignment_file
         else:
             make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
@@ -241,7 +241,7 @@ class Aligner:
         reads = sequences.ReadCollection(collection)
         res = [] # type: list[AlignedSequences]
         for i in range(len(seqs)):
-            reads.add(sequences.Read(SeqIO.SeqRecord(seqs[i], str(i))))
+            reads.add(sequences.AlignedRead(SeqIO.SeqRecord(seqs[i], str(i))))
             res.append(AlignedSequences(seqs[i], contig.seq))
         for rec in self.align(reads, collection):
             tid = int(rec.query_name)
@@ -255,7 +255,7 @@ class Aligner:
         return res
 
     def ReadToAlignedSequences(self, read, contig):
-        # type: (sequences.Read, sequences.Contig) -> AlignedSequences
+        # type: (sequences.AlignedRead, sequences.Contig) -> AlignedSequences
         res = AlignedSequences(read.seq, contig.seq)
         for rec in read.alignments:
             if rec.seg_to.contig.id != contig.id:
@@ -315,12 +315,9 @@ class Aligner:
         res = polysh_job.polish_from_disk(dir, consensus_file_name, reads_file_name)
         return list(SeqIO.parse_fasta(open(res, "r")))[0].seq
 
-    def polishAndAnalyse(self, reads, consensus, polishing_base = None):
-        # type: (sequences.ReadCollection, Edge, sequences.Contig) -> Consensus
-        if polishing_base is not None:
-            seq = sequences.Contig(self.polish(reads, polishing_base), "Noname")
-        else:
-            seq = sequences.Contig(self.polishNoConsensus(reads, consensus), "Noname")
+    def polishAndAnalyse(self, reads, polishing_base):
+        # type: (sequences.ReadCollection, sequences.Contig) -> Consensus
+        seq = sequences.Contig(self.polish(reads, polishing_base), 0)
         res = [0] * (len(seq) + 1)
         for rec in self.align(reads, sequences.ContigCollection([seq])):
             if rec.is_unmapped:
@@ -331,8 +328,37 @@ class Aligner:
             res[i] += res[i - 1]
         return Consensus(seq.seq, res)
 
+    def polishQuiver(self, reads, base_start, pos_start, min_new_len = 1000):
+        # type: (sequences.ReadCollection, str, int) -> Optional[Consensus]
+        cc = sequences.ContigCollection([sequences.Contig(base_start, 0)])
+        reads_to_base = sequences.ReadCollection(cc).loadFromSam(self.align(reads, cc))
+        print "Polishing quiver of", len(reads_to_base), "reads."
+        for read in sorted(list(reads_to_base), key = lambda read: len(read))[::-1]:
+            print read.__str__()
+            for al in read.alignments:
+                if al.rc:
+                    continue
+                if al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > min_new_len:
+                    print al.__str__()
+                    tmp = self.polishAndAnalyse(reads, sequences.Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0))
+                    print len(tmp.cut()), len(base_start), pos_start, min_new_len
+                    if len(tmp.cut()) > len(base_start) - pos_start + min_new_len:
+                        return tmp
+                    break
+        return None
+
+    def repairGraphAlignments(self, graph):
+        # type: (repeat_graph.Graph) -> None
+        print "Reparing graph alignments for", len(graph.reads), "reads and the following edges:", map(lambda edge: edge.id, graph.newEdges)
+        for rec in self.align(graph.reads, graph.newEdges):
+            if not rec.is_unmapped:
+                read = graph.reads[rec.query_name]
+                graph.E[int(rec.tname)].reads.add(read)
+                graph.E[int(rec.tname)].reads.addNewAlignment(rec)
+        graph.newEdges = []
+
     def CalculateConsensusCoverage(self, seq, reads):
-        # type: (sequences.Contig, sequences.ReadCollection) -> Consensuss
+        # type: (sequences.Contig, sequences.ReadCollection) -> Consensus
         res = [0] * (len(seq) + 1)
         for read in reads:
             for alignment in read.alignments:
