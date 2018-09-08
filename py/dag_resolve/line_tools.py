@@ -1,115 +1,9 @@
-from dag_resolve import repeat_graph
-from dag_resolve import sequences
 from typing import Generator
 
-class DivergenceState:
-    def __init__(self, div, seq, id):
-        # type: (Divergence, str) -> DivergenceState
-        self.divergence = div
-        self.seq = seq
-        self.id = id
+from dag_resolve import repeat_graph
+from dag_resolve import sequences
+from dag_resolve.phasing import Phasing
 
-    def isAmbiguous(self):
-        # type: () -> bool
-        return self.seq is None
-
-    def char(self):
-        if self.isAmbiguous():
-            return "-"
-        return str(self.id)
-
-    def __eq__(self, other):
-        # type: (DivergenceState) -> bool
-        return self.seq == other.seq and self.divergence == other.divergence
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-class Phasing:
-    def __init__(self, states = None):
-        # type: (list[DivergenceState]) -> Phasing
-        if states is None:
-            states = []
-        self.states = states
-
-    def add(self, state):
-        # type: (DivergenceState) -> DivergenceState
-        self.states.append(state)
-        return self.states[-1]
-
-    def printToFile(self, handler):
-        # type: (file) -> None
-        handler.write(str(self))
-        handler.write("\n")
-
-    def __str__(self):
-        return "".join(map(lambda state:state.char(), self.states))
-
-    def ambibuousRate(self):
-        res = 0
-        for state in self.states:
-            if state.isAmbiguous():
-                res += 1
-        return float(state) / len(self.states)
-
-    def called(self):
-        res = 0
-        for state in self.states:
-            if not state.isAmbiguous():
-                res += 1
-        return res
-
-    def __getitem__(self, item):
-        # type: (int) -> DivergenceState
-        return self.states[item]
-
-    def __iter__(self):
-        # type: () -> Iterator[DivergenceState]
-        return self.states.__iter__()
-
-    def __len__(self):
-        # type: () -> int
-        return self.states.__len__()
-
-class Statistics:
-    def __init__(self):
-        self.correct = 0 # type: int
-        self.wrong = 0 # type: int
-        self.ambig = 0 # type: int
-        self.called = 0 # type: int
-
-    def __str__(self):
-        return str((self.correct, self.wrong, self.ambig, self.called))
-
-class Divergence:
-    def __init__(self, edge, pos, states = []):
-        # type: (repeat_graph.Edge, tuple[int, int], list[str]) -> Divergence
-        self.edge = edge
-        self.pos = pos
-        self.states = [] # type: list[DivergenceState]
-        self.ambiguous = DivergenceState(self, None, -1)
-        for state in states:
-            self.addState(state)
-        self.statistics = Statistics()
-
-    def addState(self, state):
-        # type: (str) -> DivergenceState
-        self.states.append(DivergenceState(self, state, len(self.states)))
-        return self.states[-1]
-
-    def __eq__(self, other):
-        # type: (Divergence) -> bool
-        return self.edge.id == other.edge.id and self.pos == other.pos
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def printToFile(self, handler, delim = " "):
-        # type: (file) -> None
-        handler.write(str(self.edge.id) + ": " + str(self.pos) + "\n")
-        for state in self.states:
-            handler.write(state.seq + " ")
-        handler.write("\n")
 
 class LineSegment:
     def __init__(self, line, pos, edge, seq, phasing, reads):
@@ -125,16 +19,16 @@ class Line:
     def __init__(self, edge):
         # type: (repeat_graph.Edge) -> Line
         assert edge.info.unique
-        self.chain = [LineSegment(self, 0, edge, edge.seq, [], edge.reads)] # type: list[LineSegment]
+        self.chain = [LineSegment(self, 0, edge, edge.seq, Phasing(), edge.reads)] # type: list[LineSegment]
         self.nextLine = None
         self.id = edge.id
 
     def extendRight(self, edge, seq, phasing, reads):
-        # type: (repeat_graph.Edge, str, sequences.ReadCollection) -> None
+        # type: (repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
         self.chain.append(LineSegment(self, self.chain[-1].pos + 1, edge, seq, phasing, reads))
 
-    def extendLeft(self, edge, seq, reads):
-        # type: (repeat_graph.Edge, str, sequences.ReadCollection) -> None
+    def extendLeft(self, edge, seq, phasing, reads):
+        # type: (repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
         self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, phasing, reads))
 
     def rightSegment(self):
@@ -204,6 +98,15 @@ class LineStorage:
             handler.write(line.shortStr() + "\n")
 
 
+class LineTail:
+    def __init__(self, line, edge, tail_consensus, read_collection):
+        # type: (line_tools.Line, repeat_graph.Edge, dag_resolve.sequences.Consensus, sequences.ReadCollection) -> LineTail
+        self.line = line
+        self.edge = edge
+        self.tail_consensus = tail_consensus
+        self.reads = read_collection
+        self.alignment = None # type: align_tools.AlignedSequences
 
-
-
+    def __len__(self):
+        # type: () -> int
+        return self.tail_consensus.__len__()

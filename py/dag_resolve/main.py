@@ -1,9 +1,12 @@
-import sys
 import os
+import sys
+
+import dag_resolve.edge_resolver
 
 sys.path.append("py")
-from common import basic, SeqIO
-from dag_resolve import repeat_graph, sequences, align_tools, resolver, params
+from common import basic
+from dag_resolve import repeat_graph, sequences, graph_resolver, params
+from alignment import align_tools
 
 if __name__ == "__main__":
     sys.stdout.write("Started\n")
@@ -21,7 +24,7 @@ if __name__ == "__main__":
     basic.ensure_dir_existance(dir)
     if params.clean:
         basic.recreate(dir)
-    # sys.stderr = open(os.path.join(dir, "stderr.log"), "w")
+    dir_distributor = align_tools.DirDistributor(os.path.join(dir, "alignment"))
     log = open(os.path.join(dir, "log.info"), "w")
     sys.stdout = basic.OStreamWrapper(sys.stdout, log)
     sys.stdout.write("Collecting contig collection\n")
@@ -30,13 +33,14 @@ if __name__ == "__main__":
     dot = repeat_graph.DotParser(open(dot_file, "r")).parse(edges)
     graph = repeat_graph.Graph().loadFromDot(edge_sequences, dot)
     sys.stdout.write("Aligning reads\n")
-    al = align_tools.Aligner(os.path.join(dir, "alignment"))
+    al = align_tools.Aligner(dir_distributor)
+    polisher = align_tools.Polisher(al, dir_distributor)
     reads = sequences.ReadCollection().loadFromFasta(open(reads, "r"))
     alignment = al.align(reads, sequences.ContigCollection(graph.E.values()))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
     sys.stdout.write("Resolving repeats\n")
-    res = resolver.GraphResolver(graph, resolver.VertexResolver(graph, al), resolver.EdgeResolver(graph, al))
+    res = graph_resolver.GraphResolver(graph, graph_resolver.VertexResolver(graph, polisher), dag_resolve.edge_resolver.EdgeResolver(graph, al, polisher))
     res.resolve()
     sys.stdout.write("Printing results\n")
     res.printResults(sys.stdout)

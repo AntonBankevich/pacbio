@@ -1,4 +1,7 @@
 import sys
+
+from dag_resolve import params
+
 sys.path.append("py")
 from common import sam_parser, SeqIO, basic
 from typing import Generator
@@ -333,3 +336,39 @@ class ReadCollection:
         for rec in SeqIO.parse_fasta(handler):
             self.add(AlignedRead(rec))
         return self
+
+
+class Consensus:
+    def __init__(self, seq, cov, full_seq = None):
+        # type: (str, list[int]) -> Consensus
+        self.seq = seq
+        self.cov = cov
+        if full_seq is None:
+            self.full_seq = seq
+        else:
+            self.full_seq = full_seq
+
+    def printQuality(self, handler, cov_threshold = params.reliable_coverage):
+        # type: (file, int) -> None
+        for c, a in zip(self.seq, self.cov):
+            if a < cov_threshold:
+                handler.write(c.lower())
+            else:
+                handler.write(c.upper())
+        handler.write("\n")
+
+    def printCoverage(self, handler, step):
+        # type: (file, int) -> None
+        for i, val in list(enumerate(self.cov))[::step]:
+            handler.write(str((i, val)) + "\n")
+
+    def cut(self, cov_threshold = params.reliable_coverage, length = None):
+        l = 0
+        while l < len(self.seq) and self.cov[l] >= cov_threshold:
+            l += 1
+        if length is not None:
+            l = min(l, length)
+        return Consensus(self.seq[:l], self.cov[:l], self.seq)
+
+    def __len__(self):
+        return len(self.seq)

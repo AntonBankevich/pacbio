@@ -4,7 +4,6 @@ from dag_resolve import repeat_graph, sequences
 def EdgeTransitionFilter(e1, e2, transition_size = 1000):
     # type: (repeat_graph.Edge, repeat_graph.Edge, int) -> function
     def f(e1, e2, transition_size, read):
-        print read.__str__()
         # type: (repeat_graph.Edge, repeat_graph.Edge, int, sequences.AlignedRead) -> bool
         l1 = [] # type: list[sequences.AlignmentPiece]
         l2 = [] # type: list[sequences.AlignmentPiece]
@@ -22,7 +21,6 @@ def EdgeTransitionFilter(e1, e2, transition_size = 1000):
                 # print (not al1.rc), (not al2.rc), al2.seg_from.left - transition_size <= al1.seg_from.right, al1.seg_from.right <= al2.seg_from.left + 50
                 if (not al1.rc) and (not al2.rc) and al2.seg_from.left - transition_size <= al1.seg_from.right <= al2.seg_from.left + 50:
                     return True
-        print "False"
         return False
     return lambda read: f(e1, e2, transition_size, read)
 

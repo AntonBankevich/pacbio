@@ -1,15 +1,28 @@
 import itertools
 import os
-
 import sys
+
+from dag_resolve.sequences import Consensus
+
 sys.path.append("py")
 from typing import Optional
 
 from common import basic, sam_parser, SeqIO
-from dag_resolve import repeat_graph, sequences, params
+from dag_resolve import repeat_graph, sequences
 from dag_resolve.params import clean
 from flye import polysh_job
 from flye.alignment import make_alignment
+
+class DirDistributor:
+    def __init__(self, dir):
+        self.dir = dir
+        self.cur_dir = 0
+
+    def nextDir(self):
+        name = os.path.join(self.dir, str(self.cur_dir))
+        self.cur_dir += 1
+        basic.ensure_dir_existance(name)
+        return name
 
 
 class AlignedSequences:
@@ -78,7 +91,7 @@ class AlignedSequences:
             return None
 
     def mapSegment(self, l, r):
-        # type: (int, int) -> tuple[int, int]
+        # type: (int, int) -> Optional[tuple[int, int]]
         assert self.aligned
         if l < self.first:
             return None
@@ -125,9 +138,8 @@ class AlignedSequences:
                 else:
                     yield i
 
-
     def findSeqPos(self, pos):
-        # type: (int) -> tuple[int, int]
+        # type: (int) -> Optional[tuple[Optional[int], Optional[int]]]
         if not self.aligned:
             return None
         if self.alignment[self.last] < pos:
@@ -148,52 +160,16 @@ class AlignedSequences:
             return (r, r)
         return (self.findPreviousMatch(l), self.findNextMatch(r))
 
-class Consensus:
-    def __init__(self, seq, cov, full_seq = None):
-        # type: (str, list[int]) -> Consensus
-        self.seq = seq
-        self.cov = cov
-        if full_seq is None:
-            self.full_seq = seq
-        else:
-            self.full_seq = full_seq
-
-    def printQuality(self, handler, cov_threshold = params.reliable_coverage):
-        # type: (file, int) -> None
-        for c, a in zip(self.seq, self.cov):
-            if a < cov_threshold:
-                handler.write(c.lower())
-            else:
-                handler.write(c.upper())
-        handler.write("\n")
-
-    def printCoverage(self, handler, step):
-        # type: (file, int) -> None
-        for i, val in list(enumerate(self.cov))[::step]:
-            handler.write(str((i, val)) + "\n")
-
-    def cut(self, cov_threshold = params.reliable_coverage, length = None):
-        l = 0
-        while l < len(self.seq) and self.cov[l] >= cov_threshold:
-            l += 1
-        if length is not None:
-            l = min(l, length)
-        return Consensus(self.seq[:l], self.cov[:l], self.seq)
-
-    def __len__(self):
-        return len(self.seq)
 
 class Aligner:
-    def __init__(self, dir, threads = 16):
-        self.dir = dir
+    def __init__(self, dir_distributor, threads = 16):
+        # type: (DirDistributor, int) -> Aligner
+        self.dir_distributor = dir_distributor
         self.cur_alignment = 0
         self.threads = threads
 
     def next_dir(self):
-        self.cur_alignment += 1
-        name = os.path.join(self.dir, str(self.cur_alignment - 1))
-        basic.ensure_dir_existance(name)
-        return name
+        return self.dir_distributor.nextDir()
 
     def CheckSequences(self, reads, reads_file):
         # type: (sequences.ReadCollection, str) -> bool
@@ -269,9 +245,25 @@ class Aligner:
             res.addCigar(rec.cigar, rec.seg_to.left)
         return res
 
+    def repairGraphAlignments(self, graph):
+        # type: (repeat_graph.Graph) -> None
+        print "Reparing graph alignments for", len(graph.reads), "reads and the following edges:", map(lambda edge: edge.id, graph.newEdges)
+        for rec in self.align(graph.reads, graph.newEdges):
+            if not rec.is_unmapped:
+                read = graph.reads[rec.query_name]
+                graph.E[int(rec.tname)].reads.add(read)
+                graph.E[int(rec.tname)].reads.addNewAlignment(rec)
+        graph.newEdges = []
+
+class Polisher:
+    def __init__(self, aligner, dir_distributor):
+        # type: (Aligner, DirDistributor) -> Polisher
+        self.aligner = aligner
+        self.dir_distributor = dir_distributor
+
     def polish(self, reads, consensus):
         # type: (sequences.ReadCollection, sequences.Contig) -> str
-        dir = self.next_dir()
+        dir = self.aligner.next_dir()
         consensus_file_name = os.path.join(dir, "ref.fasta")
         consensus_file = open(consensus_file_name, "w")
         SeqIO.write(consensus, consensus_file, "fasta")
@@ -285,7 +277,7 @@ class Aligner:
 
     def polishNoConsensus(self, reads, edge):
         # type: (sequences.ReadCollection, repeat_graph.Edge) -> str
-        dir = self.next_dir()
+        dir = self.dir_distributor.nextDir()
         consensus_file_name = os.path.join(dir, "ref.fasta")
         consensus_file = open(consensus_file_name, "w")
         best_match = 0
@@ -319,7 +311,7 @@ class Aligner:
         # type: (sequences.ReadCollection, sequences.Contig) -> Consensus
         seq = sequences.Contig(self.polish(reads, polishing_base), 0)
         res = [0] * (len(seq) + 1)
-        for rec in self.align(reads, sequences.ContigCollection([seq])):
+        for rec in self.aligner.align(reads, sequences.ContigCollection([seq])):
             if rec.is_unmapped:
                 continue
             res[rec.pos - 1] += 1
@@ -331,7 +323,7 @@ class Aligner:
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 1000):
         # type: (sequences.ReadCollection, str, int) -> Optional[Consensus]
         cc = sequences.ContigCollection([sequences.Contig(base_start, 0)])
-        reads_to_base = sequences.ReadCollection(cc).loadFromSam(self.align(reads, cc))
+        reads_to_base = sequences.ReadCollection(cc).loadFromSam(self.aligner.align(reads, cc))
         print "Polishing quiver of", len(reads_to_base), "reads."
         for read in sorted(list(reads_to_base), key = lambda read: len(read))[::-1]:
             print read.__str__()
@@ -339,180 +331,13 @@ class Aligner:
                 if al.rc:
                     continue
                 if al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > min_new_len:
-                    print al.__str__()
+                    # print al.__str__()
                     tmp = self.polishAndAnalyse(reads, sequences.Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0))
-                    print len(tmp.cut()), len(base_start), pos_start, min_new_len
+                    # print len(tmp.cut()), len(base_start), pos_start, min_new_len
                     if len(tmp.cut()) > len(base_start) - pos_start + min_new_len:
                         return tmp
                     break
         return None
-
-    def repairGraphAlignments(self, graph):
-        # type: (repeat_graph.Graph) -> None
-        print "Reparing graph alignments for", len(graph.reads), "reads and the following edges:", map(lambda edge: edge.id, graph.newEdges)
-        for rec in self.align(graph.reads, graph.newEdges):
-            if not rec.is_unmapped:
-                read = graph.reads[rec.query_name]
-                graph.E[int(rec.tname)].reads.add(read)
-                graph.E[int(rec.tname)].reads.addNewAlignment(rec)
-        graph.newEdges = []
-
-    def CalculateConsensusCoverage(self, seq, reads):
-        # type: (sequences.Contig, sequences.ReadCollection) -> Consensus
-        res = [0] * (len(seq) + 1)
-        for read in reads:
-            for alignment in read.alignments:
-                if alignment.seg_to.contig.id != seq.id:
-                    continue
-                res[alignment.seg_to.left - 1] += 1
-                res[alignment.seg_to.right - 1] -= 1
-        for i in range(1, len(res)):
-            res[i] += res[i - 1]
-        return Consensus(seq.seq, res)
-
-class SquareRecord:
-    def __init__(self, val = 0):
-        self.sub_score = val
-        self.ins_score = val
-        self.del_score = val
-        self.sub_info = None
-        self.del_info = None
-        self.ins_info = None
-
-    def updateIns(self, val, info):
-        if val < self.ins_score:
-            self.ins_score = val
-            # self.ins_info = info
-
-    def updateDel(self, val, info):
-        if val < self.del_score:
-            self.del_score = val
-            # self.del_info = info
-
-    def updateSub(self, val, info):
-        if val < self.sub_score:
-            self.sub_score = val
-            # self.sub_info = info
-
-    def best(self):
-        return min(self.sub_score, self.ins_score, self.del_score)
-
-    def bestAction(self):
-        if self.sub_score < self.ins_score and self.sub_score < self.del_score:
-            return "sub"
-        if self.ins_score < self.del_score:
-            return "ins"
-        return "del"
-
-    def getInfo(self, action):
-        if action == "sub":
-            return self.sub_info
-        if action == "ins":
-            return self.ins_info
-        if action == "del":
-            return self.del_info
-
-class AccurateAligner:
-    def __init__(self):
-        self.ins_score = 10
-        self.del_score = 6
-        self.sub_score = 10
-        self.homo_score = 4
-        self.switch_core = 1
-        self.center_score = 20
-        self.inf = 10000000
-
-    def align(self, query, pattern, match_position = None):
-        # type: (str, str, int) -> int
-        # assert len(query) <= len(pattern)
-        query = query.upper()
-        pattern = pattern.upper()
-        res = []# type: list[list[SquareRecord]]
-        for i in xrange(len(query) + 1):
-            res.append([])
-            for j in xrange(len(pattern) + 1):
-                res[-1].append(SquareRecord(self.inf))
-            res[-1][0].ins_score = self.ins_score * i
-            res[-1][0].ins_info = (i - 1, 0, "ins")
-            res[-1][0].del_score = self.inf
-            res[-1][0].sub_score = self.inf
-        for j in xrange(len(pattern) + 1):
-            res[0][j].ins_score = self.inf
-            res[0][j].del_score = self.inf
-            res[0][j].sub_score = 0
-        for i in xrange(len(query)):
-            for j in xrange(len(pattern)):
-                #making sure that matching positions match
-                if match_position is not None and j == match_position:
-                    res[i + 1][j + 1].del_score = self.inf
-                    res[i + 1][j + 1].ins_score = self.inf
-                    if query[i] == pattern[j]:
-                        if i > 0 and j > 0 and query[i - 1] == pattern[j - 1]:
-                            res[i + 1][j + 1].updateSub(res[i][j].sub_score, (i, j, "sub"))
-                        else:
-                            res[i + 1][j + 1].updateSub(res[i][j].best() + self.switch_core, (i, j, res[i][j].bestAction()))
-                    continue
-                #calculating scores for substitution case
-                if query[i] == pattern[j]:
-                    if i > 0 and j > 0 and query[i - 1] == pattern[j - 1]:
-                        res[i + 1][j + 1].updateSub(res[i][j].sub_score, (i, j, "sub"))
-                    else:
-                        res[i + 1][j + 1].updateSub(res[i][j].sub_score + self.switch_core, (i, j, "sub"))
-                    res[i + 1][j + 1].updateSub(res[i][j].del_score + self.switch_core, (i, j, "del"))
-                    res[i + 1][j + 1].updateSub(res[i][j].ins_score + self.switch_core, (i, j, "ins"))
-                else:
-                    if i > 0 and j > 0 and query[i - 1] == pattern[j - 1]:
-                        res[i + 1][j + 1].updateSub(res[i][j].sub_score + self.sub_score + self.switch_core, (i, j, "sub"))
-                    else:
-                        res[i + 1][j + 1].updateSub(res[i][j].sub_score + self.sub_score, (i, j, "sub"))
-                    res[i + 1][j + 1].updateSub(res[i][j].del_score + self.sub_score, (i, j, "del"))
-                    res[i + 1][j + 1].updateSub(res[i][j].ins_score + self.sub_score, (i, j, "ins"))
-                #calculating scores for homopolymer case
-                if i > 0 and query[i] == query[i - 1] and pattern[j] == query[i]:
-                    res[i + 1][j + 1].updateIns(res[i][j + 1].best() + self.homo_score, (i, j + 1, res[i][j + 1].bestAction()))
-                if j > 0 and pattern[j] == pattern[j - 1] and query[i] == pattern[j]:
-                    res[i + 1][j + 1].updateDel(res[i + 1][j].best() + self.homo_score, (i + 1, j, res[i + 1][j].bestAction()))
-                #calculating scores for insertion case
-                if i > 0 and query[i - 1] == pattern[j]:
-                    res[i + 1][j + 1].updateIns(res[i][j + 1].sub_score + self.ins_score + self.switch_core, (i, j + 1, "sub"))
-                res[i + 1][j + 1].updateIns(res[i][j + 1].best() + self.ins_score, (i, j + 1, res[i][j + 1].bestAction()))
-                #calculating scores for deletion case
-                if j > 0 and query[i] == pattern[j - 1]:
-                    res[i + 1][j + 1].updateDel(res[i + 1][j].sub_score + self.del_score + self.switch_core, (i + 1, j, "sub"))
-                res[i + 1][j + 1].updateDel(res[i + 1][j].best() + self.del_score, (i + 1, j, res[i + 1][j].bestAction()))
-                #making sure that matching positions match
-        best = self.inf
-        cur_query = len(query)
-        # cur_pattern = None
-        # cur_action = None
-        for i in xrange(len(pattern) + 1):
-            if best > res[cur_query][i].best():
-                cur_pattern = i
-                cur_action = res[cur_query][i].bestAction()
-                best = res[cur_query][i].best()
-        # alignment = [[],[]]
-        # info_list = []
-        # while cur_query > 0:
-        #     info_list.append((cur_query, cur_pattern, cur_action))
-        #     print cur_query, cur_pattern, cur_action
-        #     cur_query, cur_pattern, cur_action = res[cur_query][cur_pattern].getInfo(cur_action)
-        # info_list = info_list[::-1]
-        # for cur_query, cur_pattern, cur_action in info_list:
-        #     if cur_action == "sub":
-        #         alignment[0].append(query[cur_query - 1])
-        #         alignment[1].append(pattern[cur_pattern - 1])
-        #     elif cur_action == "ins":
-        #         alignment[0].append(query[cur_query - 1])
-        #         alignment[1].append("-")
-        #     else:
-        #         alignment[0].append("-")
-        #         alignment[1].append(pattern[cur_pattern - 1])
-        # print "".join(alignment[0])
-        # print "".join(alignment[1])
-
-        # print "Accurate alignment:", query, pattern, best
-        return min(best, self.inf)
-
 
 
 if __name__ == "__main__":
