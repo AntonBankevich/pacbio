@@ -4,15 +4,16 @@ from dag_resolve import params
 
 sys.path.append("py")
 from common import sam_parser, SeqIO, basic
-from typing import Generator
+from typing import Generator, Iterator, Dict, Tuple, Optional, Union
 
 
 class ContigCollection():
-    def __init__(self, contigs_list = []):
-        # type: (list[Contig]) -> ContigCollection
-        self.contigs = dict() # type: dict[str, Contig]
-        for contig in contigs_list:
-            self.add(contig)
+    def __init__(self, contigs_list = None):
+        # type: (Optional[list[Contig]]) -> ContigCollection
+        self.contigs = dict() # type: Dict[str, Contig]
+        if contigs_list is not None:
+            for contig in contigs_list:
+                self.add(contig)
         self.main = None
 
     def add(self, contig):
@@ -44,7 +45,7 @@ class ContigCollection():
     def print_names(self, handler):
         # type: (file) -> None
         for contig in self:
-            handler.write(contig.id + " " + " ".join(contig.info.misc) + "\n")
+            handler.write(str(contig.id) + " " + " ".join(contig.info.misc) + "\n")
 
     def __iter__(self):
         return self.contigs.values().__iter__()
@@ -69,8 +70,10 @@ class TmpInfo:
         self.misc = l
 
 class Contig:
-    def __init__(self, seq, id, info = []):
-        # type: (str, int, TmpInfo) -> Contig
+    def __init__(self, seq, id, info = None):
+        # type: (str, Union[str,int], TmpInfo) -> Contig
+        if info is None:
+            info = []
         self.seq = seq.upper()
         self.id = id
         if isinstance(info, list):
@@ -101,7 +104,7 @@ class Contig:
 
 class Segment:
     def __init__(self, contig, left, right):
-        # type: (Contig, int, int) -> Segment
+        # type: (Union[Contig, AlignedRead], int, int) -> Segment
         self.contig = contig
         self.left = left
         self.right = right
@@ -180,7 +183,7 @@ class AlignedRead:
         self.alignments = filter(lambda alignment: alignment.seg_to.contig.id != contig.id, self.alignments)
 
     def contigAlignment(self, contig):
-        # type: (Contig) -> tuple[int,int]
+        # type: (Contig) -> Tuple[int,int]
         left = None
         right = None
         for alignment in self.alignments:
@@ -218,11 +221,11 @@ class AlignedRead:
 class ReadCollection:
     def __init__(self, contigs = ContigCollection()):
         # type: (ContigCollection) -> ReadCollection
-        self.reads = dict() # type: dict[str, AlignedRead]
+        self.reads = dict() # type: Dict[str, AlignedRead]
         self.contigs = contigs
 
     def extend(self, other_collection):
-        # type: (ReadCollection) -> None
+        # type: (ReadCollection) -> ReadCollection
         for read in other_collection.reads.values():
             self.add(read)
         return self
@@ -253,7 +256,7 @@ class ReadCollection:
                 self.add(new_read)
             else:
                 new_read = self.reads[rec.query_name]
-            if "H" not in rec.cigar and new_read.seq == "":
+            if "H" not in rec.cigar and rec.seq != "*" and new_read.seq == "":
                 if rec.rc:
                     new_read.setSeq(basic.RC(rec.seq))
                 else:
@@ -322,9 +325,7 @@ class ReadCollection:
     def print_alignments(self, handler):
         # type: (file) -> None
         for read in self:
-            handler.write(read.id + "\n")
-            for rec in read.alignments:
-                handler.write(str(rec) + "\n")
+            handler.write(read.__str__() + "\n")
 
     def asSeqRecords(self):
         # type: () -> Generator[SeqIO.SeqRecord]
@@ -340,13 +341,13 @@ class ReadCollection:
 
 class Consensus:
     def __init__(self, seq, cov, full_seq = None):
-        # type: (str, list[int]) -> Consensus
+        # type: (str, list[int], Optional[Consensus]) -> Consensus
         self.seq = seq
         self.cov = cov
         if full_seq is None:
-            self.full_seq = seq
+            self.full_seq = self # type: Consensus
         else:
-            self.full_seq = full_seq
+            self.full_seq = full_seq # type: Consensus
 
     def printQuality(self, handler, cov_threshold = params.reliable_coverage):
         # type: (file, int) -> None
@@ -363,12 +364,12 @@ class Consensus:
             handler.write(str((i, val)) + "\n")
 
     def cut(self, cov_threshold = params.reliable_coverage, length = None):
-        l = 0
+        l = min(10, len(self.seq))
         while l < len(self.seq) and self.cov[l] >= cov_threshold:
             l += 1
         if length is not None:
             l = min(l, length)
-        return Consensus(self.seq[:l], self.cov[:l], self.seq)
+        return Consensus(self.seq[:l], self.cov[:l], self)
 
     def __len__(self):
         return len(self.seq)

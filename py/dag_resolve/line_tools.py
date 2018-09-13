@@ -1,5 +1,6 @@
-from typing import Generator
+from typing import Generator, Dict
 
+from alignment import align_tools
 from dag_resolve import repeat_graph
 from dag_resolve import sequences
 from dag_resolve.phasing import Phasing
@@ -61,7 +62,7 @@ class LineStorage:
         # type: (repeat_graph.Graph) -> LineStorage
         self.g = g
         self.lines = [] #type: list[Line]
-        self.resolved_edges = dict() #type: dict[int, list[LineSegment]]
+        self.resolved_edges = dict() #type: Dict[int, list[LineSegment]]
         for edge in g.E.values():
             if edge.info.unique:
                 self.addLine(Line(edge))
@@ -100,7 +101,7 @@ class LineStorage:
 
 class LineTail:
     def __init__(self, line, edge, tail_consensus, read_collection):
-        # type: (line_tools.Line, repeat_graph.Edge, dag_resolve.sequences.Consensus, sequences.ReadCollection) -> LineTail
+        # type: (Line, repeat_graph.Edge, sequences.Consensus, sequences.ReadCollection) -> LineTail
         self.line = line
         self.edge = edge
         self.tail_consensus = tail_consensus

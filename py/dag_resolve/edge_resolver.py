@@ -1,10 +1,14 @@
 import sys
 
+from typing import Optional, Tuple
+
 import dag_resolve.phasing
+from alignment import align_tools
 from alignment.accurate_alignment import AccurateAligner
 from common import basic, SeqIO
-from dag_resolve import line_tools, sequences, params
+from dag_resolve import line_tools, sequences, params, repeat_graph
 from dag_resolve.divergence import Divergence
+from dag_resolve.line_tools import LineTail
 from dag_resolve.params import radius
 
 
@@ -102,7 +106,7 @@ class EdgeResolver:
 
     def callRead(self, read, consensus, div_list, phasings, min_div_number = 5):
         # type: (sequences.AlignedRead, sequences.Contig, list[dag_resolve.divergence.Divergence], list[line_tools.Phasing]) -> tuple[Optional[int], bool]
-        print "Calling read", read.id
+        print "Calling read", read.__str__()
         read_phasing = self.determinePhasing(read, consensus, div_list)
         if len(phasings) > 2:
             for phasing in phasings:
@@ -204,8 +208,11 @@ class EdgeResolver:
         return res
 
     def resolveEdge(self, e, tails):
-        # type: (repeat_graph.Edge, list[LineTail]) -> tuple[bool, repeat_graph.Edge]
+        # type: (repeat_graph.Edge, list[LineTail]) -> tuple[bool, Optional[repeat_graph.Edge]]
         tails = list(tails)
+        if len(tails) == 1:
+            tails[0].reads.extend(e.reads)
+            tails[0].tail_consensus = self.polisher.polishQuiver(tails[0].reads, tails[0].tail_consensus.seq, 0)
         for tail in tails:
             tail.tail_consensus.printQuality(sys.stdout)
         phased_reads = sequences.ReadCollection(sequences.ContigCollection([e]))
@@ -259,15 +266,17 @@ class EdgeResolver:
                     print tail.line.shortStr(), len(reads), "of", len(interesting_reads)
             for tail, read_collection in zip(tails, line_reads):
                 read_collection.extend(tail.reads)
-                # tail.tail_consensus = self.aligner.polishAndAnalyse(read_collection, e.prefix(cur_depth + 3000).subcontig())
-                # print "Line:", tail.line.id
-                # for read in read_collection:
-                #     print read.__str__()
-                tail.tail_consensus = self.polisher.polishQuiver(read_collection, tail.tail_consensus.seq, 0)
-                # tail.tail_consensus = self.aligner.polishAndAnalyse(read_collection, self.constructPolishingBase(read_collection, tail))
+                new_consensus = self.polisher.polishQuiver(read_collection, tail.tail_consensus.seq, 0)
+                if new_consensus is not None:
+                    print "Old consensus:", len(tail.tail_consensus), "New consensus:", len(new_consensus.cut())
+                    tail.tail_consensus = new_consensus
+                else:
+                    print "Failed to construct longer consensus"
+            new_depth = self.alignAndCutTails(tails)
+            for tail in tails:
+                print "New tail alignes to segment from ", tail.alignment.first, "to", tail.alignment.last, "with percent identity", tail.alignment.percentIdentity()
             for tail in tails:
                 tail.tail_consensus.printQuality(sys.stdout)
-            new_depth = self.alignAndCutTails(tails)
             print "New depth:", new_depth, "Old depth:", cur_depth
             if new_depth < cur_depth + 100:
                 for tail, read_collection in zip(tails, line_reads):
@@ -276,14 +285,16 @@ class EdgeResolver:
                     for tail, phasing in zip(tails, phasings):
                         self.lineStorage.extendRight(tail.line, e, tail.tail_consensus, phasing, tail.reads)
                     return True, None
-                repaired, new_edge = self.AttemptRepair(tails)
+                repaired, new_edge = self.AttemptRepairGraph(tails)
                 if repaired:
                     return False, new_edge
-                return False, None
+                repaired = min(map(lambda tail: tail.alignment.percentIdentity(), tails)) < 0.85 and self.AttemptRepairRecruitment(tails)
+                if not repaired:
+                    return False, None
             cur_depth = new_depth
 
-    def AttemptRepair(self, tails):
-        # type: (list[LineTail]) -> tuple[bool, Optional[repeat_graph.Edge]]
+    def AttemptRepairGraph(self, tails):
+        # type: (list[LineTail]) -> Tuple[bool, Optional[repeat_graph.Edge]]
         print "Attempting to repair graph"
         for tail in tails:
             tail.tail_consensus = self.polisher.polishQuiver(tail.reads, tail.tail_consensus.seq, 0)
@@ -291,12 +302,12 @@ class EdgeResolver:
         largest_problem = tails[0]
         print "Tail alignments and lengths"
         for tail in tails[1:]:
-            print tail.alignment[tail.alignment.last], len(tail)
-            if tail.alignment[tail.alignment.last] < largest_problem.alignment[largest_problem.alignment.last]:
+            if tail.alignment.last < largest_problem.alignment.last:
                 largest_problem = tail
-        print "Largest problem is tail of line", largest_problem.line.id, ":", (len(largest_problem) - largest_problem.alignment[largest_problem.alignment.last])
-        if len(largest_problem) - largest_problem.alignment[largest_problem.alignment.last] > 1000:
-            next = None
+        print "Largest problem is tail of line", largest_problem.line.id, "Alignment is broken at position", largest_problem.alignment.last
+        largest_problem.tail_consensus = largest_problem.tail_consensus.full_seq.cut(5)
+        if len(largest_problem) - largest_problem.alignment[largest_problem.alignment.last] > 700:
+            next_alignment = None
             tmp = sequences.ReadCollection(self.graph.edgeCollection())
             tmp.loadFromSam(self.aligner.align([SeqIO.SeqRecord(largest_problem.tail_consensus.seq, "tail")], self.graph.edgeCollection()))
             read = tmp.reads["tail"]
@@ -304,16 +315,16 @@ class EdgeResolver:
             for al in read.alignments:
                 if not al.rc and al.seg_from.right - al.seg_from.left > 500 \
                         and al.seg_from.left > largest_problem.alignment[largest_problem.alignment.last] - 50\
-                        and (next is None or next > al.seg_from.left):
-                    next = al
-            print "Closest alignment:", next.__str__()
-            if next is None:
+                        and (next_alignment is None or next_alignment.seg_from.left > al.seg_from.left):
+                    next_alignment = al
+            print "Closest alignment:", next_alignment.__str__()
+            if next_alignment is None:
                 print "Failed to repair graph. No alignment to known edges of the graph."
                 return False, None
             new_edge = self.graph.addCuttingEdge(largest_problem.edge, largest_problem.alignment.last,
-                                      self.graph.E[next.seg_to.contig.id], next.seg_to.left,
+                                      self.graph.E[next_alignment.seg_to.contig.id], next_alignment.seg_to.left,
                                       largest_problem.tail_consensus.seq[largest_problem.alignment[largest_problem.alignment.last]:
-                                      next.seg_from.left])
+                                      next_alignment.seg_from.left])
             self.aligner.repairGraphAlignments(self.graph)
             for tail in tails:
                 tail.edge = new_edge.start.inc[0]
@@ -322,3 +333,27 @@ class EdgeResolver:
         else:
             print "Failed to repair graph"
             return False, None
+
+    def AttemptRepairRecruitment(self, tails):
+        # type: (list[line_tools.LineTail]) -> bool
+        print "Attempting to repair read recruitment"
+        edge = tails[0].edge
+        new_alignments = dict()
+        for i, tail in enumerate(tails):
+            for rec in self.aligner.align(self.graph.reads, [sequences.Contig(tail.tail_consensus.seq, 0)]):
+                if rec.is_unmapped or rec.alen < 500:
+                    continue
+                if rec.query_name in edge.reads:
+                    continue
+                if rec.query_name not in new_alignments:
+                    new_alignments[rec.query_name] = []
+                new_alignments[rec.query_name].append(i)
+        cnt = 0
+        for read_id in new_alignments:
+            if len(new_alignments[read_id]) == 1:
+                tails[new_alignments[read_id][0]].reads.add(self.graph.reads[read_id])
+                edge.reads.add(self.graph.reads[read_id])
+                print "Added read", self.graph.reads[read_id]
+                cnt += 1
+        print "Recovered", cnt, "reads"
+        return cnt > 0

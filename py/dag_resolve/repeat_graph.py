@@ -1,6 +1,7 @@
 from common import basic, sam_parser, SeqIO
 from dag_resolve import sequences
-from typing import Generator
+from typing import Generator, Dict, Optional
+
 
 class EdgeInfo:
     def __init__(self, label, unique):
@@ -17,6 +18,7 @@ class Vertex:
         self.inc = [] # type: list[Edge]
         self.out = [] # type: list[Edge]
         self.label = label
+        self.rc = None # type: Vertex
 
     def removeEdge(self, edge):
         self.inc = filter(lambda e: e.id != edge.id, self.inc)
@@ -34,11 +36,12 @@ class Vertex:
 
 class Edge(sequences.Contig):
     def __init__(self, id, start, end, consensus, info = None):
-        # type: (int, Vertex, Vertex, basestring, EdgeInfo) -> Edge
+        # type: (int, Vertex, Vertex, str, EdgeInfo) -> Edge
         sequences.Contig.__init__(self, consensus, id, info)
         self.start = start
         self.end = end
         self.reads = sequences.ReadCollection(sequences.ContigCollection([self]))
+        self.rc = None # type: Edge
 
     def __eq__(self, other):
         # type: (Edge) -> bool
@@ -47,27 +50,15 @@ class Edge(sequences.Contig):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-# class VertexPort:
-#     def __init__(self, v):
-#         # type: (Vertex) -> object
-#         self.v = v
-#         self.adjacent = []
-#
-# class Orientation:
-#     def __init__(self, reverse):
-#         # type: (object) -> object
-#         self.reverse = reverse
-# class OrientedEdge:
-#     def __init__(self, edge, orientation):
-
 class Graph:
     def __init__(self):
         # type: () -> Graph
-        self.V = dict() # type: dict[int, Vertex]
-        self.E = dict() # type: dict[int, Edge]
+        self.V = dict() # type: Dict[int, Vertex]
+        self.E = dict() # type: Dict[int, Edge]
         self.source = self.addVertex(10000, "source") # type: Vertex
-        self.sink = self.addVertex(10001, "sink") # type: Vertex
-        self.min_new_vid = 5000
+        self.sink = self.source.rc # type: Vertex
+        self.sink.label = "sink"
+        self.min_new_vid = 1
         self.min_new_eid = 6000
         self.newEdges = []
         self.reads = sequences.ReadCollection(self.edgeCollection())
@@ -77,45 +68,51 @@ class Graph:
         if v_id is None:
             v_id = self.min_new_vid
             self.min_new_vid += 1
+        if v_id in self.V:
+            return self.V[v_id]
         vertex = Vertex(v_id, label)
+        vertex_rc = Vertex(-v_id, label)
         self.V[v_id] = vertex
+        self.V[-v_id] = vertex_rc
+        vertex.rc = vertex_rc
+        vertex_rc.rc = vertex
         return vertex
 
     def printToFile(self, handler):
         # type: (file) -> None
         handler.write("Graph:\n")
         for edge in self.E.values():
-            handler.write(str(edge.id) + ": " + str(edge.start.id) + " -> " + str(edge.end.id) + "\n")
+            handler.write(str(edge.id) + "(" + str(len(edge)) + ")" + ": " + str(edge.start.id) + " -> " + str(edge.end.id) + "\n")
 
     def edgeCollection(self):
         return sequences.ContigCollection(self.E.values())
 
     def addEdge(self, edge_id, start_id, end_id, consensus, info = None):
-        # type: (int, int, int, str, EdgeInfo) -> Edge
-        if start_id not in self.V:
-            self.addVertex(start_id)
-        if end_id not in self.V:
-            self.addVertex(end_id)
-        start = self.V[start_id]
-        end = self.V[end_id]
+        # type: (Optional[int], int, int, str, EdgeInfo) -> Edge
+        if edge_id is None:
+            edge_id = self.min_new_eid
+            self.min_new_eid += 1
+        if edge_id in self.E:
+            return self.E[edge_id]
+        start = self.addVertex(start_id)
+        end = self.addVertex(end_id)
         edge = Edge(edge_id, start, end, consensus, info)
+        edge_rc = Edge(-edge_id, end.rc, start.rc, basic.RC(consensus), info)
+        edge.rc = edge_rc
+        edge_rc.rc = edge
         self.E[edge.id] = edge
+        self.E[edge_rc.id] = edge_rc
         start.out.append(edge)
+        start.rc.inc.append(edge_rc)
         end.inc.append(edge)
+        end.rc.out.append(edge_rc)
         self.newEdges.append(edge)
+        self.newEdges.append(edge.rc)
         return edge
-
-    def addNewEdge(self, start_id, end_id, consensus, info = EdgeInfo("new", False)):
-        # type: (int, int, str, EdgeInfo) -> Edge
-        eid = self.min_new_eid
-        self.min_new_eid += 1
-        return self.addEdge(eid, start_id, end_id, consensus, info)
 
     def splitEdge(self, edge, pos_list):
         # type: (Edge, list[int]) -> list
         print "Splitting edge", edge.id, "at positions", pos_list
-        self.removeEdge(edge)
-
         pos_list.append(0)
         pos_list.append(len(edge))
         pos_ind = sorted([(pos, i) for i, pos in enumerate(pos_list)])
@@ -127,24 +124,32 @@ class Graph:
             groups[-1].append((pos, ind))
             prev = pos
         res = [None] * (len(pos_list))
-        new_vertices = []
-        vertex_positions = []
-        for i, group in enumerate(groups):
-            left = min([pos for pos, ind in group])
-            right = max([pos for pos, ind in group])
-            if left == 0:
-                new_vertices.append(edge.start)
-                vertex_positions.append(0)
-            elif right == len(edge):
-                new_vertices.append(edge.end)
-                vertex_positions.append(len(edge))
-            else:
-                vertex_positions.append((left + right) // 2)
-                new_vertices.append(self.addVertex())
-            for pos, ind in group:
-                res[ind] = new_vertices[-1]
-            if i > 0:
-                self.addNewEdge(new_vertices[i - 1].id, new_vertices[i].id, edge.seq[vertex_positions[i-1]:vertex_positions[i]])
+        assert len(groups) >= 2
+        if len(groups) == 2:
+            for pos, ind in groups[0]:
+                res[ind] = edge.start
+            for pos, ind in groups[1]:
+                res[ind] = edge.end
+        else:
+            self.removeEdge(edge)
+            new_vertices = []
+            vertex_positions = []
+            for i, group in enumerate(groups):
+                left = min([pos for pos, ind in group])
+                right = max([pos for pos, ind in group])
+                if left == 0:
+                    new_vertices.append(edge.start)
+                    vertex_positions.append(0)
+                elif right == len(edge):
+                    new_vertices.append(edge.end)
+                    vertex_positions.append(len(edge))
+                else:
+                    vertex_positions.append((left + right) // 2)
+                    new_vertices.append(self.addVertex())
+                for pos, ind in group:
+                    res[ind] = new_vertices[-1]
+                if i > 0:
+                    self.addEdge(None, new_vertices[i - 1].id, new_vertices[i].id, edge.seq[vertex_positions[i-1]:vertex_positions[i]], edge.info)
         return res[:-2]
 
     def addCuttingEdge(self, edge1, pos1, edge2, pos2, seq):
@@ -155,7 +160,7 @@ class Graph:
         else:
             vertices = self.splitEdge(edge1, [pos1])
             vertices.extend(self.splitEdge(edge2, [pos2]))
-        return self.addNewEdge(vertices[0].id, vertices[1].id, seq)
+        return self.addEdge(None, vertices[0].id, vertices[1].id, seq)
 
 
     def removeEdge(self, edge):
@@ -168,15 +173,31 @@ class Graph:
 
     def loadFromDot(self, contigs, dot):
         # type: (sequences.ContigCollection, Generator[tuple]) -> Graph
-        for eid, start, end, l, info in dot:
-            if start == "source":
-                start = self.source.id
-            if end == "sink":
-                end = self.sink.id
+        recs = list(dot)
+        v_rc = dict()
+        recs = sorted(recs, key = lambda rec: abs(rec[0]))
+        for rec1, rec2 in zip(recs[:-1], recs[1:]):
+            if rec1[0] == -rec2[0]:
+                v_rc[rec1[1]] = rec2[2]
+                v_rc[rec1[2]] = rec2[1]
+                v_rc[rec2[1]] = rec1[2]
+                v_rc[rec1[2]] = rec1[1]
+        v_map = dict()
+        for v in v_rc:
+            if v < v_rc[v] and not v in ["source", "sink"]:
+                v_map[v] = self.addVertex()
+                v_map[v_rc[v]] = v_map[v].rc
+        v_map["source"] = self.source
+        v_map["sink"] = self.sink
+        for eid, start, end, l, info in recs:
+            if start not in v_map:
+                v_map[start] = self.addVertex()
+            if end not in v_map:
+                v_map[end] = self.addVertex()
             seq = contigs[abs(eid)].seq
             if eid < 0:
                 seq = basic.RC(seq)
-            self.addEdge(eid, start, end, seq, info)
+            self.addEdge(eid, v_map[start].id, v_map[end].id, seq, info)
         return self
 
     def fillAlignments(self, read_recs, sam, fill_unique = True):
@@ -201,7 +222,7 @@ class DotParser:
         self.dot = dot
 
     def parse(self, edge_ids = None):
-        # type: (dict[int, list[str]]) -> Generator[tuple]
+        # type: (Dict[int, list[str]]) -> Generator[tuple]
         for s in self.dot.readlines():
             if s.find("->") == -1:
                 continue

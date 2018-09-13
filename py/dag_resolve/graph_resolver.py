@@ -1,9 +1,12 @@
 import itertools
 import sys
 
+from typing import Optional
+
 from alignment import align_tools
 from common import basic
 from dag_resolve import repeat_graph, line_tools, sequences, filters
+from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.line_tools import LineTail
 
 
@@ -19,11 +22,11 @@ class VertexResolver:
         return seg.reads.filter(filters.EdgeTransitionFilter(prev, next))
 
     def resolveVertex(self, v):
-        # type: (repeat_graph.Vertex) -> list[LineTail]
+        # type: (repeat_graph.Vertex) -> Optional[list]
         print "Resolving vertex", v.id
         print "Incoming edges:", map(lambda e: e.id, v.inc)
         print "Outgoing edges:", map(lambda e: e.id, v.out)
-        assert len(v.out) > 0, "Trying to resolve hanging vertex"
+        assert len(v.out) > 0, "Trying to resolve hanging vertex " + str(v.id)
         res = []
         for edge in v.inc:
             print "Edge:", edge.id
@@ -36,13 +39,13 @@ class VertexResolver:
                     next = 0
                 else:
                     supportWeight = map(len, support)
-                    print "Number of edges that support transitions for the line from edge", edge.id, ":", ",".join(
+                    print "Number of reads that support transitions for the line from edge", edge.id, ":", ",".join(
                         map(str, supportWeight))
                     next, alternative = basic.best2(supportWeight, lambda x, y: x > y)
                     if supportWeight[alternative] * 5 > supportWeight[next]:
                         print "Support of alternative edge is too high. Aborting."
                         return None
-                reads = support[next]# type: sequences.ReadCollection
+                reads = support[next] # type: sequences.ReadCollection
                 tail = self.polisher.polishAndAnalyse(reads, v.out[next])
                 res.append(LineTail(lineSegment.line, v.out[next], tail, reads))
                 print "Created tail on edge", edge.id, "of length", len(tail.cut())
@@ -75,13 +78,12 @@ class GraphResolver:
                     finished, new_edge = self.edgeResolver.resolveEdge(edge, tails_list)
                     if finished:
                         print "Successfully resolved edge", edge.id, "into", len(tails_list), "lines"
-                    edge = new_edge
-                    if not finished:
+                    else:
                         print "Failed to resolve edge", edge.id
-                        if edge is not None:
-                            print "Graph modification detected. Trying to resolve again with edge:", new_edge.id, "of length", len(edge)
+                        if new_edge is not None:
+                            print "Graph modification detected. Trying to resolve again with edge:", new_edge.id, "of length", len(new_edge)
                             self.graph.printToFile(sys.stdout)
-                            edge = new_edge
+                    edge = new_edge
 
     def resolve(self):
         print self.graph.V

@@ -3,12 +3,13 @@ import os
 import sys
 
 from dag_resolve.sequences import Consensus
+from flye.polysh_job import JobPolishing
 
 sys.path.append("py")
-from typing import Optional
+from typing import Optional, Iterable, Tuple
 
 from common import basic, sam_parser, SeqIO
-from dag_resolve import repeat_graph, sequences
+from dag_resolve import repeat_graph, sequences, params
 from dag_resolve.params import clean
 from flye import polysh_job
 from flye.alignment import make_alignment
@@ -24,6 +25,41 @@ class DirDistributor:
         basic.ensure_dir_existance(name)
         return name
 
+    def CheckSequences(self, reads, reads_file):
+        # type: (Iterable[sequences.AlignedRead], str) -> bool
+        if not os.path.exists(reads_file):
+            return False
+        try:
+            for rec, read in itertools.izip_longest(SeqIO.parse_fasta(open(reads_file, "r")), reads):
+                if str(rec.id) != str(read.id) or rec.seq != read.seq:
+                    return False
+            return True
+        except:
+            return False
+
+    def CheckAndWriteSequences(self, reads, reads_file):
+        # type: (Iterable[sequences.AlignedRead], str) -> bool
+        if self.CheckSequences(reads, reads_file):
+            return True
+        else:
+            f = open(reads_file, "w")
+            for read in reads:
+                SeqIO.write(read, f, "fasta")
+            f.close()
+            return False
+
+    def fillNextDir(self, content):
+        # type: (list[Tuple[Iterable[sequences.AlignedRead], str]]) -> Tuple[str, list[str], bool]
+        same = True
+        dir = self.nextDir()
+        content_files = []
+        for reads, f_name in content:
+            f_name = os.path.join(dir, f_name)
+            if not self.CheckAndWriteSequences(reads, f_name):
+                same = False
+            content_files.append(f_name)
+        return dir, content_files, same
+
 
 class AlignedSequences:
     def __init__(self, seq_from, seq_to):
@@ -35,6 +71,16 @@ class AlignedSequences:
         self.last = None # type: int
         self.aligned = False # type: bool
         self.rc = False # type: bool
+
+    def percentIdentity(self):
+        assert self.aligned
+        match = 0
+        for i in range(self.first, self.last + 1):
+            if self.alignment[i] == -1:
+                continue
+            if self.seq_from[self.alignment[i]] == self.seq_to[i]:
+                match += 1
+        return float(match) / max(self.last - self.first + 1, self[self.last] - self[self.first] + 1)
 
     def printToFile(self, handler):
         handler.write("Aligned sequences: " + str(self.first) + " " + str(self.last) + " " +
@@ -91,7 +137,7 @@ class AlignedSequences:
             return None
 
     def mapSegment(self, l, r):
-        # type: (int, int) -> Optional[tuple[int, int]]
+        # type: (int, int) -> Optional[Tuple[int, int]]
         assert self.aligned
         if l < self.first:
             return None
@@ -168,46 +214,19 @@ class Aligner:
         self.cur_alignment = 0
         self.threads = threads
 
-    def next_dir(self):
-        return self.dir_distributor.nextDir()
-
-    def CheckSequences(self, reads, reads_file):
-        # type: (sequences.ReadCollection, str) -> bool
-        if not os.path.exists(reads_file):
-            return False
-        try:
-            for rec, read in itertools.izip_longest(SeqIO.parse_fasta(open(reads_file, "r")), reads):
-                if str(rec.id) != str(read.id) or rec.seq != read.seq:
-                    return False
-            return True
-        except:
-            return False
-
-    def CheckAndWriteSequences(self, reads, reads_file):
-        # type: (sequences.ReadCollection, str) -> bool
-        if self.CheckSequences(reads, reads_file):
-            return True
-        else:
-            f = open(reads_file, "w")
-            for read in reads:
-                SeqIO.write(read, f, "fasta")
-            f.close()
-            return False
-
-    def align(self, reads, consensus):
-        # type: (sequences.ReadCollection, sequences.ContigCollection) -> sam_parser.Samfile
-        dir = self.next_dir()
-        contigs_file = os.path.join(dir, "contigs.fasta")
-        reads_file = os.path.join(dir, "reads.fasta")
+    def align(self, reads, reference):
+        # type: (Iterable[sequences.AlignedRead], Iterable[sequences.Contig]) -> sam_parser.Samfile
+        dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (reads, "reads.fasta")])
+        contigs_file = new_files[0]
+        reads_file = new_files[1]
         alignment_dir = os.path.join(dir, "alignment")
         alignment_file = os.path.join(dir, "alignment.sam")
         basic.ensure_dir_existance(dir)
         basic.ensure_dir_existance(alignment_dir)
-        same_reads = self.CheckAndWriteSequences(reads, reads_file)
-        same_contigs = self.CheckAndWriteSequences(consensus, contigs_file)
-        if same_reads and same_contigs and not clean and os.path.exists(alignment_file):
+        if same and not clean and os.path.exists(alignment_file):
             print "Alignment reused:", alignment_file
         else:
+            print "Performing alignment:", alignment_file
             make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
@@ -255,6 +274,13 @@ class Aligner:
                 graph.E[int(rec.tname)].reads.addNewAlignment(rec)
         graph.newEdges = []
 
+
+class FakePolishingArgs:
+    def __init__(self):
+        self.num_iters = params.num_iters
+        self.platform = "pacbio"
+        self.threads = 8
+
 class Polisher:
     def __init__(self, aligner, dir_distributor):
         # type: (Aligner, DirDistributor) -> Polisher
@@ -263,17 +289,18 @@ class Polisher:
 
     def polish(self, reads, consensus):
         # type: (sequences.ReadCollection, sequences.Contig) -> str
-        dir = self.aligner.next_dir()
-        consensus_file_name = os.path.join(dir, "ref.fasta")
-        consensus_file = open(consensus_file_name, "w")
-        SeqIO.write(consensus, consensus_file, "fasta")
-        consensus_file.close()
-        reads_file_name = os.path.join(dir, "reads.fasta")
-        reads_file = open(reads_file_name, "w")
-        reads.print_fasta(reads_file)
-        reads_file.close()
-        res = polysh_job.polish_from_disk(dir, consensus_file_name, reads_file_name)
-        return list(SeqIO.parse_fasta(open(res, "r")))[0].seq
+        dir, new_files, same = self.dir_distributor.fillNextDir([([consensus], "ref.fasta"), (reads, "reads.fasta")])
+        consensus_file_name = new_files[0]
+        reads_file_name = new_files[1]
+        args = FakePolishingArgs()
+        basic.ensure_dir_existance(os.path.join(dir, "work"))
+        job = JobPolishing(args, os.path.join(dir, "work"), os.path.join(dir, "log.info"), [reads_file_name], consensus_file_name, "polish")
+        polished_file = job.out_files["contigs"]
+        if same and not clean and os.path.exists(polished_file):
+            print "Polishing reused:", polished_file
+        else:
+            job.run()
+        return list(SeqIO.parse_fasta(open(polished_file, "r")))[0].seq
 
     def polishNoConsensus(self, reads, edge):
         # type: (sequences.ReadCollection, repeat_graph.Edge) -> str
@@ -325,19 +352,19 @@ class Polisher:
         cc = sequences.ContigCollection([sequences.Contig(base_start, 0)])
         reads_to_base = sequences.ReadCollection(cc).loadFromSam(self.aligner.align(reads, cc))
         print "Polishing quiver of", len(reads_to_base), "reads."
+        best = None
         for read in sorted(list(reads_to_base), key = lambda read: len(read))[::-1]:
-            print read.__str__()
             for al in read.alignments:
                 if al.rc:
                     continue
                 if al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > min_new_len:
-                    # print al.__str__()
                     tmp = self.polishAndAnalyse(reads, sequences.Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0))
-                    # print len(tmp.cut()), len(base_start), pos_start, min_new_len
                     if len(tmp.cut()) > len(base_start) - pos_start + min_new_len:
                         return tmp
+                    if best is None and len(tmp.cut()) > len(base_start) or best is not None and len(tmp.cut()) > len(best.cut()):
+                        best = tmp
                     break
-        return None
+        return best
 
 
 if __name__ == "__main__":

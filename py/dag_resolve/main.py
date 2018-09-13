@@ -1,9 +1,8 @@
 import os
 import sys
+sys.path.append("py")
 
 import dag_resolve.edge_resolver
-
-sys.path.append("py")
 from common import basic
 from dag_resolve import repeat_graph, sequences, graph_resolver, params
 from alignment import align_tools
@@ -32,6 +31,7 @@ if __name__ == "__main__":
     sys.stdout.write("Loading dot\n")
     dot = repeat_graph.DotParser(open(dot_file, "r")).parse(edges)
     graph = repeat_graph.Graph().loadFromDot(edge_sequences, dot)
+    graph.printToFile(sys.stdout)
     sys.stdout.write("Aligning reads\n")
     al = align_tools.Aligner(dir_distributor)
     polisher = align_tools.Polisher(al, dir_distributor)
