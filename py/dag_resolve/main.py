@@ -1,7 +1,10 @@
 import os
 import sys
+
+
 sys.path.append("py")
 
+import alignment.polishing
 import dag_resolve.edge_resolver
 from common import basic
 from dag_resolve import repeat_graph, sequences, graph_resolver, params
@@ -34,13 +37,13 @@ if __name__ == "__main__":
     graph.printToFile(sys.stdout)
     sys.stdout.write("Aligning reads\n")
     al = align_tools.Aligner(dir_distributor)
-    polisher = align_tools.Polisher(al, dir_distributor)
+    polisher = alignment.polishing.Polisher(al, dir_distributor)
     reads = sequences.ReadCollection().loadFromFasta(open(reads, "r"))
     alignment = al.align(reads, sequences.ContigCollection(graph.E.values()))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
     sys.stdout.write("Resolving repeats\n")
-    res = graph_resolver.GraphResolver(graph, graph_resolver.VertexResolver(graph, polisher), dag_resolve.edge_resolver.EdgeResolver(graph, al, polisher))
+    res = graph_resolver.GraphResolver(graph, graph_resolver.VertexResolver(graph, al, polisher), dag_resolve.edge_resolver.EdgeResolver(graph, al, polisher))
     res.resolve()
     sys.stdout.write("Printing results\n")
     res.printResults(sys.stdout)

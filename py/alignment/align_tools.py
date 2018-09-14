@@ -2,16 +2,13 @@ import itertools
 import os
 import sys
 
-from dag_resolve.sequences import Consensus
-from flye.polysh_job import JobPolishing
+from dag_resolve.repeat_graph import Graph
+from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection
 
 sys.path.append("py")
 from typing import Optional, Iterable, Tuple
 
 from common import basic, sam_parser, SeqIO
-from dag_resolve import repeat_graph, sequences, params
-from dag_resolve.params import clean
-from flye import polysh_job
 from flye.alignment import make_alignment
 
 class DirDistributor:
@@ -26,7 +23,7 @@ class DirDistributor:
         return name
 
     def CheckSequences(self, reads, reads_file):
-        # type: (Iterable[sequences.AlignedRead], str) -> bool
+        # type: (Iterable[AlignedRead], str) -> bool
         if not os.path.exists(reads_file):
             return False
         try:
@@ -38,7 +35,7 @@ class DirDistributor:
             return False
 
     def CheckAndWriteSequences(self, reads, reads_file):
-        # type: (Iterable[sequences.AlignedRead], str) -> bool
+        # type: (Iterable[AlignedRead], str) -> bool
         if self.CheckSequences(reads, reads_file):
             return True
         else:
@@ -49,7 +46,7 @@ class DirDistributor:
             return False
 
     def fillNextDir(self, content):
-        # type: (list[Tuple[Iterable[sequences.AlignedRead], str]]) -> Tuple[str, list[str], bool]
+        # type: (list[Tuple[Iterable[AlignedRead], str]]) -> Tuple[str, list[str], bool]
         same = True
         dir = self.nextDir()
         content_files = []
@@ -71,6 +68,32 @@ class AlignedSequences:
         self.last = None # type: int
         self.aligned = False # type: bool
         self.rc = False # type: bool
+
+    def alignedSequence(self):
+        return self.seq_from[self.alignment[self.first]:self.alignment[self.last] + 1]
+
+    def AlignedSegments(self):
+        positions = []
+        res = ""
+        for i in range(self.first, self.last + 1):
+            if self.alignment[i] == -1:
+                continue
+            prev = [(pos, self.alignment[pos]) for pos in range(max(i - 20, 0), i + 1) if self.alignment[pos] != -1]
+            if len(prev) >= 15 and abs(prev[-1][1] - prev[0][1] - 20) < 5:
+                positions.append(i)
+        start = self.first
+        end = self.first
+        for pos in positions:
+            if start == -1:
+                start = pos
+                end = pos
+            if pos - end > 5:
+                res +=  str((self.alignment[start], self.alignment[pos])) + "->" + str((start, pos)) + "\n"
+                start = -1
+            else:
+                end = pos
+        res += str((self.alignment[start], self.alignment[self.last])) + "->" + str((start, self.last)) + "\n"
+        return res
 
     def percentIdentity(self):
         assert self.aligned
@@ -215,7 +238,7 @@ class Aligner:
         self.threads = threads
 
     def align(self, reads, reference):
-        # type: (Iterable[sequences.AlignedRead], Iterable[sequences.Contig]) -> sam_parser.Samfile
+        # type: (Iterable[AlignedRead], Iterable[Contig]) -> sam_parser.Samfile
         dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (reads, "reads.fasta")])
         contigs_file = new_files[0]
         reads_file = new_files[1]
@@ -231,12 +254,12 @@ class Aligner:
         return sam_parser.Samfile(open(alignment_file, "r"))
 
     def matchingAlignment(self, seqs, contig):
-        # type: (list[str], sequences.Contig) -> list[AlignedSequences]
-        collection = sequences.ContigCollection([contig])
-        reads = sequences.ReadCollection(collection)
+        # type: (list[str], Contig) -> list[AlignedSequences]
+        collection = ContigCollection([contig])
+        reads = ReadCollection(collection)
         res = [] # type: list[AlignedSequences]
         for i in range(len(seqs)):
-            reads.add(sequences.AlignedRead(SeqIO.SeqRecord(seqs[i], str(i))))
+            reads.add(AlignedRead(SeqIO.SeqRecord(seqs[i], str(i))))
             res.append(AlignedSequences(seqs[i], contig.seq))
         for rec in self.align(reads, collection):
             tid = int(rec.query_name)
@@ -250,7 +273,7 @@ class Aligner:
         return res
 
     def ReadToAlignedSequences(self, read, contig):
-        # type: (sequences.AlignedRead, sequences.Contig) -> AlignedSequences
+        # type: (AlignedRead, Contig) -> AlignedSequences
         res = AlignedSequences(read.seq, contig.seq)
         for rec in read.alignments:
             if rec.seg_to.contig.id != contig.id:
@@ -265,7 +288,7 @@ class Aligner:
         return res
 
     def repairGraphAlignments(self, graph):
-        # type: (repeat_graph.Graph) -> None
+        # type: (Graph) -> None
         print "Reparing graph alignments for", len(graph.reads), "reads and the following edges:", map(lambda edge: edge.id, graph.newEdges)
         for rec in self.align(graph.reads, graph.newEdges):
             if not rec.is_unmapped:
@@ -275,105 +298,13 @@ class Aligner:
         graph.newEdges = []
 
 
-class FakePolishingArgs:
-    def __init__(self):
-        self.num_iters = params.num_iters
-        self.platform = "pacbio"
-        self.threads = 8
-
-class Polisher:
-    def __init__(self, aligner, dir_distributor):
-        # type: (Aligner, DirDistributor) -> Polisher
-        self.aligner = aligner
-        self.dir_distributor = dir_distributor
-
-    def polish(self, reads, consensus):
-        # type: (sequences.ReadCollection, sequences.Contig) -> str
-        dir, new_files, same = self.dir_distributor.fillNextDir([([consensus], "ref.fasta"), (reads, "reads.fasta")])
-        consensus_file_name = new_files[0]
-        reads_file_name = new_files[1]
-        args = FakePolishingArgs()
-        basic.ensure_dir_existance(os.path.join(dir, "work"))
-        job = JobPolishing(args, os.path.join(dir, "work"), os.path.join(dir, "log.info"), [reads_file_name], consensus_file_name, "polish")
-        polished_file = job.out_files["contigs"]
-        if same and not clean and os.path.exists(polished_file):
-            print "Polishing reused:", polished_file
-        else:
-            job.run()
-        return list(SeqIO.parse_fasta(open(polished_file, "r")))[0].seq
-
-    def polishNoConsensus(self, reads, edge):
-        # type: (sequences.ReadCollection, repeat_graph.Edge) -> str
-        dir = self.dir_distributor.nextDir()
-        consensus_file_name = os.path.join(dir, "ref.fasta")
-        consensus_file = open(consensus_file_name, "w")
-        best_match = 0
-        best = ""
-        best_id = None
-        for read in reads:
-            # print read.id
-            for alignment in read.alignments:
-                # print alignment.__str__()
-                if alignment.seg_to.contig.id == edge.id:
-                    if not alignment.rc:
-                        if alignment.seg_to.left < 100 and len(read) - alignment.seg_from.left > 2000 and alignment.seg_from.left > best_match:
-                            best_match = alignment.seg_from.left
-                            best = read.seq[alignment.seg_from.left:]
-                            best_id = read.id
-                    # else:
-                    #     if alignment.seg_from.right > len(best):
-                    #         best = basic.RC(read.seq[:alignment.seg_from.right])
-                    #         best_id = read.id
-        consensus = SeqIO.SeqRecord(best, best_id)
-        SeqIO.write(consensus, consensus_file, "fasta")
-        consensus_file.close()
-        reads_file_name = os.path.join(dir, "reads.fasta")
-        reads_file = open(reads_file_name, "w")
-        reads.print_fasta(reads_file)
-        reads_file.close()
-        res = polysh_job.polish_from_disk(dir, consensus_file_name, reads_file_name)
-        return list(SeqIO.parse_fasta(open(res, "r")))[0].seq
-
-    def polishAndAnalyse(self, reads, polishing_base):
-        # type: (sequences.ReadCollection, sequences.Contig) -> Consensus
-        seq = sequences.Contig(self.polish(reads, polishing_base), 0)
-        res = [0] * (len(seq) + 1)
-        for rec in self.aligner.align(reads, sequences.ContigCollection([seq])):
-            if rec.is_unmapped:
-                continue
-            res[rec.pos - 1] += 1
-            res[rec.pos + rec.alen - 1] -= 1
-        for i in range(1, len(res)):
-            res[i] += res[i - 1]
-        return Consensus(seq.seq, res)
-
-    def polishQuiver(self, reads, base_start, pos_start, min_new_len = 1000):
-        # type: (sequences.ReadCollection, str, int) -> Optional[Consensus]
-        cc = sequences.ContigCollection([sequences.Contig(base_start, 0)])
-        reads_to_base = sequences.ReadCollection(cc).loadFromSam(self.aligner.align(reads, cc))
-        print "Polishing quiver of", len(reads_to_base), "reads."
-        best = None
-        for read in sorted(list(reads_to_base), key = lambda read: len(read))[::-1]:
-            for al in read.alignments:
-                if al.rc:
-                    continue
-                if al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > min_new_len:
-                    tmp = self.polishAndAnalyse(reads, sequences.Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0))
-                    if len(tmp.cut()) > len(base_start) - pos_start + min_new_len:
-                        return tmp
-                    if best is None and len(tmp.cut()) > len(base_start) or best is not None and len(tmp.cut()) > len(best.cut()):
-                        best = tmp
-                    break
-        return best
-
-
 if __name__ == "__main__":
     dir = sys.argv[1]
     query = sys.argv[2]
     target = sys.argv[3]
     aln = Aligner(dir)
-    contigs = sequences.ContigCollection().loadFromFasta(open(target, "r"))
-    sequences.ReadCollection(contigs).loadFromSam(aln.align(sequences.ReadCollection().loadFromFasta(open(query, "r")), contigs)).print_alignments(sys.stdout)
+    contigs = ContigCollection().loadFromFasta(open(target, "r"))
+    ReadCollection(contigs).loadFromSam(aln.align(ReadCollection().loadFromFasta(open(query, "r")), contigs)).print_alignments(sys.stdout)
 
 
 

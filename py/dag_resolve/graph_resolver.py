@@ -3,76 +3,113 @@ import sys
 
 from typing import Optional
 
-from alignment import align_tools
-from common import basic
-from dag_resolve import repeat_graph, line_tools, sequences, filters
+from alignment.align_tools import Aligner
+from alignment.polishing import Polisher
+from common import sam_parser
 from dag_resolve.edge_resolver import EdgeResolver
-from dag_resolve.line_tools import LineTail
+from dag_resolve.filters import EdgeTransitionFilter
+from dag_resolve.line_tools import LineTail, LineSegment, LineStorage
+from dag_resolve.repeat_graph import Graph, Edge, Vertex
+from dag_resolve.sequences import Contig, ReadCollection
 
 
 class VertexResolver:
-    def __init__(self, graph, polisher):
-        # type: (repeat_graph.Graph, align_tools.Polisher) -> VertexResolver
+    def __init__(self, graph, aligner, polisher):
+        # type: (Graph, Aligner, Polisher) -> VertexResolver
         self.graph = graph
         self.lineStorage = None
         self.polisher = polisher
+        self.aligner = aligner
 
     def transitionSupport(self, prev, seg, next):
-        # type: (repeat_graph.Edge, line_tools.LineSegment, repeat_graph.Edge) -> sequences.ReadCollection
-        return seg.reads.filter(filters.EdgeTransitionFilter(prev, next))
+        # type: (Edge, LineSegment, Edge) -> ReadCollection
+        return seg.reads.filter(EdgeTransitionFilter(prev, next))
 
     def resolveVertex(self, v):
-        # type: (repeat_graph.Vertex) -> Optional[list]
+        # type: (Vertex) -> bool
         print "Resolving vertex", v.id
         print "Incoming edges:", map(lambda e: e.id, v.inc)
         print "Outgoing edges:", map(lambda e: e.id, v.out)
         assert len(v.out) > 0, "Trying to resolve hanging vertex " + str(v.id)
-        res = []
         for edge in v.inc:
-            print "Edge:", edge.id
-            for lineSegment in self.lineStorage.resolved_edges[edge.id]:
-                print "New line"
-                support = []
-                for next_candidate in v.out:
-                    support.append(self.transitionSupport(edge, lineSegment, next_candidate))
-                if len(v.out) == 1:
-                    next = 0
+            for lineSegment in self.lineStorage.edgeLines(edge):# type:LineSegment
+                print "Creating a tail for line", lineSegment.line
+                base_seq = lineSegment.seq[-min(5000, len(lineSegment.seq)):]
+                consensus = self.polisher.polishQuiver(lineSegment.reads, base_seq, len(base_seq), 3000)
+                consensus = consensus.cut()
+                print "Created consensus of length", len(consensus)
+                first = None
+                for rec in self.aligner.align([Contig(consensus.seq, 0)], v.out):
+                    print rec.is_unmapped
+                    if not rec.is_unmapped:
+                        print rec.rc, rec.alen, rec.pos, rec.tname
+                    if not rec.is_unmapped and not rec.rc and rec.alen > 300 and (first == None or rec.pos < first.pos):
+                        first = rec
+                if first is None:
+                    print "Could not connect one of the tails. Aborting."
+                    return False
+                print "Found connection of consensus to position", first.pos, "of edge", first.tname
+                read_pos = list(sam_parser.ParseCigar(first.cigar, len(consensus), first.pos))[0][0]
+                new_edge = self.graph.E[int(first.tname)]
+                filtered_reads = lineSegment.reads.inter(sequences.Segment(new_edge, first.pos, first.pos + first.alen))
+                if first.pos < 500:
+                    print read_pos, "nucleotedes were hidden inside a vertex"
+                    lineSegment.line.tail = LineTail(lineSegment.line, new_edge, consensus.suffix(read_pos), filtered_reads)
                 else:
-                    supportWeight = map(len, support)
-                    print "Number of reads that support transitions for the line from edge", edge.id, ":", ",".join(
-                        map(str, supportWeight))
-                    next, alternative = basic.best2(supportWeight, lambda x, y: x > y)
-                    if supportWeight[alternative] * 5 > supportWeight[next]:
-                        print "Support of alternative edge is too high. Aborting."
-                        return None
-                reads = support[next] # type: sequences.ReadCollection
-                tail = self.polisher.polishAndAnalyse(reads, v.out[next])
-                res.append(LineTail(lineSegment.line, v.out[next], tail, reads))
-                print "Created tail on edge", edge.id, "of length", len(tail.cut())
-        return res
+                    if read_pos < 500:
+                        print "Late entrances not supported. Aborting."
+                        return False
+                    print "Reparing graph and restarting vertex resolution"
+                    new_edge = self.graph.addCuttingEdge(new_edge, 0, new_edge, first.pos, consensus.seq[:read_pos])
+                    self.aligner.repairGraphAlignments(self.graph)
+                    self.graph.printToFile(sys.stdout)
+                    return self.resolveVertex(v)
+                    # lineSegment.line.tail = LineTail(lineSegment.line, new_edge, consensus.cut(length=read_pos), filtered_reads)
+
+
+                # support = []
+                # for next_candidate in v.out:
+                #     support.append(self.transitionSupport(edge, lineSegment, next_candidate))
+                # if len(v.out) == 1:
+                #     next = 0
+                # else:
+                #     supportWeight = map(len, support)
+                #     print "Number of reads that support transitions for the line from edge", edge.id, ":", ",".join(
+                #         map(str, supportWeight))
+                #     next, alternative = basic.best2(supportWeight, lambda x, y: x > y)
+                #     if supportWeight[alternative] * 5 > supportWeight[next]:
+                #         print "Support of alternative edge is too high. Aborting."
+                #         return False
+                # reads = support[next] # type: sequences.ReadCollection
+                # tail = self.polisher.polishAndAnalyse(reads, v.out[next])
+                # lineSegment.line.tail = LineTail(lineSegment.line, v.out[next], tail, reads)
+                # print "Created tail of line", lineSegment.line, "on edge", v.out[next].id, "of length", len(tail.cut())
+        return True
 
 
 class GraphResolver:
     def __init__(self, graph, vertexResolver, edgeResolver):
-        # type: (repeat_graph.Graph, VertexResolver, EdgeResolver) -> GraphResolver
+        # type: (Graph, VertexResolver, EdgeResolver) -> GraphResolver
         self.graph = graph
-        self.lineStorage = line_tools.LineStorage(graph)
+        self.lineStorage = LineStorage(graph)
         self.vertexResolver = vertexResolver
         vertexResolver.lineStorage = self.lineStorage
         self.edgeResolver = edgeResolver
         edgeResolver.lineStorage = self.lineStorage
 
     def resolveVertexForward(self, v):
-        # type: (repeat_graph.Vertex) -> None
-        tails = sorted(self.vertexResolver.resolveVertex(v), key = lambda tail: tail.edge.id)
-        for edge, tails_generator in itertools.groupby(tails, lambda tail: tail.edge):
-            tails_list = list(tails_generator) # type: list[LineTail]
+        # type: (Vertex) -> None
+        if not self.vertexResolver.resolveVertex(v):
+            print "Failed to resolve vertex", v.id
+            return
+        for edge in v.out:
+            tails_list = list(self.lineStorage.edgeTails(edge))
             if edge.id in self.lineStorage.resolved_edges:
                 assert len(tails_list) == 1
-                nextLine = self.lineStorage.resolved_edges[edge.id][0].line
-                assert nextLine.leftSegment().edge.id == edge.id
+                nextLine = list(self.lineStorage.edgeLines(edge))[0].line
+                assert nextLine.leftSegment().edge == edge
                 tails_list[0].line.merge(nextLine)
-                print "Successfully connected line", tails_list[0].line.shortStr()
+                print "Successfully connected line", tails_list[0].line.__str__()
             else:
                 while edge is not None:
                     finished, new_edge = self.edgeResolver.resolveEdge(edge, tails_list)
@@ -86,7 +123,6 @@ class GraphResolver:
                     edge = new_edge
 
     def resolve(self):
-        print self.graph.V
         visited_vertices = set()
         while True:
             cnt = 0
@@ -113,12 +149,12 @@ class GraphResolver:
                 continue
             tmp = line
             printed.add(tmp.id)
-            handler.write(tmp.shortStr())
+            handler.write(tmp.__str__())
             while tmp.nextLine is not None:
                 tmp = tmp.nextLine
                 printed.add(tmp.id)
                 handler.write("->")
-                handler.write(tmp.shortStr())
+                handler.write(tmp.__str__())
             handler.write("\n")
         for line in self.lineStorage.lines:
             if line.id in printed:
@@ -126,12 +162,12 @@ class GraphResolver:
             tmp = line
             printed.add(tmp.id)
             handler.write("->")
-            handler.write(tmp.shortStr())
+            handler.write(tmp.__str__())
             while tmp.nextLine is not None and tmp.id not in printed:
                 tmp = tmp.nextLine
                 printed.add(tmp.id)
                 handler.write("->")
-                handler.write(tmp.shortStr())
+                handler.write(tmp.__str__())
             handler.write("->")
             handler.write("\n")
 

@@ -168,7 +168,7 @@ class AlignedRead:
 
     def __str__(self):
         self.sort()
-        return "Read:" + str(self.id) + "[" + ".".join(map(str, self.alignments)) + "]"
+        return str(self.id) + "(" + str(len(self.seq)) + ")" + "[" + ".".join(map(str, self.alignments)) + "]"
 
     def setSeq(self, seq):
         assert self.seq == "", "Changing assigned read sequence"
@@ -345,9 +345,15 @@ class Consensus:
         self.seq = seq
         self.cov = cov
         if full_seq is None:
-            self.full_seq = self # type: Consensus
+            self.full = self # type: Consensus
         else:
-            self.full_seq = full_seq # type: Consensus
+            self.full = full_seq # type: Consensus
+
+    def suffix(self, pos):
+        if self == self.full:
+            return Consensus(self.seq[pos:], self.cov[pos:])
+        else:
+            return Consensus(self.seq[pos:], self.cov[pos:], self.full.suffix(pos))
 
     def printQuality(self, handler, cov_threshold = params.reliable_coverage):
         # type: (file, int) -> None
@@ -369,7 +375,7 @@ class Consensus:
             l += 1
         if length is not None:
             l = min(l, length)
-        return Consensus(self.seq[:l], self.cov[:l], self)
+        return Consensus(self.seq[:l], self.cov[:l], self.full)
 
     def __len__(self):
         return len(self.seq)

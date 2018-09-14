@@ -1,6 +1,7 @@
 from typing import Generator, Dict
 
 from alignment import align_tools
+from common import basic
 from dag_resolve import repeat_graph
 from dag_resolve import sequences
 from dag_resolve.phasing import Phasing
@@ -23,6 +24,8 @@ class Line:
         self.chain = [LineSegment(self, 0, edge, edge.seq, Phasing(), edge.reads)] # type: list[LineSegment]
         self.nextLine = None
         self.id = edge.id
+        self.tail = None # type: LineTail
+        self.rc = None
 
     def extendRight(self, edge, seq, phasing, reads):
         # type: (repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
@@ -31,6 +34,13 @@ class Line:
     def extendLeft(self, edge, seq, phasing, reads):
         # type: (repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
         self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, phasing, reads))
+
+    def freezeTail(self):
+        tail_seq = self.tail.alignment.alignedSequence()
+        new_segment = LineSegment(self, self.chain[-1].pos + 1, self.tail.edge, tail_seq,
+                                  self.tail.phasing, self.tail.reads)
+        self.chain.append(new_segment)
+        self.tail = None
 
     def rightSegment(self):
         # type: () -> LineSegment
@@ -46,7 +56,7 @@ class Line:
             if seg.edge.id == edge.id:
                 yield seg
 
-    def shortStr(self):
+    def __str__(self):
         return "[" + ",".join(map(lambda seg: str(seg.edge.id), self.chain)) + "]"
 
     def __getitem__(self, item):
@@ -62,22 +72,17 @@ class LineStorage:
         # type: (repeat_graph.Graph) -> LineStorage
         self.g = g
         self.lines = [] #type: list[Line]
-        self.resolved_edges = dict() #type: Dict[int, list[LineSegment]]
-        for edge in g.E.values():
-            if edge.info.unique:
-                self.addLine(Line(edge))
-
-    def addLine(self, line):
-        # type: (Line) -> None
-        for seg in line.chain:
-            self.addSegment(seg)
-        self.lines.append(line)
-
-    def addSegment(self, seg):
-        # type: (LineSegment) -> None
-        if seg.edge.id not in self.resolved_edges:
-            self.resolved_edges[seg.edge.id] = []
-        self.resolved_edges[seg.edge.id].append(seg)
+        self.resolved_edges = set() #type: set[int]
+        for edge1, edge2 in g.unorientedEdges():
+            if edge1.info.unique:
+                self.resolved_edges.add(edge1.id)
+                self.resolved_edges.add(edge2.id)
+                line1 = Line(edge1)
+                line2 = Line(edge2)
+                line1.rc = line2
+                line2.rc = line1
+                self.lines.append(line1)
+                self.lines.append(line2)
 
     def isResolvableLeft(self, v):
         # type: (repeat_graph.Vertex) -> bool
@@ -88,15 +93,24 @@ class LineStorage:
                 return False
         return True
 
-    def extendRight(self, line, edge, seq, phasing, reads):
-        # type: (Line, repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
-        line.extendRight(edge, seq, phasing, reads)
-        self.addSegment(line.rightSegment())
+    def edgeLines(self, edge):
+        # type: (repeat_graph.Edge) -> Generator[LineSegment]
+        assert edge.id in self.resolved_edges
+        for line in self.lines:
+            for segment in line.chain:
+                if segment.edge == edge:
+                    yield segment
+
+    def edgeTails(self, edge):
+        # type: (repeat_graph.Edge) -> Generator[LineTail]
+        for line in self.lines:
+            if line.tail is not None and line.tail.edge == edge:
+                yield line.tail
 
     def printToFile(self, handler):
         # type: (file) -> None
         for line in self.lines:
-            handler.write(line.shortStr() + "\n")
+            handler.write(line.__str__() + "\n")
 
 
 class LineTail:
@@ -107,6 +121,7 @@ class LineTail:
         self.tail_consensus = tail_consensus
         self.reads = read_collection
         self.alignment = None # type: align_tools.AlignedSequences
+        self.phasing = None
 
     def __len__(self):
         # type: () -> int

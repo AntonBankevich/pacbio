@@ -1,6 +1,6 @@
 from common import basic, sam_parser, SeqIO
-from dag_resolve import sequences
 from typing import Generator, Dict, Optional
+from dag_resolve.sequences import Contig, ReadCollection, ContigCollection
 
 
 class EdgeInfo:
@@ -37,10 +37,10 @@ class Vertex:
 class Edge(sequences.Contig):
     def __init__(self, id, start, end, consensus, info = None):
         # type: (int, Vertex, Vertex, str, EdgeInfo) -> Edge
-        sequences.Contig.__init__(self, consensus, id, info)
+        Contig.__init__(self, consensus, id, info)
         self.start = start
         self.end = end
-        self.reads = sequences.ReadCollection(sequences.ContigCollection([self]))
+        self.reads = ReadCollection(ContigCollection([self]))
         self.rc = None # type: Edge
 
     def __eq__(self, other):
@@ -61,7 +61,7 @@ class Graph:
         self.min_new_vid = 1
         self.min_new_eid = 6000
         self.newEdges = []
-        self.reads = sequences.ReadCollection(self.edgeCollection())
+        self.reads = ReadCollection(self.edgeCollection())
 
     def addVertex(self, v_id = None, label = None):
         # type: (int, str) -> Vertex
@@ -85,7 +85,7 @@ class Graph:
             handler.write(str(edge.id) + "(" + str(len(edge)) + ")" + ": " + str(edge.start.id) + " -> " + str(edge.end.id) + "\n")
 
     def edgeCollection(self):
-        return sequences.ContigCollection(self.E.values())
+        return ContigCollection(self.E.values())
 
     def addEdge(self, edge_id, start_id, end_id, consensus, info = None):
         # type: (Optional[int], int, int, str, EdgeInfo) -> Edge
@@ -154,7 +154,7 @@ class Graph:
 
     def addCuttingEdge(self, edge1, pos1, edge2, pos2, seq):
         # type: (Edge, int, Edge, int, str) -> Edge
-        print "Edding cutting edge from position", pos1,"on edge", edge1.id,"to position", pos2, "on edge", edge2.id, "of length", len(seq)
+        print "Adding cutting edge from position", pos1,"on edge", edge1.id,"to position", pos2, "on edge", edge2.id, "of length", len(seq)
         if edge1.id == edge2.id:
             vertices = self.splitEdge(edge1, [pos1, pos2])
         else:
@@ -167,12 +167,16 @@ class Graph:
         # type: (Edge) -> None
         for read in edge.reads:
             read.removeContig(edge)
+            read.removeContig(edge.rc)
         edge.start.removeEdge(edge)
         edge.end.removeEdge(edge)
+        edge.rc.start.removeEdge(edge.rc)
+        edge.rc.end.removeEdge(edge.rc)
         del self.E[edge.id]
+        del self.E[edge.rc.id]
 
     def loadFromDot(self, contigs, dot):
-        # type: (sequences.ContigCollection, Generator[tuple]) -> Graph
+        # type: (ContigCollection, Generator[tuple]) -> Graph
         recs = list(dot)
         v_rc = dict()
         recs = sorted(recs, key = lambda rec: abs(rec[0]))
@@ -214,7 +218,10 @@ class Graph:
             self.E[edge_id].reads.addNewAlignment(rec)
         self.newEdges = []
 
-
+    def unorientedEdges(self):
+        for edge in self.E.values():
+            if edge.id <= edge.rc.id:
+                yield (edge, edge.rc)
 
 class DotParser:
     def __init__(self, dot):

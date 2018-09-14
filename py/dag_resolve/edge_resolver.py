@@ -3,38 +3,40 @@ import sys
 from typing import Optional, Tuple
 
 import dag_resolve.phasing
-from alignment import align_tools
 from alignment.accurate_alignment import AccurateAligner
+from alignment.align_tools import Aligner, AlignedSequences
+from alignment.polishing import Polisher
 from common import basic, SeqIO
-from dag_resolve import line_tools, sequences, params, repeat_graph
+from dag_resolve import params
 from dag_resolve.divergence import Divergence
 from dag_resolve.line_tools import LineTail
-from dag_resolve.params import radius
+from dag_resolve.phasing import Phasing
+from dag_resolve.repeat_graph import Graph, Edge
+from dag_resolve.sequences import AlignedRead, Contig, ReadCollection, ContigCollection
 
 
 class EdgeResolver:
     def __init__(self, graph, aligner, polisher):
-        # type: (repeat_graph.Graph, align_tools.Aligner, align_tools.Polisher) -> EdgeResolver
+        # type: (Graph, Aligner, Polisher) -> EdgeResolver
         self.graph = graph
         self.lineStorage = None
         self.aligner = aligner
         self.polisher = polisher
 
     def findDivergence(self, tails):
-        # type: (list[LineTail]) -> tuple[list[dag_resolve.divergence.Divergence], list[dag_resolve.phasing.Phasing]]
+        # type: (list[LineTail]) -> list[dag_resolve.divergence.Divergence]
         assert len(tails) > 0
         edge = tails[0].edge
         alignments_list = map(lambda t: t.alignment, tails)
         first = max(map(lambda al: al.first, alignments_list))
         last = min(map(lambda al: al.last, alignments_list))
-        assert first + radius < last - radius
-        bad_positions = list(basic.merge(*map(lambda alignment: alignment.divPositions(first + radius, last - radius), alignments_list)))
+        assert first + params.radius < last - params.radius
+        bad_positions = list(basic.merge(*map(lambda alignment: alignment.divPositions(first + params.radius, last - params.radius), alignments_list)))
         div_list = []  # type: list[dag_resolve.divergence.Divergence]
-        phasings = []  # type: list[dag_resolve.phasing.Phasing]
         for t in tails:
-            phasings.append(dag_resolve.phasing.Phasing())
+            t.phasing = Phasing()
         if len(bad_positions) == 0:
-            return div_list, phasings
+            return div_list
         div_pos = [[bad_positions[0], bad_positions[0], 1]]
         for pos in bad_positions[1:]:
             if pos > div_pos[-1][1] + radius:
@@ -52,31 +54,27 @@ class EdgeResolver:
                     states.append(seg_seq)
                 if len(set(states)) >= 2:
                     states_dict = dict()
-                    for i, seg_seq in enumerate(states):
+                    for tail, seg_seq in zip(tails, states):
                         if seg_seq not in states_dict:
                             states_dict[seg_seq] = divergence.addState(seg_seq)
-                        phasings[i].add(states_dict[seg_seq])
+                        tail.phasing.add(states_dict[seg_seq])
                     div_list.append(divergence)
             else:
                 sys.stdout.write("Long divergence: " + str(rec[0]) + " " + str(rec[1]) + " " + str(rec[2]) + "\n")
         print "Divergence rate:", float(sum([pos_rec[2] for pos_rec in div_pos])) / len(edge)
         for i, div in enumerate(div_list):
             print "Divergence", i, ":", div.pos, ",".join([state.seq for state in div.states if state.seq is not None])
-        for phasing in phasings:
-            phasing.printToFile(sys.stdout)
-        return div_list, phasings
+        for tail in tails:
+            tail.phasing.printToFile(sys.stdout)
+        return div_list
 
     def determinePhasing(self, read, consensus, div_list):
-        # type: (sequences.AlignedRead, sequences.Contig, list[dag_resolve.divergence.Divergence]) -> line_tools.Phasing
-        # print "Determining phasing of read", read.id
-        seq = read.seq
-        res = line_tools.Phasing()
+        # type: (AlignedRead, Contig, list[dag_resolve.divergence.Divergence]) -> Phasing
+        res = Phasing()
         alignment = self.aligner.ReadToAlignedSequences(read, consensus)
-        # alignment = self.aligner.matchingAlignment([read.seq], consensus)[0]
-        # print "from-to:", read.__str__()
         if not alignment.aligned:
             print "WARNING: ALIGNED READ DID NOT ALIGN:", read.id
-            return line_tools.Phasing()
+            return Phasing()
         seq = alignment.seq_from
         cnt = 0
         toprint = []
@@ -88,9 +86,8 @@ class EdgeResolver:
                 res.add(div.ambiguous)
                 continue
             div.statistics.called += 1
-            nighborhood = seq[pos[0] - radius // 2: pos[1] + radius // 2 + 1]
+            nighborhood = seq[pos[0] - params.radius // 2: pos[1] + params.radius // 2 + 1]
             weights = [AccurateAligner().align(nighborhood, state.seq) for state in div.states]
-            # print weights
             sorted_weights = sorted(weights)
             if sorted_weights[0] * 1.3 > sorted_weights[1]:
                 res.add(div.ambiguous)
@@ -105,7 +102,7 @@ class EdgeResolver:
         return res
 
     def callRead(self, read, consensus, div_list, phasings, min_div_number = 5):
-        # type: (sequences.AlignedRead, sequences.Contig, list[dag_resolve.divergence.Divergence], list[line_tools.Phasing]) -> tuple[Optional[int], bool]
+        # type: (AlignedRead, Contig, list[dag_resolve.divergence.Divergence], list[Phasing]) -> Tuple[Optional[int], bool]
         print "Calling read", read.__str__()
         read_phasing = self.determinePhasing(read, consensus, div_list)
         if len(phasings) > 2:
@@ -153,7 +150,7 @@ class EdgeResolver:
 
 
     def comparePhasings(self, query, targets):
-        # type: (dag_resolve.phasing.Phasing, list[dag_resolve.phasing.Phasing]) -> list[list[int]]
+        # type: (Phasing, list[Phasing]) -> list[list[int]]
         res = []
         for i in range(len(targets)):
             res.append([])
@@ -172,43 +169,47 @@ class EdgeResolver:
                     res[i].append(0)
         return res
 
-    def alignAndCutTails(self, tails):
+    def straightenTails(self, tails):
         # type: (list[LineTail]) -> int
-        self.alignTails(tails)
         cur_depth = min([tail.alignment.last for tail in tails])
         for tail in tails:
             tail_depth = tail.alignment.alignment[tail.alignment.findPreviousMatch(cur_depth)]
             tail.tail_consensus = tail.tail_consensus.cut(length = tail_depth)
+        print "Straightened tails to lengths:", str(map(len, tails))
         return cur_depth
+
+    def cutTails(self, tails, cov = params.reliable_coverage):
+        for tail in tails:
+            tail.tail_consensus = tail.tail_consensus.cut(cov)
+        print "Cut tails to lengths:", str(map(len, tails))
 
     def alignTails(self, tails):
         # type: (list[LineTail]) -> None
-        print "New tails lengths:", map(len, tails)
-        for tail in tails:
-            tail.tail_consensus = tail.tail_consensus.cut()
-        print "Cut tails lengths:", map(len, tails)
         alignments_list = self.aligner.matchingAlignment(map(lambda tail: tail.tail_consensus.seq, tails),
                                                          tails[0].edge)
         for tail, alignment in zip(tails, alignments_list):
             tail.alignment = alignment
-        print "Tail alignments:", map(lambda tail: (tail.alignment.first, tail.alignment.last), tails)
+        print "Tails aligned to segments:", map(lambda tail: (tail.alignment.first, tail.alignment.last), tails)
         print "Tail aligned segments:", map(
             lambda tail: (tail.alignment[tail.alignment.first], tail.alignment[tail.alignment.last]), tails)
 
 #This method is not used
     def AlignToTails(self, tails, reads):
-        # type: (list[LineTail], sequences.ReadCollection) -> sequences.ReadCollection
-        tail_contigs = sequences.ContigCollection()
+        # type: (list[LineTail], ReadCollection) -> ReadCollection
+        tail_contigs = ContigCollection()
         for i, tail in enumerate(tails):
-            tail_contig = sequences.Contig(tail.tail_consensus.seq, i)
+            tail_contig = Contig(tail.tail_consensus.seq, i)
             tail_contigs.add(tail_contig)
-        res = sequences.ReadCollection(tail_contigs)
+        res = ReadCollection(tail_contigs)
         for tail_contig in tail_contigs:
             res.loadFromSam(self.aligner.align(reads, sequences.ContigCollection([tail_contig])))
         return res
 
     def resolveEdge(self, e, tails):
-        # type: (repeat_graph.Edge, list[LineTail]) -> tuple[bool, Optional[repeat_graph.Edge]]
+        # type: (Edge, list[LineTail]) -> Tuple[bool, Optional[Edge]]
+        print "Resolving edge", e.id, "of length", len(e), "into", len(tails), "lines"
+        for tail in tails:
+            print tail.line
         tails = list(tails)
         if len(tails) == 1:
             tails[0].reads.extend(e.reads)
@@ -220,16 +221,18 @@ class EdgeResolver:
             phased_reads.extend(tail.reads)
         undecided = e.reads.minus(phased_reads)
         print len(e.reads), len(phased_reads), len(undecided)
-        cur_depth = self.alignAndCutTails(tails)
+        self.cutTails(tails)
+        self.alignTails(tails)
+        cur_depth = self.straightenTails(tails)
         min_div_number = 5
         while True:
             print "Starting new iteration with current depth:", cur_depth
             print len(e.reads) - len(undecided), "reads already classified.", len(undecided), "reads left to classify"
-            line_reads = []  # type: list[sequences.ReadCollection]
+            line_reads = []  # type: list[ReadCollection]
             for tail in tails:
-                line_reads.append(sequences.ReadCollection(sequences.ContigCollection([e])))
+                line_reads.append(ReadCollection(ContigCollection([e])))
             print "Tail lengths: ", map(lambda tail: len(tail.tail_consensus), tails)
-            divergences, phasings = self.findDivergence(tails)
+            divergences = self.findDivergence(tails)
             cnt_end_div = 0
             for div in divergences:
                 if div.pos[0] > cur_depth - 3000:
@@ -241,15 +244,8 @@ class EdgeResolver:
                     interesting_reads = list(e.reads.reads.values())
                 interesting_reads = sorted(interesting_reads, key = lambda read: read.contigAlignment(e)[1])
                 print "Attempting to classify", len(interesting_reads), "reads"
-                # print "Aligning reads to tails"
-                # tail_alignment = self.AlignToTails(tails, interesting_reads)
-                # print "Alignment finished. Calling reads."
                 for read in interesting_reads:
-                    # if read.id not in tail_alignment.reads:
-                    #     print "WARNING: Read", read.id, "was not aligned to tails. Skipping."
-                    #     print read
-                    # read_to_tail = tail_alignment.reads[read.id]
-                    call_result, permanent = self.callRead(read, e, divergences, phasings, min_div_number)
+                    call_result, permanent = self.callRead(read, e, divergences, [tail.phasing for tail in tails], min_div_number)
                     if call_result is not None:
                         if permanent:
                             tails[call_result].reads.add(read)
@@ -257,13 +253,11 @@ class EdgeResolver:
                             undecided.remove(read)
                         else:
                             line_reads[call_result].add(read)
-                    # if call_result is not None:
-                    #     line_reads[call_result].add(read)
                 for div in divergences:
                     print div.pos, div.statistics.__str__()
                 print "Calling results for", len(tails), "tails"
                 for tail, reads in zip(tails, line_reads):
-                    print tail.line.shortStr(), len(reads), "of", len(interesting_reads)
+                    print tail.line.__str__(), len(reads), "of", len(interesting_reads)
             for tail, read_collection in zip(tails, line_reads):
                 read_collection.extend(tail.reads)
                 new_consensus = self.polisher.polishQuiver(read_collection, tail.tail_consensus.seq, 0)
@@ -272,7 +266,9 @@ class EdgeResolver:
                     tail.tail_consensus = new_consensus
                 else:
                     print "Failed to construct longer consensus"
-            new_depth = self.alignAndCutTails(tails)
+            self.cutTails(tails)
+            self.alignTails(tails)
+            new_depth = self.straightenTails(tails)
             for tail in tails:
                 print "New tail alignes to segment from ", tail.alignment.first, "to", tail.alignment.last, "with percent identity", tail.alignment.percentIdentity()
             for tail in tails:
@@ -282,22 +278,27 @@ class EdgeResolver:
                 for tail, read_collection in zip(tails, line_reads):
                     tail.reads = read_collection
                 if new_depth > len(e) - 200:
-                    for tail, phasing in zip(tails, phasings):
-                        self.lineStorage.extendRight(tail.line, e, tail.tail_consensus, phasing, tail.reads)
+                    for tail in tails:
+                        tail.line.freezeTail()
+                    self.lineStorage.resolved_edges.add(e.id)
                     return True, None
                 repaired, new_edge = self.AttemptRepairGraph(tails)
                 if repaired:
                     return False, new_edge
-                repaired = min(map(lambda tail: tail.alignment.percentIdentity(), tails)) < 0.85 and self.AttemptRepairRecruitment(tails)
+                recruitmentRequired = min(map(lambda tail: tail.alignment.percentIdentity(), tails)) < 0.85
+                if recruitmentRequired:
+                    repaired = self.AttemptRepairRecruitment(tails)
+                recruitmentRequired = False
                 if not repaired:
                     return False, None
             cur_depth = new_depth
 
     def AttemptRepairGraph(self, tails):
-        # type: (list[LineTail]) -> Tuple[bool, Optional[repeat_graph.Edge]]
+        # type: (list[LineTail]) -> Tuple[bool, Optional[Edge]]
         print "Attempting to repair graph"
         for tail in tails:
             tail.tail_consensus = self.polisher.polishQuiver(tail.reads, tail.tail_consensus.seq, 0)
+        self.cutTails(tails)
         self.alignTails(tails)
         largest_problem = tails[0]
         print "Tail alignments and lengths"
@@ -305,14 +306,17 @@ class EdgeResolver:
             if tail.alignment.last < largest_problem.alignment.last:
                 largest_problem = tail
         print "Largest problem is tail of line", largest_problem.line.id, "Alignment is broken at position", largest_problem.alignment.last
-        largest_problem.tail_consensus = largest_problem.tail_consensus.full_seq.cut(5)
         if len(largest_problem) - largest_problem.alignment[largest_problem.alignment.last] > 700:
             next_alignment = None
-            tmp = sequences.ReadCollection(self.graph.edgeCollection())
+            tmp = ReadCollection(self.graph.edgeCollection())
             tmp.loadFromSam(self.aligner.align([SeqIO.SeqRecord(largest_problem.tail_consensus.seq, "tail")], self.graph.edgeCollection()))
             read = tmp.reads["tail"]
             print "Largest problem alignment:", read.__str__()
             for al in read.alignments:
+                tmp = AlignedSequences(al.seg_from.contig.seq, al.seg_to.contig.seq)
+                tmp.addCigar(al.cigar, al.seg_to.left)
+                print tmp.percentIdentity()
+                print tmp.AlignedSegments()
                 if not al.rc and al.seg_from.right - al.seg_from.left > 500 \
                         and al.seg_from.left > largest_problem.alignment[largest_problem.alignment.last] - 50\
                         and (next_alignment is None or next_alignment.seg_from.left > al.seg_from.left):
@@ -335,7 +339,7 @@ class EdgeResolver:
             return False, None
 
     def AttemptRepairRecruitment(self, tails):
-        # type: (list[line_tools.LineTail]) -> bool
+        # type: (list[LineTail]) -> bool
         print "Attempting to repair read recruitment"
         edge = tails[0].edge
         new_alignments = dict()
