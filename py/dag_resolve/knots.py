@@ -39,8 +39,8 @@ class Knotter:
             reads = reads.filter(lambda read: self.checkConnect(read, seg1, seg2))
         print len(reads), "supporting reads"
         if len(reads) >= params.min_reads_in_knot:
-            line1.knot = Knot(line1.tail, line2.tail, "", reads)
-            line2.knot = Knot(line2.tail, line1.tail, "", reads)
+            line1.knot = Knot(line1, line2, "", reads)
+            line2.knot = Knot(line2, line1, "", reads)
             line1.tail = None
             line2.tail = None
             print "Knotted lines", line1, "and", line2
@@ -52,15 +52,12 @@ class Knotter:
         print "Knotting lines"
         for line1 in self.storage.lines:
             for line2 in self.storage.lines:
-                # print line1, line2, line1.tail is None, line2 is None, line1.id < line2.id
                 if line1.knot is None and line2.knot is None and line1.id < line2.id:
-                    # print "Doit"
                     if self.tryKnot(line1, line2):
                         break
 
     def checkConnect(self, read, seg1, seg2):
         # type: (AlignedRead, Segment, Segment) -> bool
-        # print read, seg1, seg2
         for aln1 in read.alignments:
             if not aln1.seg_to.inter(seg1):
                 continue

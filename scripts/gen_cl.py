@@ -15,4 +15,4 @@ for dir in os.listdir(indir):
     contigs = os.path.join(indir, dir, "2-repeat", "graph_final.fasta")
     dot = os.path.join(indir, dir, "2-repeat", "graph_final.dot")
     out = os.path.join(outdir, dir)
-    print "python py/dag_resolve/main.py " + " ".join(contigs, dot, reads, "\"\"", out)
+    print "python py/dag_resolve/main.py " + " ".join([contigs, dot, reads, "\"\"", out])

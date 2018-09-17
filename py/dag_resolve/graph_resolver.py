@@ -202,7 +202,7 @@ class GraphResolver:
                     line = None
                 else:
                     handler.write("->")
-                    line = line.rc.knot.tail2.line
+                    line = line.rc.knot.line2
             handler.write("\n")
 
         for line in self.lineStorage.lines:
@@ -219,7 +219,7 @@ class GraphResolver:
                     line = None
                 else:
                     handler.write("->")
-                    line = line.rc.knot.tail2.line
+                    line = line.rc.knot.line2
             handler.write("->\n")
 
 

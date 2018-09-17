@@ -138,9 +138,9 @@ class LineTail:
 
 
 class Knot:
-    def __init__(self, tail1, tail2, seq, reads):
-        # type: (LineTail, LineTail, str, ReadCollection) -> Knot
-        self.tail1 = tail1
-        self.tail2 = tail2
+    def __init__(self, line1, line2, seq, reads):
+        # type: (Line, Line, str, ReadCollection) -> Knot
+        self.line1 = line1
+        self.line2 = line2
         self.seq = seq
         self.reads = reads
