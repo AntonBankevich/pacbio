@@ -136,11 +136,6 @@ class GraphResolver:
         visited_vertices = set()
         while True:
             cnt = 0
-            v = self.graph.E[-10].end
-            if v.id not in visited_vertices and self.lineStorage.isResolvableLeft(v):
-                self.resolveVertexForward(v)
-                visited_vertices.add(v.id)
-                cnt += 1
             for v in self.graph.V.values():
                 v_id = v.id
                 if v_id in [self.graph.source.id, self.graph.sink.id] or v_id in visited_vertices:
