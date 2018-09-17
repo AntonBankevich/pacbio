@@ -62,6 +62,8 @@ class Polisher:
                         # print read.__str__(), al.seg_to.right, len(base_start), pos_start, al.seg_from.right, len(tmp)
                         best = tmp
                     break
+        if best is None:
+            best = self.polishAndAnalyse(reads, Contig(base_start[pos_start:], 0))
         return best
 
 

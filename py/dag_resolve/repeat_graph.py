@@ -34,7 +34,7 @@ class Vertex:
     def __str__(self):
         return str(self.id)
 
-class Edge(sequences.Contig):
+class Edge(Contig):
     def __init__(self, id, start, end, consensus, info = None):
         # type: (int, Vertex, Vertex, str, EdgeInfo) -> Edge
         Contig.__init__(self, consensus, id, info)
@@ -177,15 +177,18 @@ class Graph:
 
     def loadFromDot(self, contigs, dot):
         # type: (ContigCollection, Generator[tuple]) -> Graph
-        recs = list(dot)
+        recs = dict()
+        for rec in dot:
+            recs[rec[0]] = rec
         v_rc = dict()
-        recs = sorted(recs, key = lambda rec: abs(rec[0]))
-        for rec1, rec2 in zip(recs[:-1], recs[1:]):
-            if rec1[0] == -rec2[0]:
+        for eid in recs:
+            if -eid in recs:
+                rec1 = recs[eid]
+                rec2 = recs[-eid]
                 v_rc[rec1[1]] = rec2[2]
                 v_rc[rec1[2]] = rec2[1]
                 v_rc[rec2[1]] = rec1[2]
-                v_rc[rec1[2]] = rec1[1]
+                v_rc[rec2[2]] = rec1[1]
         v_map = dict()
         for v in v_rc:
             if v < v_rc[v] and not v in ["source", "sink"]:
@@ -193,7 +196,7 @@ class Graph:
                 v_map[v_rc[v]] = v_map[v].rc
         v_map["source"] = self.source
         v_map["sink"] = self.sink
-        for eid, start, end, l, info in recs:
+        for eid, start, end, l, info in recs.values():
             if start not in v_map:
                 v_map[start] = self.addVertex()
             if end not in v_map:

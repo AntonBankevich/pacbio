@@ -120,7 +120,7 @@ def construct_alignments(contigs_names, initial_contigs_file, reads_file, dir):
     cnt = 0
     for contig in contigs.incoming():
         sys.stderr.write("Polishing incoming contig " + contig.id + " of length " + str(len(contig)) + "\n")
-        sorted_reads = reads.inter(contig.as_segment())
+        sorted_reads = reads.inter(contig.asSegment())
         dump = open(os.path.join(dir, "aln" + contig.id+ ".txt"), "w")
         sorted_reads.print_alignments(dump)
         dump.close()

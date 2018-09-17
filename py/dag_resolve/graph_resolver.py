@@ -8,9 +8,10 @@ from alignment.polishing import Polisher
 from common import sam_parser
 from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.filters import EdgeTransitionFilter
+from dag_resolve.knots import Knotter
 from dag_resolve.line_tools import LineTail, LineSegment, LineStorage
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
-from dag_resolve.sequences import Contig, ReadCollection
+from dag_resolve.sequences import Contig, ReadCollection, Segment, ContigCollection
 
 
 class VertexResolver:
@@ -31,36 +32,43 @@ class VertexResolver:
         print "Incoming edges:", map(lambda e: e.id, v.inc)
         print "Outgoing edges:", map(lambda e: e.id, v.out)
         assert len(v.out) > 0, "Trying to resolve hanging vertex " + str(v.id)
+        # for edge in v.inc:
+        #     for lineSegment in self.lineStorage.edgeLines(edge):# type:LineSegment
+        #         print ""
+        #         print "Reads from line", lineSegment.line.id
+        #         lineSegment.reads.print_alignments(sys.stdout)
         for edge in v.inc:
             for lineSegment in self.lineStorage.edgeLines(edge):# type:LineSegment
                 print "Creating a tail for line", lineSegment.line
                 base_seq = lineSegment.seq[-min(5000, len(lineSegment.seq)):]
-                consensus = self.polisher.polishQuiver(lineSegment.reads, base_seq, len(base_seq), 3000)
+                consensus = self.polisher.polishQuiver(lineSegment.reads.inter(lineSegment.edge.suffix(5000)), base_seq, len(base_seq), 3000)
                 consensus = consensus.cut()
                 print "Created consensus of length", len(consensus)
                 first = None
-                for rec in self.aligner.align([Contig(consensus.seq, 0)], v.out):
-                    print rec.is_unmapped
-                    if not rec.is_unmapped:
-                        print rec.rc, rec.alen, rec.pos, rec.tname
-                    if not rec.is_unmapped and not rec.rc and rec.alen > 300 and (first == None or rec.pos < first.pos):
+                collection = ReadCollection(ContigCollection(v.out))
+                collection.loadFromSam(self.aligner.align([Contig(consensus.seq, 0)], ContigCollection(v.out)))
+                print collection.reads["0"].__str__()
+                for rec in collection.reads["0"].alignments:#v.out):
+                    if not rec.rc and len(rec.seg_from) > 300 and (first == None or rec.seg_from.left < rec.seg_to.left):
                         first = rec
                 if first is None:
                     print "Could not connect one of the tails. Aborting."
                     return False
-                print "Found connection of consensus to position", first.pos, "of edge", first.tname
-                read_pos = list(sam_parser.ParseCigar(first.cigar, len(consensus), first.pos))[0][0]
-                new_edge = self.graph.E[int(first.tname)]
-                filtered_reads = lineSegment.reads.inter(sequences.Segment(new_edge, first.pos, first.pos + first.alen))
-                if first.pos < 500:
-                    print read_pos, "nucleotedes were hidden inside a vertex"
+                print "Found connection of consensus to position", first.seg_to.left, "of edge", first.seg_to.contig.id
+                read_pos = first.seg_from.left
+                new_edge = first.seg_to.contig
+                filtered_reads = lineSegment.reads.inter(lineSegment.edge.suffix(5000)).inter(Segment(new_edge, first.seg_to.left, first.seg_to.right))
+                if first.seg_to.left < 500:
+                    print first.seg_from.left, "nucleotedes were hidden inside a vertex"
                     lineSegment.line.tail = LineTail(lineSegment.line, new_edge, consensus.suffix(read_pos), filtered_reads)
+                    lineSegment.line.tail.alignment = self.aligner.matchingAlignment([lineSegment.line.tail.tail_consensus.seq],
+                                                                     new_edge)[0]
                 else:
                     if read_pos < 500:
                         print "Late entrances not supported. Aborting."
                         return False
                     print "Reparing graph and restarting vertex resolution"
-                    new_edge = self.graph.addCuttingEdge(new_edge, 0, new_edge, first.pos, consensus.seq[:read_pos])
+                    self.graph.addCuttingEdge(new_edge, 0, new_edge, first.seg_from.left, consensus.seq[:read_pos])
                     self.aligner.repairGraphAlignments(self.graph)
                     self.graph.printToFile(sys.stdout)
                     return self.resolveVertex(v)
@@ -95,7 +103,6 @@ class GraphResolver:
         self.vertexResolver = vertexResolver
         vertexResolver.lineStorage = self.lineStorage
         self.edgeResolver = edgeResolver
-        edgeResolver.lineStorage = self.lineStorage
 
     def resolveVertexForward(self, v):
         # type: (Vertex) -> None
@@ -105,15 +112,18 @@ class GraphResolver:
         for edge in v.out:
             tails_list = list(self.lineStorage.edgeTails(edge))
             if edge.id in self.lineStorage.resolved_edges:
-                assert len(tails_list) == 1
-                nextLine = list(self.lineStorage.edgeLines(edge))[0].line
-                assert nextLine.leftSegment().edge == edge
-                tails_list[0].line.merge(nextLine)
-                print "Successfully connected line", tails_list[0].line.__str__()
+                print "Encountered resolved edge. Skipping."
+                # assert len(tails_list) == 1
+                # nextLine = list(self.lineStorage.edgeLines(edge))[0].line
+                # assert nextLine.leftSegment().edge == edge
+                # tails_list[0].line.merge(nextLine)
+                # print "Successfully connected line", tails_list[0].line.__str__()
             else:
                 while edge is not None:
                     finished, new_edge = self.edgeResolver.resolveEdge(edge, tails_list)
                     if finished:
+                        self.lineStorage.resolved_edges.add(edge.id)
+                        self.lineStorage.resolved_edges.add(edge.rc.id)
                         print "Successfully resolved edge", edge.id, "into", len(tails_list), "lines"
                     else:
                         print "Failed to resolve edge", edge.id
@@ -126,6 +136,11 @@ class GraphResolver:
         visited_vertices = set()
         while True:
             cnt = 0
+            v = self.graph.E[-10].end
+            if v.id not in visited_vertices and self.lineStorage.isResolvableLeft(v):
+                self.resolveVertexForward(v)
+                visited_vertices.add(v.id)
+                cnt += 1
             for v in self.graph.V.values():
                 v_id = v.id
                 if v_id in [self.graph.source.id, self.graph.sink.id] or v_id in visited_vertices:
@@ -136,39 +151,76 @@ class GraphResolver:
                     cnt += 1
             if cnt == 0:
                 break
+        Knotter(self.lineStorage).knotGraph()
+
+    # def printResults(self, handler):
+    #     # type: (file) -> None
+    #     nonterminal = set()
+    #     for line in self.lineStorage.lines:
+    #         if line.nextLine is not None:
+    #             nonterminal.add(line.nextLine.id)
+    #     printed = set()
+    #     for line in self.lineStorage.lines:
+    #         if line.id in nonterminal:
+    #             continue
+    #         tmp = line
+    #         printed.add(tmp.id)
+    #         handler.write(tmp.__str__())
+    #         while tmp.nextLine is not None:
+    #             tmp = tmp.nextLine
+    #             printed.add(tmp.id)
+    #             handler.write("->")
+    #             handler.write(tmp.__str__())
+    #         handler.write("\n")
+    #     for line in self.lineStorage.lines:
+    #         if line.id in printed:
+    #             continue
+    #         tmp = line
+    #         printed.add(tmp.id)
+    #         handler.write("->")
+    #         handler.write(tmp.__str__())
+    #         while tmp.nextLine is not None and tmp.id not in printed:
+    #             tmp = tmp.nextLine
+    #             printed.add(tmp.id)
+    #             handler.write("->")
+    #             handler.write(tmp.__str__())
+    #         handler.write("->")
+    #         handler.write("\n")
 
     def printResults(self, handler):
-        # type: (file) -> None
-        nonterminal = set()
-        for line in self.lineStorage.lines:
-            if line.nextLine is not None:
-                nonterminal.add(line.nextLine.id)
         printed = set()
         for line in self.lineStorage.lines:
-            if line.id in nonterminal:
+            if line.id in printed or line.knot is not None:
                 continue
-            tmp = line
-            printed.add(tmp.id)
-            handler.write(tmp.__str__())
-            while tmp.nextLine is not None:
-                tmp = tmp.nextLine
-                printed.add(tmp.id)
-                handler.write("->")
-                handler.write(tmp.__str__())
+            while line is not None:
+                printed.add(line.id)
+                printed.add(line.rc.id)
+                handler.write(line.rcStr())
+                handler.write("-")
+                handler.write(line.rc.__str__())
+                if line.rc.knot is None:
+                    line = None
+                else:
+                    handler.write("->")
+                    line = line.rc.knot.tail2.line
             handler.write("\n")
+
         for line in self.lineStorage.lines:
             if line.id in printed:
                 continue
-            tmp = line
-            printed.add(tmp.id)
             handler.write("->")
-            handler.write(tmp.__str__())
-            while tmp.nextLine is not None and tmp.id not in printed:
-                tmp = tmp.nextLine
-                printed.add(tmp.id)
-                handler.write("->")
-                handler.write(tmp.__str__())
-            handler.write("->")
-            handler.write("\n")
+            while line is not None and line.id not in printed:
+                printed.add(line.id)
+                printed.add(line.rc.id)
+                handler.write(line.rcStr())
+                handler.write("-")
+                handler.write(line.rc.__str__())
+                if line.rc.knot is None:
+                    line = None
+                else:
+                    handler.write("->")
+                    line = line.rc.knot.tail2.line
+            handler.write("->\n")
+
 
 

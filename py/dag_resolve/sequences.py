@@ -90,7 +90,7 @@ class Contig:
         len = min(len, self.__len__())
         return Segment(self, 0, len)
 
-    def as_segment(self):
+    def asSegment(self):
         # type: () -> Segment
         return Segment(self, 0, len(self))
 
@@ -124,6 +124,9 @@ class Segment:
     def __str__(self):
         # type: () -> str
         return str(self.contig.id) + "[" + str(self.left) + ":" + str(self.right) + "]"
+
+    def __len__(self):
+        return self.right - self.left + 1
 
 
 class AlignmentPiece:
@@ -298,6 +301,10 @@ class ReadCollection:
             tmp.extend(other)
         return self.minus(tmp)
 
+    def cap(self, other):
+        # type: (ReadCollection) -> ReadCollection
+        return self.filter(lambda read: read.id in other)
+
     def inter(self, segment):
         # type: (Segment) -> ReadCollection
         return self.filter(lambda read: read.inter(segment))
@@ -313,6 +320,9 @@ class ReadCollection:
     def __getitem__(self, read_id):
         # type: (str) -> AlignedRead
         return self.reads[read_id.split()[0]]
+
+    def __contains__(self, item):
+        return self.reads.__contains__(item)
 
     def __len__(self):
         return len(self.reads)

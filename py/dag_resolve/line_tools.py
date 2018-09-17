@@ -1,15 +1,15 @@
-from typing import Generator, Dict
+from typing import Generator, Dict, Set
 
-from alignment import align_tools
+from alignment.align_tools import AlignedSequences
 from common import basic
-from dag_resolve import repeat_graph
-from dag_resolve import sequences
 from dag_resolve.phasing import Phasing
+from dag_resolve.repeat_graph import Edge, Graph, Vertex
+from dag_resolve.sequences import Segment, Consensus, ReadCollection
 
 
 class LineSegment:
     def __init__(self, line, pos, edge, seq, phasing, reads):
-        # type: (Line, int, repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> LineSegment
+        # type: (Line, int, Edge, str, Phasing, ReadCollection) -> LineSegment
         self.line = line
         self.pos = pos
         self.edge = edge
@@ -19,20 +19,21 @@ class LineSegment:
 
 class Line:
     def __init__(self, edge):
-        # type: (repeat_graph.Edge) -> Line
+        # type: (Edge) -> Line
         assert edge.info.unique
         self.chain = [LineSegment(self, 0, edge, edge.seq, Phasing(), edge.reads)] # type: list[LineSegment]
-        self.nextLine = None
+        # self.nextLine = None
         self.id = edge.id
         self.tail = None # type: LineTail
-        self.rc = None
+        self.rc = None # type: Line
+        self.knot = None # type: Knot
 
     def extendRight(self, edge, seq, phasing, reads):
-        # type: (repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
+        # type: (Edge, str, Phasing, ReadCollection) -> None
         self.chain.append(LineSegment(self, self.chain[-1].pos + 1, edge, seq, phasing, reads))
 
     def extendLeft(self, edge, seq, phasing, reads):
-        # type: (repeat_graph.Edge, str, Phasing, sequences.ReadCollection) -> None
+        # type: (Edge, str, Phasing, ReadCollection) -> None
         self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, phasing, reads))
 
     def freezeTail(self):
@@ -51,13 +52,16 @@ class Line:
         return self.chain[0]
 
     def find(self, edge):
-        # type: (repeat_graph.Edge) -> Generator[LineSegment]
+        # type: (Edge) -> Generator[LineSegment]
         for seg in self.chain:
             if seg.edge.id == edge.id:
                 yield seg
 
     def __str__(self):
         return "[" + ",".join(map(lambda seg: str(seg.edge.id), self.chain)) + "]"
+
+    def rcStr(self):
+        return "[" + ",".join(map(lambda seg: str(seg.edge.rc.id), self.chain[::-1])) + "]"
 
     def __getitem__(self, item):
         # type: (int) -> LineSegment
@@ -69,10 +73,10 @@ class Line:
 
 class LineStorage:
     def __init__(self, g):
-        # type: (repeat_graph.Graph) -> LineStorage
+        # type: (Graph) -> LineStorage
         self.g = g
         self.lines = [] #type: list[Line]
-        self.resolved_edges = set() #type: set[int]
+        self.resolved_edges = set() #type: Set[int]
         for edge1, edge2 in g.unorientedEdges():
             if edge1.info.unique:
                 self.resolved_edges.add(edge1.id)
@@ -85,7 +89,7 @@ class LineStorage:
                 self.lines.append(line2)
 
     def isResolvableLeft(self, v):
-        # type: (repeat_graph.Vertex) -> bool
+        # type: (Vertex) -> bool
         if len(v.inc) == 0:
             return False
         for e in v.inc:
@@ -94,7 +98,7 @@ class LineStorage:
         return True
 
     def edgeLines(self, edge):
-        # type: (repeat_graph.Edge) -> Generator[LineSegment]
+        # type: (Edge) -> Generator[LineSegment]
         assert edge.id in self.resolved_edges
         for line in self.lines:
             for segment in line.chain:
@@ -102,7 +106,7 @@ class LineStorage:
                     yield segment
 
     def edgeTails(self, edge):
-        # type: (repeat_graph.Edge) -> Generator[LineTail]
+        # type: (Edge) -> Generator[LineTail]
         for line in self.lines:
             if line.tail is not None and line.tail.edge == edge:
                 yield line.tail
@@ -115,14 +119,28 @@ class LineStorage:
 
 class LineTail:
     def __init__(self, line, edge, tail_consensus, read_collection):
-        # type: (Line, repeat_graph.Edge, sequences.Consensus, sequences.ReadCollection) -> LineTail
+        # type: (Line, Edge, Consensus, ReadCollection) -> LineTail
         self.line = line
         self.edge = edge
         self.tail_consensus = tail_consensus
         self.reads = read_collection
-        self.alignment = None # type: align_tools.AlignedSequences
+        self.alignment = None # type: AlignedSequences
+        self.reverse_alignment = None # type: AlignedSequences
         self.phasing = None
+
+    def edgeSegment(self):
+        assert self.alignment is not None
+        return Segment(self.edge, self.alignment.first, self.alignment.last + 1)
 
     def __len__(self):
         # type: () -> int
         return self.tail_consensus.__len__()
+
+
+class Knot:
+    def __init__(self, tail1, tail2, seq, reads):
+        # type: (LineTail, LineTail, str, ReadCollection) -> Knot
+        self.tail1 = tail1
+        self.tail2 = tail2
+        self.seq = seq
+        self.reads = reads

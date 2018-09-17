@@ -2,6 +2,7 @@ import itertools
 import os
 import sys
 
+from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
 from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection
 
@@ -229,6 +230,32 @@ class AlignedSequences:
             return (r, r)
         return (self.findPreviousMatch(l), self.findNextMatch(r))
 
+    def checkPosEquals(self, pos):
+        assert pos >= 0 and pos < len(self.seq_to)
+        return self.alignment[pos] != -1 and self.seq_from[self.alignment[pos]] == self.seq_to[pos]
+
+    def checkNoIndelAfter(self, pos):
+        assert pos >= 0 and pos < len(self.seq_to)
+        if pos == len(self.seq_to) - 1:
+            return True
+        return self.alignment[pos] != -1 and self.alignment[pos + 1] != -1 and self.alignment[pos] + 1 == self.alignment[pos + 1]
+
+
+def ReadToAlignedSequences(read, contig):
+    # type: (AlignedRead, Contig) -> AlignedSequences
+    res = AlignedSequences(read.seq, contig.seq)
+    for rec in read.alignments:
+        if rec.seg_to.contig.id != contig.id:
+            continue
+        if res.aligned and res.rc != rec.rc:
+            continue
+            # assert False, "Straight and reverse alignments of the same read"
+        if not res.aligned and rec.rc:
+            res.rc = True
+            res.seq_from = basic.RC(res.seq_from)
+        res.addCigar(rec.cigar, rec.seg_to.left)
+    return res
+
 
 class Aligner:
     def __init__(self, dir_distributor, threads = 16):
@@ -246,7 +273,7 @@ class Aligner:
         alignment_file = os.path.join(dir, "alignment.sam")
         basic.ensure_dir_existance(dir)
         basic.ensure_dir_existance(alignment_dir)
-        if same and not clean and os.path.exists(alignment_file):
+        if same and not params.clean and os.path.exists(alignment_file):
             print "Alignment reused:", alignment_file
         else:
             print "Performing alignment:", alignment_file
@@ -270,21 +297,6 @@ class Aligner:
                 res[tid].rc = True
                 res[tid].seq_from = basic.RC(res[tid].seq_from)
             res[tid].addCigar(rec.cigar, rec.pos)
-        return res
-
-    def ReadToAlignedSequences(self, read, contig):
-        # type: (AlignedRead, Contig) -> AlignedSequences
-        res = AlignedSequences(read.seq, contig.seq)
-        for rec in read.alignments:
-            if rec.seg_to.contig.id != contig.id:
-                continue
-            if res.aligned and res.rc != rec.rc:
-                continue
-                # assert False, "Straight and reverse alignments of the same read"
-            if not res.aligned and rec.rc:
-                res.rc = True
-                res.seq_from = basic.RC(res.seq_from)
-            res.addCigar(rec.cigar, rec.seg_to.left)
         return res
 
     def repairGraphAlignments(self, graph):
