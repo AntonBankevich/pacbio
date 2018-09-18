@@ -35,7 +35,7 @@ class Vertex:
         return str(self.id)
 
 class Edge(Contig):
-    def __init__(self, id, start, end, consensus, info = None):
+    def __init__(self, id, start, end, consensus, info):
         # type: (int, Vertex, Vertex, str, EdgeInfo) -> Edge
         Contig.__init__(self, consensus, id, info)
         self.start = start
@@ -87,7 +87,7 @@ class Graph:
     def edgeCollection(self):
         return ContigCollection(self.E.values())
 
-    def addEdge(self, edge_id, start_id, end_id, consensus, info = None):
+    def addEdge(self, edge_id, start_id, end_id, consensus, info):
         # type: (Optional[int], int, int, str, EdgeInfo) -> Edge
         if edge_id is None:
             edge_id = self.min_new_eid

@@ -93,7 +93,7 @@ class LineStorage:
 
     def isResolvableLeft(self, v):
         # type: (Vertex) -> bool
-        if len(v.inc) == 0:
+        if len(v.inc) == 0 or len(v.out) == 0:
             return False
         for e in v.inc:
             if e.id not in self.resolved_edges:
