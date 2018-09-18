@@ -46,6 +46,7 @@ def analyse(graph, storage):
     print "Stat: 2in2out:", len(filter(lambda comp: len(comp) == 1, comp_dict.values()))
     print "Stat: Resolved edges:", len(storage.resolved_edges) - len(filter(lambda edge: edge.info.unique, graph.E.values()))
     print "Stat: Unique edge connections:", len(filter(lambda line: line.knot is not None, storage.lines))
+    print "Stat: Loops:", len(filter(lambda line: line.isSimpleLoop(), storage.lines))
 
 if __name__ == "__main__":
     sys.stdout.write("Started\n")
@@ -84,4 +85,5 @@ if __name__ == "__main__":
     res.resolve()
     sys.stdout.write("Printing results\n")
     res.printResults(sys.stdout)
+    analyse(graph, res.lineStorage)
     log.close()
