@@ -5,7 +5,7 @@ from dag_resolve.sequences import Contig, ReadCollection, ContigCollection
 
 class EdgeInfo:
     def __init__(self, label, unique):
-        # type: (basestring, bool) -> EdgeInfo
+        # type: (str, bool) -> EdgeInfo
         self.label = label
         self.unique = unique
         self.misc = []
@@ -160,7 +160,7 @@ class Graph:
         else:
             vertices = self.splitEdge(edge1, [pos1])
             vertices.extend(self.splitEdge(edge2, [pos2]))
-        return self.addEdge(None, vertices[0].id, vertices[1].id, seq)
+        return self.addEdge(None, vertices[0].id, vertices[1].id, seq, EdgeInfo("", False))
 
 
     def removeEdge(self, edge):
