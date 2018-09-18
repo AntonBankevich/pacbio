@@ -37,7 +37,7 @@ class Line:
         self.chain.insert(0, LineSegment(self, self.chain[0].pos - 1, edge, seq, phasing, reads))
 
     def isSimpleLoop(self):
-        return self.knot is not None and len(self.chain) == 1 and len(self.rc.chain) == 1 and self.knot.line2.rc.id = self.id
+        return self.knot is not None and len(self.chain) == 1 and len(self.rc.chain) == 1 and self.knot.line2.rc.id == self.id
 
     def freezeTail(self):
         tail_seq = self.tail.alignment.alignedSequence()
