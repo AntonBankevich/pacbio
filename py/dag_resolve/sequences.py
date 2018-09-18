@@ -141,6 +141,15 @@ class AlignmentPiece:
         # type: () -> str
         return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ")"
 
+    def connect(self, other, delta = 50):
+        # type: (AlignmentPiece, int) -> bool
+        if self.rc != other.rc:
+            return False
+        if not self.rc:
+            return self.seg_from.right <= other.seg_from.left + delta and self.seg_to.right <= other.seg_to.left + delta
+        else:
+            return self.seg_from.left <= other.seg_from.right + delta and self.seg_to.right <= other.seg_to.left + delta
+
 class AlignedRead:
     def __init__(self, rec):
         # type: (SeqIO.SeqRecord) -> AlignedRead

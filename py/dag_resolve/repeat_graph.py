@@ -1,5 +1,5 @@
 from common import basic, sam_parser, SeqIO
-from typing import Generator, Dict, Optional
+from typing import Generator, Dict, Optional, Tuple
 from dag_resolve.sequences import Contig, ReadCollection, ContigCollection
 
 
@@ -176,7 +176,7 @@ class Graph:
         del self.E[edge.rc.id]
 
     def loadFromDot(self, contigs, dot):
-        # type: (ContigCollection, Generator[tuple]) -> Graph
+        # type: (ContigCollection, Generator[Tuple[int, int, int, int, EdgeInfo]]) -> Graph
         recs = dict()
         for rec in dot:
             recs[rec[0]] = rec
@@ -232,7 +232,7 @@ class DotParser:
         self.dot = dot
 
     def parse(self, edge_ids = None):
-        # type: (Dict[int, list[str]]) -> Generator[tuple]
+        # type: (Dict[int, list[str]]) -> Generator[Tuple[int, int, int, int, EdgeInfo]]
         for s in self.dot.readlines():
             if s.find("->") == -1:
                 continue

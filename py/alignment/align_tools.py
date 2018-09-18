@@ -288,15 +288,32 @@ class Aligner:
         for i in range(len(seqs)):
             reads.add(AlignedRead(SeqIO.SeqRecord(seqs[i], str(i))))
             res.append(AlignedSequences(seqs[i], contig.seq))
-        for rec in self.align(reads, collection):
-            tid = int(rec.query_name)
-            if res[tid].aligned and res[tid].rc != rec.rc:
-                continue
-                # assert False, "Straight and reverse alignments of the same read"
-            if not res[tid].aligned and rec.rc:
-                res[tid].rc = True
+        reads.loadFromSam(self.align(reads, collection))
+        for read in reads:
+            tid = int(read.id)
+            read.sort()
+            groups = []
+            group_lens = []
+            for al in read.alignments:
+                found = False
+                for i, group in enumerate(groups):
+                    if group[-1].connect(al):
+                        group.append(al)
+                        group_lens[i] += len(al.seg_from)
+                        found = True
+                        break
+                if not found:
+                    groups.append([al])
+                    group_lens.append(len(al.seg_from))
+            best = None
+            for i in range(len(groups)):
+                if best == None or group_lens[i] > group_lens[best]:
+                    best = i
+            for al in groups[best]:
+                res[tid].addCigar(al.cigar, al.seg_to.left)
+            res[tid].rc = groups[best][0].rc
+            if res[tid].rc:
                 res[tid].seq_from = basic.RC(res[tid].seq_from)
-            res[tid].addCigar(rec.cigar, rec.pos)
         return res
 
     def repairGraphAlignments(self, graph):
