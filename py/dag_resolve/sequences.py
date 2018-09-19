@@ -126,7 +126,7 @@ class Segment:
         return str(self.contig.id) + "[" + str(self.left) + ":" + str(self.right) + "]"
 
     def __len__(self):
-        return self.right - self.left + 1
+        return abs(self.right - self.left) + 1
 
 
 class AlignmentPiece:

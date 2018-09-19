@@ -49,7 +49,7 @@ class VertexResolver:
                 collection.loadFromSam(self.aligner.align([Contig(consensus.seq, 0)], ContigCollection(v.out)))
                 print collection.reads["0"].__str__()
                 for rec in collection.reads["0"].alignments:#v.out):
-                    if not rec.rc and len(rec.seg_from) > 300 and (first == None or rec.seg_from.left < rec.seg_to.left):
+                    if not rec.rc and len(rec.seg_from) > 300 and (first == None or rec.seg_from.left < first.seg_from.left):
                         first = rec
                 if first is None:
                     print "Could not connect one of the tails. Aborting."
@@ -61,8 +61,7 @@ class VertexResolver:
                 if first.seg_to.left < 500:
                     print first.seg_from.left, "nucleotedes were hidden inside a vertex"
                     lineSegment.line.tail = LineTail(lineSegment.line, new_edge, consensus.suffix(read_pos), filtered_reads)
-                    lineSegment.line.tail.alignment = self.aligner.matchingAlignment([lineSegment.line.tail.tail_consensus.seq],
-                                                                     new_edge)[0]
+                    lineSegment.line.tail.alignment = self.aligner.matchingAlignment([lineSegment.line.tail.tail_consensus.seq], new_edge)[0]
                 else:
                     if read_pos < 500:
                         print "Late entrances not supported. Aborting."

@@ -10,7 +10,7 @@ indir = sys.argv[1]
 outdir = sys.argv[2]
 basic.ensure_dir_existance(outdir)
 
-for dir in os.listdir(indir):
+for dir in sorted(os.listdir(indir)):
     reads = os.path.join(indir, dir, dir + ".fasta")
     contigs = os.path.join(indir, dir, "2-repeat", "graph_final.fasta")
     dot = os.path.join(indir, dir, "2-repeat", "graph_final.dot")

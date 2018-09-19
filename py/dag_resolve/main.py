@@ -67,6 +67,8 @@ if __name__ == "__main__":
     dir_distributor = DirDistributor(os.path.join(dir, "alignment"))
     log = open(os.path.join(dir, "log.info"), "w")
     sys.stdout = basic.OStreamWrapper(sys.stdout, log)
+    sys.stderr = sys.stdout
+    print " ".join(sys.argv)
     sys.stdout.write("Collecting contig collection\n")
     edge_sequences = ContigCollection().loadFromFasta(open(edge_sequences, "r"))
     sys.stdout.write("Loading dot\n")
