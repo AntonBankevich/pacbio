@@ -5,7 +5,7 @@ from typing import Optional
 
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
-from common import sam_parser
+from common import sam_parser, basic
 from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.filters import EdgeTransitionFilter
 from dag_resolve.knots import Knotter
@@ -121,6 +121,8 @@ class GraphResolver:
                 # assert nextLine.leftSegment().edge == edge
                 # tails_list[0].line.merge(nextLine)
                 # print "Successfully connected line", tails_list[0].line.__str__()
+            elif edge.seq == basic.RC(edge.seq):
+                print "Encountered self-rc edge. Skipping"
             else:
                 while edge is not None:
                     finished, new_edge = self.edgeResolver.resolveEdge(edge, tails_list)
