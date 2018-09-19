@@ -1,6 +1,7 @@
 import os
 import sys
 
+from typing import Dict
 
 sys.path.append("py")
 
@@ -34,7 +35,7 @@ def analyse(graph, storage):
             for eid in components:
                 if components[eid] in vc:
                     components[eid] = nid
-    comp_dict = dict()
+    comp_dict = dict() # type: Dict[int, list[int]]
     for eid in components:
         if components[eid] not in comp_dict:
             comp_dict[components[eid]] = []
@@ -43,23 +44,37 @@ def analyse(graph, storage):
     print "Stat: Unique edges:", unique
     print "Stat: Repeat edges:", len(graph.E) - unique
     print "Stat: Repeat components:", len(comp_dict)
-    print "Stat: 2in2out:", len(filter(lambda comp: len(comp) == 1, comp_dict.values()))
+    print "Stat: 2in2out:", len(filter(lambda comp: len(comp) == 1 and len(graph.E[comp[0]].start.inc) == 2, comp_dict.values()))
     print "Stat: Resolved edges:", len(storage.resolved_edges) - len(filter(lambda edge: edge.info.unique, graph.E.values()))
     print "Stat: Unique edge connections:", len(filter(lambda line: line.knot is not None, storage.lines))
     print "Stat: Loops:", len(filter(lambda line: line.isSimpleLoop(), storage.lines))
+
+
+def ParseEdges(e_str):
+    if e_str == "":
+        return None
+    edges = dict()  # type: Dict[int, str]
+    for s in e_str.split(";"):
+        s = s.split(",")
+        edges[int(s[0])] = s[1:]
+    for eid in list(edges.keys()):
+        if -eid not in edges:
+            s = []
+            for tmp in edges[eid]:
+                if tmp == "source":
+                    s.append("sink")
+                if tmp == "sink":
+                    s.append("source")
+            edges[-eid] = s
+    return edges
+
 
 if __name__ == "__main__":
     sys.stdout.write("Started\n")
     edge_sequences = sys.argv[1]
     dot_file = sys.argv[2]
     reads = sys.argv[3]
-    edges = dict()
-    if sys.argv[4] == "":
-        edges = None
-    else:
-        for s in sys.argv[4].split(";"):
-            s = s.split(",")
-            edges[int(s[0])] = s[1:]
+    edges = ParseEdges(sys.argv[4])
     dir = sys.argv[5]
     basic.ensure_dir_existance(dir)
     if params.clean:

@@ -4,7 +4,7 @@ import sys
 
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
-from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection
+from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, AlignmentPiece
 
 sys.path.append("py")
 from typing import Optional, Iterable, Tuple
@@ -290,11 +290,14 @@ class Aligner:
             res.append(AlignedSequences(seqs[i], contig.seq))
         reads.loadFromSam(self.align(reads, collection))
         for read in reads:
+            print read.__str__()
             tid = int(read.id)
             read.sort()
-            groups = []
+            groups = [] #type: list[list[AlignmentPiece]]
             group_lens = []
             for al in read.alignments:
+                if al.rc:
+                    continue
                 found = False
                 for i, group in enumerate(groups):
                     if group[-1].connect(al):

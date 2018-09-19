@@ -334,7 +334,7 @@ class EdgeResolver:
                 print tmp.percentIdentity()
                 print tmp.AlignedSegments()
                 if not al.rc and al.seg_from.right - al.seg_from.left > 500 \
-                        and al.seg_from.left > largest_problem.alignment[largest_problem.alignment.last] - 50\
+                        and al.seg_from.left > largest_problem.alignment[largest_problem.alignment.last] - 100\
                         and (next_alignment is None or next_alignment.seg_from.left > al.seg_from.left):
                     next_alignment = al
             print "Closest alignment:", next_alignment.__str__()

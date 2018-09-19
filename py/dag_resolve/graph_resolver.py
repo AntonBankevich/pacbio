@@ -37,6 +37,10 @@ class VertexResolver:
         #         print ""
         #         print "Reads from line", lineSegment.line.id
         #         lineSegment.reads.print_alignments(sys.stdout)
+        for edge in v.out:
+            if len(edge) < 500:
+                print "One of outgoing edges is too short. Skipping vertex"
+                return False
         for edge in v.inc:
             for lineSegment in self.lineStorage.edgeLines(edge):# type:LineSegment
                 print "Creating a tail for line", lineSegment.line

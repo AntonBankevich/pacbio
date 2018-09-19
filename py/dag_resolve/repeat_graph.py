@@ -232,7 +232,7 @@ class DotParser:
         self.dot = dot
 
     def parse(self, edge_ids = None):
-        # type: (Dict[int, list[str]]) -> Generator[Tuple[int, int, int, int, EdgeInfo]]
+        # type: (Optional[Dict[int, list[str]]]) -> Generator[Tuple[int, int, int, int, EdgeInfo]]
         for s in self.dot.readlines():
             if s.find("->") == -1:
                 continue
