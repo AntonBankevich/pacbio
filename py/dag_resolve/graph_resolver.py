@@ -53,7 +53,9 @@ class VertexResolver:
                 collection.loadFromSam(self.aligner.align([Contig(consensus.seq, 0)], ContigCollection(v.out)))
                 print collection.reads["0"].__str__()
                 for rec in collection.reads["0"].alignments:#v.out):
-                    if not rec.rc and len(rec.seg_from) > 300 and (first == None or rec.seg_from.left < first.seg_from.left):
+                    if not rec.rc and len(rec.seg_from) > 300 and \
+                            (len(rec.seg_from) > 500 or rec.seg_from.right > len(consensus.seq) - 100) and \
+                            (first == None or rec.seg_from.left < first.seg_from.left):
                         first = rec
                 if first is None:
                     print "Could not connect one of the tails. Aborting."
