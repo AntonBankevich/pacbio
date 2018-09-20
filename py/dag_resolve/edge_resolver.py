@@ -295,7 +295,7 @@ class EdgeResolver:
             if new_depth < cur_depth + 100:
                 for tail, read_collection in zip(tails, line_reads):
                     tail.reads = read_collection
-                if new_depth > len(e) - 200:
+                if new_depth > len(e) - 500:
                     for tail in tails:
                         tail.line.freezeTail()
                     return True, None
