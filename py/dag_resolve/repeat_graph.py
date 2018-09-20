@@ -64,16 +64,20 @@ class Graph:
         self.newEdges = []
         self.reads = ReadCollection(self.edgeCollection())
 
-    def addVertex(self, v_id = None, label = None):
-        # type: (int, str) -> Vertex
+    def addVertex(self, v_id = None, selfrc = False, label = None):
+        # type: (int, bool, str) -> Vertex
         if v_id is None:
             v_id = self.min_new_vid
             self.min_new_vid += 1
         if v_id in self.V:
+            assert selfrc == (self.V[v_id].rc.id == v_id)
             return self.V[v_id]
         vertex = Vertex(v_id, label)
-        vertex_rc = Vertex(-v_id, label)
         self.V[v_id] = vertex
+        if selfrc:
+            vertex.rc = vertex
+            return vertex
+        vertex_rc = Vertex(-v_id, label)
         self.V[-v_id] = vertex_rc
         vertex.rc = vertex_rc
         vertex_rc.rc = vertex
@@ -195,6 +199,8 @@ class Graph:
             if v < v_rc[v] and not v in ["source", "sink"]:
                 v_map[v] = self.addVertex()
                 v_map[v_rc[v]] = v_map[v].rc
+            elif v == v_rc[v]:
+                v_map[v] = self.addVertex(None, True)
         v_map["source"] = self.source
         v_map["sink"] = self.sink
         for eid, start, end, l, info in recs.values():
