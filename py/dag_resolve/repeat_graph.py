@@ -165,7 +165,7 @@ class Graph:
         else:
             vertices = self.splitEdge(edge1, [pos1])
             vertices.extend(self.splitEdge(edge2, [pos2]))
-        return self.addEdge(None, vertices[0].id, vertices[1].id, seq, EdgeInfo("", False))
+        return self.addEdge(None, vertices[0].id, vertices[1].id, seq, EdgeInfo("", False, 0))
 
 
     def removeEdge(self, edge):
