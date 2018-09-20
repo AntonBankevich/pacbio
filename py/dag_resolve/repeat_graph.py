@@ -4,11 +4,12 @@ from dag_resolve.sequences import Contig, ReadCollection, ContigCollection
 
 
 class EdgeInfo:
-    def __init__(self, label, unique):
-        # type: (str, bool) -> EdgeInfo
+    def __init__(self, label, unique, selfrc = False):
+        # type: (str, bool, bool) -> EdgeInfo
         self.label = label
         self.unique = unique
         self.misc = []
+        self.selfrc = selfrc
 
 
 class Vertex:
@@ -177,7 +178,7 @@ class Graph:
 
     def loadFromDot(self, contigs, dot):
         # type: (ContigCollection, Generator[Tuple[int, int, int, int, EdgeInfo]]) -> Graph
-        recs = dict()
+        recs = dict() # type: Dict[int, Tuple[int, int, int, int, EdgeInfo]]
         for rec in dot:
             recs[rec[0]] = rec
         v_rc = dict()
@@ -204,6 +205,10 @@ class Graph:
             seq = contigs[abs(eid)].seq
             if eid < 0:
                 seq = basic.RC(seq)
+            if info.selfrc:
+                end = 40000 + abs(eid)
+                v_map[end] = self.addVertex()
+                seq = seq[:len(seq) / 2]
             self.addEdge(eid, v_map[start].id, v_map[end].id, seq, info)
         return self
 
@@ -241,12 +246,13 @@ class DotParser:
             eid = basic.parseNegativeNumber(s, s.find("id"))
             l = basic.parseNumber(s, s.find("\\l"))
             unique = (s.find("black") != -1)
+            src = (s.find("dir = both") != -1)
             if edge_ids is None or eid in edge_ids:
                 if edge_ids is not None:
                     if "sink" in edge_ids[eid]:
                         v_to = "sink"
                     if "source" in edge_ids[eid]:
                         v_from = "source"
-                yield eid, v_from, v_to, l, EdgeInfo(s, unique)
+                yield eid, v_from, v_to, l, EdgeInfo(s, unique, src)
 
 
