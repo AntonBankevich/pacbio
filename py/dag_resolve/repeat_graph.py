@@ -70,7 +70,6 @@ class Graph:
             v_id = self.min_new_vid
             self.min_new_vid += 1
         if v_id in self.V:
-            assert selfrc == (self.V[v_id].rc.id == v_id)
             return self.V[v_id]
         vertex = Vertex(v_id, label)
         self.V[v_id] = vertex
