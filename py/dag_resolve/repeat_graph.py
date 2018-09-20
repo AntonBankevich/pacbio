@@ -4,11 +4,12 @@ from dag_resolve.sequences import Contig, ReadCollection, ContigCollection
 
 
 class EdgeInfo:
-    def __init__(self, label, unique, selfrc = False):
-        # type: (str, bool, bool) -> EdgeInfo
+    def __init__(self, label, unique, cov, selfrc = False):
+        # type: (str, bool, int, bool) -> EdgeInfo
         self.label = label
         self.unique = unique
         self.misc = []
+        self.cov = cov
         self.selfrc = selfrc
 
 
@@ -56,7 +57,7 @@ class Graph:
         # type: () -> Graph
         self.V = dict() # type: Dict[int, Vertex]
         self.E = dict() # type: Dict[int, Edge]
-        self.source = self.addVertex(10000, "source") # type: Vertex
+        self.source = self.addVertex(10000, label = "source") # type: Vertex
         self.sink = self.source.rc # type: Vertex
         self.sink.label = "sink"
         self.min_new_vid = 1
@@ -65,7 +66,7 @@ class Graph:
         self.reads = ReadCollection(self.edgeCollection())
 
     def addVertex(self, v_id = None, selfrc = False, label = None):
-        # type: (int, bool, str) -> Vertex
+        # type: (Optional[int], bool, str) -> Vertex
         if v_id is None:
             v_id = self.min_new_vid
             self.min_new_vid += 1
@@ -249,7 +250,8 @@ class DotParser:
             v_from = basic.parseNumber(s)
             v_to = basic.parseNumber(s, s.find("->"))
             eid = basic.parseNegativeNumber(s, s.find("id"))
-            l = basic.parseNumber(s, s.find("\\l"))
+            cov = basic.parseNumber(s, s.find("k "))
+            # l = basic.parseNumber(s, s.find("\\l"))
             unique = (s.find("black") != -1)
             src = (s.find("dir = both") != -1)
             if edge_ids is None or eid in edge_ids:
@@ -258,6 +260,6 @@ class DotParser:
                         v_to = "sink"
                     if "source" in edge_ids[eid]:
                         v_from = "source"
-                yield eid, v_from, v_to, l, EdgeInfo(s, unique, src)
+                yield eid, v_from, v_to, cov, EdgeInfo(s, unique, cov, src)
 
 

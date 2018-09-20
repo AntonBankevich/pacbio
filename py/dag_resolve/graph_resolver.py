@@ -71,7 +71,7 @@ class VertexResolver:
                         print "Late entrances not supported. Aborting."
                         return False
                     print "Reparing graph and restarting vertex resolution"
-                    self.graph.addCuttingEdge(new_edge, 0, new_edge, first.seg_from.left, consensus.seq[:read_pos])
+                    self.graph.addCuttingEdge(new_edge, 0, new_edge, first.seg_to.left, consensus.seq[:read_pos])
                     self.aligner.repairGraphAlignments(self.graph)
                     self.graph.printToFile(sys.stdout)
                     return self.resolveVertex(v)
