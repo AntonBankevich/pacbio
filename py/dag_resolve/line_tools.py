@@ -91,6 +91,12 @@ class LineStorage:
                 self.lines.append(line1)
                 self.lines.append(line2)
 
+    def getLine(self, eid):
+        for line in self.lines:
+            if line.id == eid:
+                return line
+        return None
+
     def isResolvableLeft(self, v):
         # type: (Vertex) -> bool
         if len(v.inc) == 0 or len(v.out) == 0:

@@ -20,6 +20,7 @@ class DirDistributor:
     def nextDir(self):
         name = os.path.join(self.dir, str(self.cur_dir))
         self.cur_dir += 1
+        assert self.cur_dir <= 400
         basic.ensure_dir_existance(name)
         return name
 

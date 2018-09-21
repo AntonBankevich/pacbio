@@ -5,6 +5,7 @@ from typing import Dict
 
 sys.path.append("py")
 
+import time
 from alignment.polishing import Polisher
 from alignment.align_tools import DirDistributor, Aligner
 from dag_resolve import params
@@ -13,7 +14,6 @@ from dag_resolve.graph_resolver import GraphResolver, VertexResolver
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
 from dag_resolve.sequences import ContigCollection, ReadCollection
-
 from common import basic
 
 def analyse(graph, storage):
@@ -68,8 +68,8 @@ def ParseEdges(e_str):
             edges[-eid] = s
     return edges
 
-
 if __name__ == "__main__":
+    start = time.time()
     sys.stdout.write("Started\n")
     edge_sequences = sys.argv[1]
     dot_file = sys.argv[2]
@@ -98,9 +98,12 @@ if __name__ == "__main__":
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
     sys.stdout.write("Resolving repeats\n")
-    res = GraphResolver(graph, VertexResolver(graph, al, polisher), EdgeResolver(graph, al, polisher))
+    picture_dir = os.path.join(dir, "pictures")
+    basic.recreate(picture_dir)
+    res = GraphResolver(graph, picture_dir, VertexResolver(graph, al, polisher), EdgeResolver(graph, al, polisher))
     res.resolve()
     sys.stdout.write("Printing results\n")
     res.printResults(sys.stdout)
     analyse(graph, res.lineStorage)
+    print "Finished in " + str(time.time() - start) + " seconds"
     log.close()
