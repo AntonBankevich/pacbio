@@ -2,15 +2,15 @@ import itertools
 import os
 import sys
 
+sys.path.append("py")
+from common.SeqIO import NamedSequence
+from flye.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
 from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, AlignmentPiece
-
-sys.path.append("py")
 from typing import Optional, Iterable, Tuple
-
 from common import basic, sam_parser, SeqIO
-from flye.alignment import make_alignment
+
 
 class DirDistributor:
     def __init__(self, dir):
@@ -25,7 +25,7 @@ class DirDistributor:
         return name
 
     def CheckSequences(self, reads, reads_file):
-        # type: (Iterable[AlignedRead], str) -> bool
+        # type: (Iterable[NamedSequence], str) -> bool
         if not os.path.exists(reads_file):
             return False
         try:
@@ -37,7 +37,7 @@ class DirDistributor:
             return False
 
     def CheckAndWriteSequences(self, reads, reads_file):
-        # type: (Iterable[AlignedRead], str) -> bool
+        # type: (Iterable[NamedSequence], str) -> bool
         if self.CheckSequences(reads, reads_file):
             return True
         else:
@@ -48,7 +48,7 @@ class DirDistributor:
             return False
 
     def fillNextDir(self, content):
-        # type: (list[Tuple[Iterable[AlignedRead], str]]) -> Tuple[str, list[str], bool]
+        # type: (list[Tuple[Iterable[NamedSequence], str]]) -> Tuple[str, list[str], bool]
         same = True
         dir = self.nextDir()
         content_files = []
@@ -210,7 +210,7 @@ class AlignedSequences:
                     yield i
 
     def findSeqPos(self, pos):
-        # type: (int) -> Optional[tuple[Optional[int], Optional[int]]]
+        # type: (int) -> Optional[Tuple[Optional[int], Optional[int]]]
         if not self.aligned:
             return None
         if self.alignment[self.last] < pos:
@@ -246,14 +246,8 @@ def ReadToAlignedSequences(read, contig):
     # type: (AlignedRead, Contig) -> AlignedSequences
     res = AlignedSequences(read.seq, contig.seq)
     for rec in read.alignments:
-        if rec.seg_to.contig.id != contig.id:
+        if rec.seg_to.contig != contig:
             continue
-        if res.aligned and res.rc != rec.rc:
-            continue
-            # assert False, "Straight and reverse alignments of the same read"
-        if not res.aligned and rec.rc:
-            res.rc = True
-            res.seq_from = basic.RC(res.seq_from)
         res.addCigar(rec.cigar, rec.seg_to.left)
     return res
 
@@ -265,8 +259,17 @@ class Aligner:
         self.cur_alignment = 0
         self.threads = threads
 
+    def alignReadCollection(self, reads):
+        # type: (ReadCollection) -> None
+        contig_ids = set()
+        for contig in reads.contigs:
+            if contig.rc.id not in contig_ids:
+                contig_ids.add(contig.id)
+        contigs = filter(lambda contig: contig.id in contig_ids, reads.contigs)
+        reads.loadFromSam(self.align(reads, reads.contigs))
+
     def align(self, reads, reference):
-        # type: (Iterable[AlignedRead], Iterable[Contig]) -> sam_parser.Samfile
+        # type: (Iterable[NamedSequence], Iterable[Contig]) -> sam_parser.Samfile
         dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (reads, "reads.fasta")])
         contigs_file = new_files[0]
         reads_file = new_files[1]
@@ -284,24 +287,22 @@ class Aligner:
     def matchingAlignment(self, seqs, contig):
         # type: (list[str], Contig) -> list[AlignedSequences]
         collection = ContigCollection([contig])
-        reads = ReadCollection(collection)
         res = [] # type: list[AlignedSequences]
-        for i in range(len(seqs)):
-            reads.add(AlignedRead(SeqIO.SeqRecord(seqs[i], str(i))))
-            res.append(AlignedSequences(seqs[i], contig.seq))
-        reads.loadFromSam(self.align(reads, collection))
+        for seq in seqs:
+            res.append(AlignedSequences(seq, contig.seq))
+        reads = ReadCollection(collection).loadFromSam(
+            self.align([AlignedRead(SeqIO.SeqRecord(seq, str(i))) for i, seq in enumerate(seqs)], collection))
         for read in reads:
-            print read.__str__()
             tid = int(read.id)
             read.sort()
             groups = [] #type: list[list[AlignmentPiece]]
             group_lens = []
             for al in read.alignments:
-                if al.rc:
+                if al.seg_to.contig != contig:
                     continue
                 found = False
                 for i, group in enumerate(groups):
-                    if group[-1].connect(al):
+                    if group[-1].precedes(al, 50):
                         group.append(al)
                         group_lens[i] += len(al.seg_from)
                         found = True
@@ -315,9 +316,6 @@ class Aligner:
                     best = i
             for al in groups[best]:
                 res[tid].addCigar(al.cigar, al.seg_to.left)
-            res[tid].rc = groups[best][0].rc
-            if res[tid].rc:
-                res[tid].seq_from = basic.RC(res[tid].seq_from)
         return res
 
     def repairGraphAlignments(self, graph):

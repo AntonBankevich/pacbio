@@ -47,7 +47,7 @@ class VertexResolver:
             for lineSegment in self.lineStorage.edgeLines(edge):# type:LineSegment
                 print "Creating a tail for line", lineSegment.line
                 base_seq = lineSegment.seq[-min(5000, len(lineSegment.seq)):]
-                consensus = self.polisher.polishQuiver(lineSegment.reads.inter(lineSegment.edge.suffix(5000)), base_seq, len(base_seq), 3000)
+                consensus = self.polisher.polishQuiver(lineSegment.reads.inter(lineSegment.edge.suffix(-5000)), base_seq, len(base_seq), 3000)
                 consensus = consensus.cut()
                 print "Created consensus of length", len(consensus)
                 first = None
@@ -55,9 +55,9 @@ class VertexResolver:
                 collection.loadFromSam(self.aligner.align([Contig(consensus.seq, 0)], ContigCollection(v.out)))
                 print collection.reads["0"].__str__()
                 for rec in collection.reads["0"].alignments:#v.out):
-                    if not rec.rc and len(rec.seg_from) > 300 and \
+                    if rec.seg_to.contig in v.out and len(rec.seg_from) > 300 and \
                             (len(rec.seg_from) > 500 or rec.seg_from.right > len(consensus.seq) - 100) and \
-                            (first == None or rec.seg_from.left < first.seg_from.left):
+                            (first is None or rec.seg_from.left < first.seg_from.left):
                         first = rec
                 if first is None:
                     print "Could not connect one of the tails. Aborting."
@@ -65,7 +65,7 @@ class VertexResolver:
                 print "Found connection of consensus to position", first.seg_to.left, "of edge", first.seg_to.contig.id
                 read_pos = first.seg_from.left
                 new_edge = first.seg_to.contig
-                filtered_reads = lineSegment.reads.inter(lineSegment.edge.suffix(5000)).inter(Segment(new_edge, first.seg_to.left, first.seg_to.right))
+                filtered_reads = lineSegment.reads.inter(lineSegment.edge.suffix(-5000)).inter(Segment(new_edge, first.seg_to.left, first.seg_to.right))
                 if first.seg_to.left < 500:
                     print first.seg_from.left, "nucleotedes were hidden inside a vertex"
                     lineSegment.line.tail = LineTail(lineSegment.line, new_edge, consensus.suffix(read_pos), filtered_reads)
@@ -119,8 +119,8 @@ class GraphResolver:
         # self.printer.edge_colorings.append(FilterColoring(lambda e: abs(e.id) >= 6000, "red"))
         self.cur_picture = 1
 
-    def printCurrentGraph(self, vertices, edges):
-        fn = os.path.join(self.dir, str(self.cur_picture) + ".dot")
+    def printCurrentGraph(self, vertices, edges, message = ""):
+        fn = os.path.join(self.dir, str(self.cur_picture) + "_" + "_".join(message.split()) + ".dot")
         f = open(fn, "w")
         self.printer.printToFile(f, [FilterColoring(lambda e: e in edges, "purple")], [FilterColoring(lambda v: v in vertices, "purple")])
         f.close()
@@ -129,29 +129,25 @@ class GraphResolver:
 
     def resolveVertexForward(self, v):
         # type: (Vertex) -> None
-        if not self.vertexResolver.resolveVertex(v):
-            print "Failed to resolve vertex", v.id
-            return
-        self.printCurrentGraph([v], [])
+        self.printCurrentGraph([v], [], "Resolving vertex " + str(v.id))
         for edge in v.out:
-            tails_list = list(self.lineStorage.edgeTails(edge))
+            lines_list = self.lineStorage.getEdgeLines(edge)
+            if len(lines_list) == 0:
+                print "No line entered edge " + str(edge.id) + ". Skipping vertex."
+        for edge in v.out:
             if edge.id in self.lineStorage.resolved_edges:
                 print "Encountered resolved edge. Skipping."
-                # assert len(tails_list) == 1
-                # nextLine = list(self.lineStorage.edgeLines(edge))[0].line
-                # assert nextLine.leftSegment().edge == edge
-                # tails_list[0].line.merge(nextLine)
-                # print "Successfully connected line", tails_list[0].line.__str__()
             elif edge.seq == basic.RC(edge.seq):
                 print "Encountered self-rc edge. Skipping"
             else:
+                lines_list = self.lineStorage.getEdgeLines(edge)
                 while edge is not None:
-                    finished, new_edge = self.edgeResolver.resolveEdge(edge, tails_list)
+                    finished, new_edge = self.edgeResolver.resolveEdge(edge, lines_list)
                     if finished:
                         self.lineStorage.resolved_edges.add(edge.id)
                         self.lineStorage.resolved_edges.add(edge.rc.id)
-                        print "Successfully resolved edge", edge.id, "into", len(tails_list), "lines"
-                        self.printCurrentGraph([], [edge])
+                        print "Successfully resolved edge", edge.id, "into", len(lines_list), "lines"
+                        self.printCurrentGraph([], [edge], "Resolved edge " + str(edge.id))
                     else:
                         print "Failed to resolve edge", edge.id
                         if new_edge is not None:

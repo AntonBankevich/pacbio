@@ -1,7 +1,10 @@
 import itertools
 import sys
 import gzip
-from typing import Generator
+from typing import Generator, Union, Callable, Optional
+
+from common import basic
+
 
 class Reader:
     def __init__(self, handler):
@@ -38,7 +41,7 @@ class Reader:
         return result
 
     def ReadUntill(self, f):
-        # type: (function) -> str
+        # type: (Callable[[str], bool]) -> str
         result = []
         while True:
             next_line = self.Readline()
@@ -46,7 +49,6 @@ class Reader:
                 self.Push(next_line)
                 return "".join(result)
             result.append(next_line)
-        return "".join(result)
 
     def ReadUntillFill(self, buf_size):
         # type: (int) -> str
@@ -65,31 +67,53 @@ class Reader:
         return self.Top() == ""
 
 
-class SeqRecord:
-    def __init__(self, seq, id, qual = None):
-        # type: (str, str, str) -> SeqRecord
-        assert qual is None or len(qual) == len(seq)
+class NamedSequence:
+    def __init__(self, seq, id):
+        # type: (str, Union[str, int]) -> NamedSequence
         self.id = id
         self.seq = seq.upper()
-        self.qual = qual
-        self.info = None
 
     def __len__(self):
+        # type: () -> int
         return len(self.seq)
 
+    def RC(self):
+        # type: () -> SeqRecord
+        return NamedSequence(basic.RC(self.seq), basic.Reverse(id))
+
+
+class SeqRecord(NamedSequence):
+    def __init__(self, seq, id, qual = None, info = None):
+        # type: (str, str, Optional[str], Optional[str]) -> SeqRecord
+        assert qual is None or len(qual) == len(seq)
+        NamedSequence.__init__(self, seq, id)
+        self.qual = qual
+        self.info = info
+
+    def RC(self):
+        # type: () -> SeqRecord
+        qual = self.qual
+        if qual is not None:
+            qual = qual[::-1]
+        return SeqRecord(basic.RC(self.seq), basic.Reverse(id), qual)
+
     def __getitem__(self, key):
+        # type: (int) -> str
         return self.seq[key]
 
     def QualSubseq(self, l, r):
-        if self.qual != None:
+        # type: (int, int) -> Optional[str]
+        if self.qual is not None:
             return self.qual[l: r]
         return None
 
     def subseq(self, l, r):
+        # type: (int, int) -> SeqRecord
         if l != 0 or r != len(self.seq):
             return SeqRecord(self.seq[l:r], self.id + "(" + str(l + 1) +"-" + str(r) + ")", self.QualSubseq(l, r))
         else:
             return self
+
 
 def parse(handler, file_name):
     file_type = file_name.split(".")[-1]
@@ -98,6 +122,7 @@ def parse(handler, file_name):
         return parse_fasta(handler)
     if file_type in ["fastq", "fq"]:
         return parse_fastq(handler)
+
 
 def parse_fasta(handler):
     # type: (file) -> Generator[SeqRecord]
@@ -111,7 +136,8 @@ def parse_fasta(handler):
             rec_id = rec_id[:pos]
         assert(rec_id[0] == '>')
         rec_seq = reader.ReadUntill(lambda s: s.startswith(">"))
-        yield SeqRecord(rec_seq, rec_id[1:])
+        yield SeqRecord(rec_seq, rec_id[1:], None, info)
+
 
 def parse_fastq(handler):
     reader = Reader(handler)
@@ -123,6 +149,7 @@ def parse_fastq(handler):
         assert(tmp[0] == '+')
         rec_qual = reader.ReadUntillFill(len(rec_seq))
         yield SeqRecord(rec_seq, rec_id[1:], rec_qual)
+
 
 def write(rec, handler, file_type):
     if file_type == "fasta":
@@ -140,6 +167,7 @@ def FilterContigs(input_handler, output_handler, f, file_type):
         if f(contig):
             write(contig, output_handler, file_type)
 
+
 def RemoveNs(input_handler, output_handler):
     for contig in parse(input_handler, "fasta"):
         l = 0
@@ -149,4 +177,4 @@ def RemoveNs(input_handler, output_handler):
         while r > l and contig[r - 1] == 'N':
             r -= 1
         if r > l:
-            write(SeqRecord(contig.seq[l:r], contig.id))
+            output_handler.write(SeqRecord(contig.seq[l:r], contig.id))

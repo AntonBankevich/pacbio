@@ -297,6 +297,7 @@ def ParseCigar(cigar, len, pos=0, full_read = False):
             cur += n
 
 def CigarToList(cigar):
+    # type: (str) -> Generator[Tuple[str, int]]
     if cigar == "=":
         yield ("=", 0)
         return
@@ -308,6 +309,23 @@ def CigarToList(cigar):
         else:
             n = 1
         yield (c, n)
+
+def RCCigar(cigar):
+    # type: (str) -> str
+    if cigar == "=":
+        return "="
+    if cigar == "X":
+        return "X"
+    res = []
+    for n, c in list(pattern.findall(cigar))[::-1]:
+        if n:
+            n = int(n)
+            res.append(n + c)
+        else:
+            n = 1
+            res.append(c)
+    return "".join(res)
+
 
 ############################# test
 

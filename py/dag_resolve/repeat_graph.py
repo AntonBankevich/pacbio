@@ -1,11 +1,12 @@
 from common import basic, sam_parser, SeqIO
 from typing import Generator, Dict, Optional, Tuple
-from dag_resolve.sequences import Contig, ReadCollection, ContigCollection
+from dag_resolve.sequences import Contig, ReadCollection, ContigCollection, TmpInfo
 
 
-class EdgeInfo:
+class EdgeInfo(TmpInfo):
     def __init__(self, label, unique, cov, selfrc = False):
         # type: (str, bool, int, bool) -> EdgeInfo
+        TmpInfo.__init__(self, [])
         self.label = label
         self.unique = unique
         self.misc = []
@@ -37,20 +38,18 @@ class Vertex:
         return str(self.id)
 
 class Edge(Contig):
-    def __init__(self, id, start, end, consensus, info):
+    def __init__(self, id, start, end, consensus, info, rc = None):
         # type: (int, Vertex, Vertex, str, EdgeInfo) -> Edge
-        Contig.__init__(self, consensus, id, info)
         self.start = start
         self.end = end
+        start.out.append(self)
+        end.inc.append(self)
         self.reads = ReadCollection(ContigCollection([self]))
-        self.rc = None # type: Edge
-
-    def __eq__(self, other):
-        # type: (Edge) -> bool
-        return self.id == other.id
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
+        if rc is None:
+            rc = Edge(basic.Reverse(id), end.rc, start.rc, basic.RC(consensus), info, self)
+        self.rc = rc # type: Edge
+        Contig.__init__(self, consensus, id, info, self.rc)
+        self.info = info
 
 class Graph:
     def __init__(self):
@@ -102,15 +101,9 @@ class Graph:
         start = self.addVertex(start_id)
         end = self.addVertex(end_id)
         edge = Edge(edge_id, start, end, consensus, info)
-        edge_rc = Edge(-edge_id, end.rc, start.rc, basic.RC(consensus), info)
-        edge.rc = edge_rc
-        edge_rc.rc = edge
+        edge_rc = edge.rc
         self.E[edge.id] = edge
         self.E[edge_rc.id] = edge_rc
-        start.out.append(edge)
-        start.rc.inc.append(edge_rc)
-        end.inc.append(edge)
-        end.rc.out.append(edge_rc)
         self.newEdges.append(edge)
         self.newEdges.append(edge.rc)
         return edge
@@ -213,8 +206,9 @@ class Graph:
                 seq = basic.RC(seq)
             if info.selfrc:
                 end = 40000 + abs(eid)
-                v_map[end] = self.addVertex()
+                v_map[end] = self.addVertex(None, True)
                 seq = seq[:len(seq) / 2]
+                info.selfrc = False
             self.addEdge(eid, v_map[start].id, v_map[end].id, seq, info)
         return self
 
@@ -251,7 +245,6 @@ class DotParser:
             v_to = basic.parseNumber(s, s.find("->"))
             eid = basic.parseNegativeNumber(s, s.find("id"))
             cov = basic.parseNumber(s, s.find("k "))
-            # l = basic.parseNumber(s, s.find("\\l"))
             unique = (s.find("black") != -1)
             src = (s.find("dir = both") != -1)
             if edge_ids is None or eid in edge_ids:

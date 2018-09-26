@@ -8,7 +8,7 @@ def EdgeTransitionFilter(e1, e2, transition_size = 1000):
         l1 = [] # type: list[sequences.AlignmentPiece]
         l2 = [] # type: list[sequences.AlignmentPiece]
         for al in read.alignments:
-            if al.seg_to.inter(e1.suffix(500)):
+            if al.seg_to.inter(e1.suffix(-500)):
                 l1.append(al)
             if al.seg_to.inter(e2.prefix(500)):
                 l2.append(al)

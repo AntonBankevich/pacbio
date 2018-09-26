@@ -119,3 +119,14 @@ def Link(arr, dist):
             left = val
         prev = val
     yield prev, arr[-1]
+
+def Reverse(val):
+    if isinstance(val, str):
+        assert not val.startswith("--")
+        if val.startswith("-"):
+            return val[1:]
+        else:
+            return "-" + val
+    elif isinstance(val, int):
+        return -val
+    assert False, "Tried to reverse an object that is neither number not a string"

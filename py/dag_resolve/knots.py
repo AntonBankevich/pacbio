@@ -75,7 +75,7 @@ class Knotter:
     def extremeConnect(self, read, edge):
         # type: (AlignedRead, Edge) -> bool
         for aln1 in read.alignments:
-            if not aln1.seg_to.inter(edge.suffix(1000)):
+            if not aln1.seg_to.inter(edge.suffix(-1000)):
                 continue
             for aln2 in read.alignments:
                 if not aln2.seg_to.inter(edge.prefix(1000)):
