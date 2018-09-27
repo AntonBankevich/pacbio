@@ -59,7 +59,6 @@ class DirDistributor:
             content_files.append(f_name)
         return dir, content_files, same
 
-
 class AlignedSequences:
     def __init__(self, seq_from, seq_to):
         # type: (str, str) -> AlignedSequences
@@ -252,6 +251,8 @@ def ReadToAlignedSequences(read, contig):
     return res
 
 
+
+
 class Aligner:
     def __init__(self, dir_distributor, threads = 16):
         # type: (DirDistributor, int) -> Aligner
@@ -291,39 +292,39 @@ class Aligner:
             make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
-    def matchingAlignment(self, seqs, contig):
-        # type: (list[str], Contig) -> list[AlignedSequences]
-        collection = ContigCollection([contig])
-        res = [] # type: list[AlignedSequences]
-        for seq in seqs:
-            res.append(AlignedSequences(seq, contig.seq))
-        reads = ReadCollection(collection).loadFromSam(
-            self.align([AlignedRead(SeqIO.SeqRecord(seq, str(i))) for i, seq in enumerate(seqs)], collection))
-        for read in reads:
-            tid = int(read.id)
-            read.sort()
-            groups = [] #type: list[list[AlignmentPiece]]
-            group_lens = []
-            for al in read.alignments:
-                if al.seg_to.contig != contig:
-                    continue
-                found = False
-                for i, group in enumerate(groups):
-                    if group[-1].precedes(al, 50):
-                        group.append(al)
-                        group_lens[i] += len(al.seg_from)
-                        found = True
-                        break
-                if not found:
-                    groups.append([al])
-                    group_lens.append(len(al.seg_from))
-            best = None
-            for i in range(len(groups)):
-                if best == None or group_lens[i] > group_lens[best]:
-                    best = i
-            for al in groups[best]:
-                res[tid].addCigar(al.cigar, al.seg_to.left)
-        return res
+    # def matchingAlignment(self, seqs, contig):
+    #     # type: (list[str], Contig) -> list[AlignedSequences]
+    #     collection = ContigCollection([contig])
+    #     res = [] # type: list[AlignedSequences]
+    #     for seq in seqs:
+    #         res.append(AlignedSequences(seq, contig.seq))
+    #     reads = ReadCollection(collection).loadFromSam(
+    #         self.align([AlignedRead(SeqIO.SeqRecord(seq, str(i))) for i, seq in enumerate(seqs)], collection))
+    #     for read in reads:
+    #         tid = int(read.id)
+    #         read.sort()
+    #         groups = [] #type: list[list[AlignmentPiece]]
+    #         group_lens = []
+    #         for al in read.alignments:
+    #             if al.seg_to.contig != contig:
+    #                 continue
+    #             found = False
+    #             for i, group in enumerate(groups):
+    #                 if group[-1].precedes(al, 50):
+    #                     group.append(al)
+    #                     group_lens[i] += len(al.seg_from)
+    #                     found = True
+    #                     break
+    #             if not found:
+    #                 groups.append([al])
+    #                 group_lens.append(len(al.seg_from))
+    #         best = None
+    #         for i in range(len(groups)):
+    #             if best == None or group_lens[i] > group_lens[best]:
+    #                 best = i
+    #         for al in groups[best]:
+    #             res[tid].addCigar(al.cigar, al.seg_to.left)
+    #     return res
 
     def repairGraphAlignments(self, graph):
         # type: (Graph) -> None

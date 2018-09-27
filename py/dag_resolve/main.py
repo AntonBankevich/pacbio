@@ -100,7 +100,7 @@ if __name__ == "__main__":
     sys.stdout.write("Resolving repeats\n")
     picture_dir = os.path.join(dir, "pictures")
     basic.recreate(picture_dir)
-    res = GraphResolver(graph, picture_dir, VertexResolver(graph, al, polisher), EdgeResolver(graph, al, polisher))
+    res = GraphResolver(graph, picture_dir, EdgeResolver(graph, al, polisher))
     res.resolve()
     sys.stdout.write("Printing results\n")
     res.printResults(sys.stdout)

@@ -10,106 +10,18 @@ from common import sam_parser, basic
 from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.filters import EdgeTransitionFilter
 from dag_resolve.knots import Knotter
-from dag_resolve.line_tools import LineTail, LineSegment, LineStorage
+from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
 from dag_resolve.sequences import Contig, ReadCollection, Segment, ContigCollection
 from dag_resolve.visualization import DotPrinter, FilterColoring
 
 
-class VertexResolver:
-    def __init__(self, graph, aligner, polisher):
-        # type: (Graph, Aligner, Polisher) -> VertexResolver
-        self.graph = graph
-        self.lineStorage = None
-        self.polisher = polisher
-        self.aligner = aligner
-
-    def transitionSupport(self, prev, seg, next):
-        # type: (Edge, LineSegment, Edge) -> ReadCollection
-        return seg.reads.filter(EdgeTransitionFilter(prev, next))
-
-    def resolveVertex(self, v):
-        # type: (Vertex) -> bool
-        print "Resolving vertex", v.id
-        print "Incoming edges:", map(lambda e: e.id, v.inc)
-        print "Outgoing edges:", map(lambda e: e.id, v.out)
-        assert len(v.out) > 0, "Trying to resolve hanging vertex " + str(v.id)
-        # for edge in v.inc:
-        #     for lineSegment in self.lineStorage.edgeLines(edge):# type:LineSegment
-        #         print ""
-        #         print "Reads from line", lineSegment.line.id
-        #         lineSegment.reads.print_alignments(sys.stdout)
-        for edge in v.out:
-            if len(edge) < 500:
-                print "One of outgoing edges is too short. Skipping vertex"
-                return False
-        for edge in v.inc:
-            for lineSegment in self.lineStorage.edgeLines(edge):# type:LineSegment
-                print "Creating a tail for line", lineSegment.line
-                base_seq = lineSegment.seq[-min(5000, len(lineSegment.seq)):]
-                consensus = self.polisher.polishQuiver(lineSegment.reads.inter(lineSegment.edge.suffix(-5000)), base_seq, len(base_seq), 3000)
-                consensus = consensus.cut()
-                print "Created consensus of length", len(consensus)
-                first = None
-                collection = ReadCollection(ContigCollection(v.out))
-                collection.loadFromSam(self.aligner.align([Contig(consensus.seq, 0)], ContigCollection(v.out)))
-                print collection.reads["0"].__str__()
-                for rec in collection.reads["0"].alignments:#v.out):
-                    if rec.seg_to.contig in v.out and len(rec.seg_from) > 300 and \
-                            (len(rec.seg_from) > 500 or rec.seg_from.right > len(consensus.seq) - 100) and \
-                            (first is None or rec.seg_from.left < first.seg_from.left):
-                        first = rec
-                if first is None:
-                    print "Could not connect one of the tails. Aborting."
-                    return False
-                print "Found connection of consensus to position", first.seg_to.left, "of edge", first.seg_to.contig.id
-                read_pos = first.seg_from.left
-                new_edge = first.seg_to.contig
-                filtered_reads = lineSegment.reads.inter(lineSegment.edge.suffix(-5000)).inter(Segment(new_edge, first.seg_to.left, first.seg_to.right))
-                if first.seg_to.left < 500:
-                    print first.seg_from.left, "nucleotedes were hidden inside a vertex"
-                    lineSegment.line.tail = LineTail(lineSegment.line, new_edge, consensus.suffix(read_pos), filtered_reads)
-                    lineSegment.line.tail.alignment = self.aligner.matchingAlignment([lineSegment.line.tail.tail_consensus.seq], new_edge)[0]
-                else:
-                    if read_pos < 500:
-                        print "Late entrances not supported. Aborting."
-                        return False
-                    print "Reparing graph and restarting vertex resolution"
-                    self.graph.addCuttingEdge(new_edge, 0, new_edge, first.seg_to.left, consensus.seq[:read_pos])
-                    self.aligner.repairGraphAlignments(self.graph)
-                    self.graph.printToFile(sys.stdout)
-                    return self.resolveVertex(v)
-                    # lineSegment.line.tail = LineTail(lineSegment.line, new_edge, consensus.cut(length=read_pos), filtered_reads)
-
-
-                # support = []
-                # for next_candidate in v.out:
-                #     support.append(self.transitionSupport(edge, lineSegment, next_candidate))
-                # if len(v.out) == 1:
-                #     next = 0
-                # else:
-                #     supportWeight = map(len, support)
-                #     print "Number of reads that support transitions for the line from edge", edge.id, ":", ",".join(
-                #         map(str, supportWeight))
-                #     next, alternative = basic.best2(supportWeight, lambda x, y: x > y)
-                #     if supportWeight[alternative] * 5 > supportWeight[next]:
-                #         print "Support of alternative edge is too high. Aborting."
-                #         return False
-                # reads = support[next] # type: sequences.ReadCollection
-                # tail = self.polisher.polishAndAnalyse(reads, v.out[next])
-                # lineSegment.line.tail = LineTail(lineSegment.line, v.out[next], tail, reads)
-                # print "Created tail of line", lineSegment.line, "on edge", v.out[next].id, "of length", len(tail.cut())
-        return True
-
-
 class GraphResolver:
-    def __init__(self, graph, dir, vertexResolver, edgeResolver):
-        # type: (Graph, str, VertexResolver, EdgeResolver) -> GraphResolver
+    def __init__(self, graph, dir, edgeResolver):
+        # type: (Graph, str, EdgeResolver) -> GraphResolver
         self.graph = graph
         self.dir = dir
         self.lineStorage = LineStorage(graph)
-        self.vertexResolver = vertexResolver
-        vertexResolver.lineStorage = self.lineStorage
         self.edgeResolver = edgeResolver
         self.printer = DotPrinter(self.graph)
         self.printer.edge_colorings.append(FilterColoring(lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is None, "black"))

@@ -124,6 +124,12 @@ class EdgeResolver:
             self.updateAlignments(shortest)
         return shortest, classified
 
+    def fight(self, c1, c2):
+        # type: (AlignmentPiece, AlignmentPiece) -> Optional[AlignmentPiece]
+        assert c1.seg_from.contig == c2.seg_from.contig
+
+        return None
+
     def championship(self, candidates):
         # type: (list[AlignmentPiece]) -> Optional[AlignmentPiece]
         best = None
