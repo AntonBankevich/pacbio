@@ -108,6 +108,9 @@ class Contig(NamedSequence):
     def __ne__(self, other):
         return self.id != other.id
 
+    def __str__(self):
+        return str(self.id) + "(" + str(self.__len__()) + ")"
+
 
 class Segment:
     def __init__(self, contig, left = None, right = None):
@@ -116,6 +119,7 @@ class Segment:
             left = 0
         if right is None:
             right = len(contig)
+        assert 0 <= left <= right <= len(contig)
         self.contig = contig
         self.left = left
         self.right = right
@@ -146,6 +150,9 @@ class Segment:
 
     def merge(self, other):
         return Segment(self.contig, self.left, other.right)
+
+    def shift(self, val):
+        return Segment(self.contig, self.left + val, self.right + val)
 
     def Seq(self):
         return self.contig.seq[self.left:self.right]
@@ -195,7 +202,6 @@ class AlignmentPiece:
     def RC(self):
         return AlignmentPiece(self.seg_from.RC(), self.seg_to.RC(), sam_parser.RCCigar(self.cigar))
 
-
 class AlignmentCollection:
     def __init__(self, alignments, contig):
         # type: (Iterable[AlignmentPiece], Contig) -> AlignmentCollection
@@ -244,6 +250,11 @@ class AlignedRead(NamedSequence):
         self.rc.alignments.append(piece.RC())
         return piece
 
+    def addAlignment(self, al):
+        # type: (AlignmentPiece) -> None
+        self.alignments.append(al)
+        self.rc.alignments.append(al.RC())
+
     def sort(self):
         self.alignments = sorted(self.alignments, key = lambda alignment: (alignment.seg_to.contig.id, alignment.seg_from.left))
 
@@ -266,7 +277,6 @@ class AlignedRead(NamedSequence):
             if right is None or right < alignment.seg_to.right:
                 right = alignment.seg_to.right
         return left, right
-
 
     def inter(self, other):
         # type: (Segment) -> bool
@@ -442,6 +452,15 @@ class ReadCollection:
             self.add(AlignedRead(rec))
         return self
 
+    def cleanCopy(self, contigs):
+        res = ReadCollection(contigs)
+        for read in self.reads.values():
+            if read.rc.id in res.reads:
+                res.add(res.reads[read.rc.id].rc)
+            else:
+                res.addNewRead(read)
+        return res
+
 
 class Consensus:
     def __init__(self, seq, cov):
@@ -478,6 +497,9 @@ class Consensus:
 
     def __len__(self):
         return len(self.seq)
+
+    def RC(self):
+        return Consensus(basic.RC(self.seq), self.cov[::-1])
 
     def merge(self, other, pos):
         # type: (Consensus, int) -> None

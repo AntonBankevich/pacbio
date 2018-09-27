@@ -5,7 +5,8 @@ from common import basic
 from common.SeqIO import NamedSequence
 from dag_resolve.phasing import Phasing
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
-from dag_resolve.sequences import Segment, Consensus, ReadCollection, AlignmentCollection, AlignmentPiece, Contig
+from dag_resolve.sequences import Segment, Consensus, ReadCollection, AlignmentCollection, AlignmentPiece, Contig, \
+    AlignedRead, ContigCollection
 
 
 # class PseudoLineSegment:
@@ -55,6 +56,9 @@ class Line(Contig):
         self.rc = rc
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
         Contig.__init__(self, edge.seq, edge.id, self.rc)
+        if self.rc.reads is None:
+            self.reads = edge.reads.cleanCopy(ContigCollection([self, self.rc]))
+            self.rc.reads = self.reads
 
     def extendRight(self, consensus, pos = None):
         # type: (Consensus, Optional(int)) -> None
@@ -63,10 +67,16 @@ class Line(Contig):
         self.consensus.merge(consensus, pos)
         self.seq = self.consensus.seq
         self.removeAlignments(pos)
+        self.fixRC()
+
+    def fixRC(self):
+        self.rc.seq = basic.RC(self.seq)
+        self.rc.chain = [al.RC() for al in self.chain[::-1]]
 
     def removeAlignments(self, pos):
         while len(self.chain) > 0 and self.chain[-1].seg_from.right > pos:
             self.chain.pop()
+        self.fixRC()
 
     def addAlignment(self, piece):
         self.removeAlignments(piece.seg_from.left)
@@ -74,6 +84,7 @@ class Line(Contig):
             self.chain[-1] = self.chain[-1].merge(piece)
         else:
             self.chain.append(piece)
+        self.fixRC()
 
     def isSimpleLoop(self):
         return self.knot is not None and len(self.chain) == 1 and len(self.rc.chain) == 1 and self.knot.line2.rc.id == self.id
@@ -92,7 +103,7 @@ class Line(Contig):
                 yield al
 
     def __str__(self):
-        return "[" + ",".join(map(lambda seg: str(seg.edge.id), self.chain)) + "]"
+        return "[" + ",".join(map(lambda al: str(al.seg_to), self.chain)) + "]"
 
     def rcStr(self):
         return "[" + ",".join(map(lambda seg: str(seg.edge.rc.id), self.chain[::-1])) + "]"

@@ -259,14 +259,21 @@ class Aligner:
         self.cur_alignment = 0
         self.threads = threads
 
-    def alignReadCollection(self, reads):
-        # type: (ReadCollection) -> None
+    def alignReadCollection(self, reads_collection, contigs = None):
+        # type: (ReadCollection, Iterable[Contig]) -> None
+        if contigs is None:
+            contigs = reads_collection.contigs
         contig_ids = set()
-        for contig in reads.contigs:
+        for contig in contigs:
             if contig.rc.id not in contig_ids:
                 contig_ids.add(contig.id)
-        contigs = filter(lambda contig: contig.id in contig_ids, reads.contigs)
-        reads.loadFromSam(self.align(reads, reads.contigs))
+        read_ids = set()
+        for read in reads_collection:
+            if read.rc.id not in read_ids:
+                read_ids.add(read.id)
+        contigs = filter(lambda contig: contig.id in contig_ids, contigs)
+        reads = filter(lambda read: read.id in read_ids, reads_collection)
+        reads_collection.loadFromSam(self.align(reads, contigs))
 
     def align(self, reads, reference):
         # type: (Iterable[NamedSequence], Iterable[Contig]) -> sam_parser.Samfile
