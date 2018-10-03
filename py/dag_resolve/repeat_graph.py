@@ -44,12 +44,12 @@ class Edge(Contig):
         self.end = end
         start.out.append(self)
         end.inc.append(self)
-        self.reads = ReadCollection(ContigCollection([self]))
         if rc is None:
             rc = Edge(basic.Reverse(id), end.rc, start.rc, basic.RC(consensus), info, self)
         self.rc = rc # type: Edge
         Contig.__init__(self, consensus, id, info, self.rc)
         self.info = info
+        self.reads = ReadCollection(ContigCollection([self]))
 
 class Graph:
     def __init__(self):
@@ -225,6 +225,27 @@ class Graph:
             self.E[edge_id].reads.add(self.reads[rec.query_name])
             self.E[edge_id].reads.addNewAlignment(rec)
         self.newEdges = []
+
+    def fillRelevant(self, relevants, reads):
+        # type: (str, ReadCollection) -> int
+        cedge = None
+        cnt = 0
+        for s in open(relevants, "r").readlines():
+            if s.startswith("#Repeat") or s.startswith("#Input") or s.startswith("Output"):
+                cedge = self.E[basic.parseNumber(s)]
+            elif s.startswith("+"):
+                rname = s.strip()[1:]
+                assert rname in reads
+                if rname not in cedge.reads:
+                    cedge.reads.addNewRead(reads[rname])
+                    cnt += 1
+            elif s.startswith("-"):
+                rname = s.strip()[1:]
+                assert rname in reads
+                if rname not in cedge.reads:
+                    cedge.rc.reads.addNewRead(reads[rname].rc)
+                    cnt += 1
+        return cnt
 
     def unorientedEdges(self):
         for edge in self.E.values():

@@ -59,10 +59,10 @@ class Knotter:
     def checkConnect(self, read, seg1, seg2):
         # type: (AlignedRead, Segment, Segment) -> bool
         for aln1 in read.alignments:
-            if not aln1.seg_to.inter(seg1):
+            if not aln1.seg_to.common(seg1):
                 continue
             for aln2 in read.alignments:
-                if not aln2.seg_to.inter(seg2):
+                if not aln2.seg_to.common(seg2):
                     continue
                 if aln1.rc == aln2.rc:
                     continue
@@ -75,10 +75,10 @@ class Knotter:
     def extremeConnect(self, read, edge):
         # type: (AlignedRead, Edge) -> bool
         for aln1 in read.alignments:
-            if not aln1.seg_to.inter(edge.suffix(-1000)):
+            if not aln1.seg_to.common(edge.suffix(-1000)):
                 continue
             for aln2 in read.alignments:
-                if not aln2.seg_to.inter(edge.prefix(1000)):
+                if not aln2.seg_to.common(edge.prefix(1000)):
                     continue
                 if aln1.seg_from.right <= aln2.seg_from.left and aln1.seg_to.right > aln2.seg_to.left:
                     return True

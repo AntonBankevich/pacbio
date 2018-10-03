@@ -1,16 +1,16 @@
 import os
 import sys
+import time
 
 from typing import Dict
 
 sys.path.append("py")
 
-import time
 from alignment.polishing import Polisher
 from alignment.align_tools import DirDistributor, Aligner
 from dag_resolve import params
 from dag_resolve.edge_resolver import EdgeResolver
-from dag_resolve.graph_resolver import GraphResolver, VertexResolver
+from dag_resolve.graph_resolver import GraphResolver
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
 from dag_resolve.sequences import ContigCollection, ReadCollection
@@ -68,14 +68,19 @@ def ParseEdges(e_str):
             edges[-eid] = s
     return edges
 
+
 if __name__ == "__main__":
     start = time.time()
     sys.stdout.write("Started\n")
-    edge_sequences = sys.argv[1]
-    dot_file = sys.argv[2]
-    reads = sys.argv[3]
-    edges = ParseEdges(sys.argv[4])
-    dir = sys.argv[5]
+    indir = sys.argv[1]
+    if indir.endswith("/"):
+        indir = indir[:-1]
+    edges = ParseEdges(sys.argv[2])
+    dir = sys.argv[3]
+    edge_sequences = os.path.join(indir, "2-repeat", "graph_final.fasta")
+    dot_file = os.path.join(indir, "2-repeat", "graph_final.dot")
+    reads_file = os.path.join(indir, os.path.split(indir)[1] + ".fasta")
+    relevant_reads = os.path.join(indir, "2-repeat", "repeats_dump.txt")
     basic.ensure_dir_existance(dir)
     if params.clean:
         basic.recreate(dir)
@@ -93,10 +98,12 @@ if __name__ == "__main__":
     sys.stdout.write("Aligning reads\n")
     al = Aligner(dir_distributor)
     polisher = Polisher(al, dir_distributor)
-    reads = ReadCollection().loadFromFasta(open(reads, "r"))
+    reads = ReadCollection().loadFromFasta(open(reads_file, "r"))
     alignment = al.align(reads, ContigCollection(graph.E.values()))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
+    relevant = graph.fillRelevant(relevant_reads, reads)
+    sys.stdout.write("Added " + str(relevant) + " reads\n")
     sys.stdout.write("Resolving repeats\n")
     picture_dir = os.path.join(dir, "pictures")
     basic.recreate(picture_dir)

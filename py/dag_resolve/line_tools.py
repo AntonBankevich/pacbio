@@ -1,12 +1,10 @@
 from typing import Generator, Dict, Set, Optional
 
-from alignment.align_tools import AlignedSequences
 from common import basic
 from common.SeqIO import NamedSequence
 from dag_resolve.phasing import Phasing
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
-from dag_resolve.sequences import Segment, Consensus, ReadCollection, AlignmentCollection, AlignmentPiece, Contig, \
-    AlignedRead, ContigCollection
+from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece
 
 
 # class PseudoLineSegment:
@@ -47,16 +45,17 @@ class Line(Contig):
     def __init__(self, edge, rc = None):
         # type: (Edge) -> Line
         assert edge.info.unique
-        self.chain = [AlignmentPiece(self.asSegment(), edge.asSegment(), "=")] # type: list[AlignmentPiece]
-        self.reads = edge.reads
+        self.reads = None # type: ReadCollection
         self.rc = None # type: Line
         self.knot = None # type: Knot
+        self.id = edge.id
         if rc is None:
             rc = Line(edge.rc, self)
         self.rc = rc
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
-        Contig.__init__(self, edge.seq, edge.id, self.rc)
-        if self.rc.reads is None:
+        Contig.__init__(self, edge.seq, edge.id, None, self.rc)
+        self.chain = [AlignmentPiece(self.asSegment(), edge.asSegment(), "=")] # type: list[AlignmentPiece]
+        if self.reads is None:
             self.reads = edge.reads.cleanCopy(ContigCollection([self, self.rc]))
             self.rc.reads = self.reads
 
@@ -64,8 +63,13 @@ class Line(Contig):
         # type: (Consensus, Optional(int)) -> None
         if pos is None:
             pos = len(self.seq)
+        old_len = len(self)
         self.consensus.merge(consensus, pos)
         self.seq = self.consensus.seq
+        for read in self.reads:
+            for al in read.alignments:
+                if al.seg_to.contig == self.rc:
+                    al.seg_to = al.seg_to.shift(old_len - len(self))
         self.removeAlignments(pos)
         self.fixRC()
 
@@ -118,6 +122,8 @@ class LineStorage:
         self.g = g
         self.lines = [] #type: list[Line]
         self.edgeLines = dict() # type: Dict[int, list[Line]]
+        for edge in g.E.values():
+            self.edgeLines[edge.id] = []
         self.resolved_edges = set() #type: Set[int]
         for edge1, edge2 in g.unorientedEdges():
             if edge1.info.unique:
@@ -125,6 +131,8 @@ class LineStorage:
                 self.resolved_edges.add(edge1.id)
                 self.resolved_edges.add(edge2.id)
                 line = Line(edge1)
+                self.edgeLines[edge1.id].append(line)
+                self.edgeLines[edge2.id].append(line.rc)
                 self.lines.append(line)
                 self.lines.append(line.rc)
 

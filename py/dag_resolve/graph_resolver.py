@@ -8,13 +8,11 @@ from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common import sam_parser, basic
 from dag_resolve.edge_resolver import EdgeResolver
-from dag_resolve.filters import EdgeTransitionFilter
 from dag_resolve.knots import Knotter
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
 from dag_resolve.sequences import Contig, ReadCollection, Segment, ContigCollection
 from dag_resolve.visualization import DotPrinter, FilterColoring
-
 
 class GraphResolver:
     def __init__(self, graph, dir, edgeResolver):
@@ -59,6 +57,9 @@ class GraphResolver:
                         self.lineStorage.resolved_edges.add(edge.id)
                         self.lineStorage.resolved_edges.add(edge.rc.id)
                         print "Successfully resolved edge", edge.id, "into", len(lines_list), "lines"
+                        self.lineStorage.resolved_edges.add(edge)
+                        for line in lines_list:
+                            self.lineStorage.edgeLines[line.chain[-1].seg_to.contig.id].append(line)
                         self.printCurrentGraph([], [edge], "Resolved edge " + str(edge.id))
                     else:
                         print "Failed to resolve edge", edge.id
@@ -71,6 +72,10 @@ class GraphResolver:
     def resolve(self):
         self.graph.printToFile(sys.stdout)
         visited_vertices = set()
+        print "Resolving unique edges"
+        for edge in self.graph.E.values():
+            finished, new_edge = self.edgeResolver.resolveEdge(edge, self.lineStorage.getEdgeLines(edge))
+            assert finished
         while True:
             cnt = 0
             for v in self.graph.V.values():

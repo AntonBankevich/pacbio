@@ -89,9 +89,7 @@ class SAM_entry:
     def __init__(self, alignment_string):
         splits = alignment_string.split()
 
-        if len(splits) < self.sam_config.num_mand_fields:
-            sys.stderr.write("ERROR: Mandatory fields of alignment were not specified!\n")
-            sys.exit(1)
+        assert len(splits) >= self.sam_config.num_mand_fields, "ERROR: Mandatory fields of alignment were not specified"
 
         self.query_name = splits[self.sam_config.query_index]
         self.flag = int(splits[self.sam_config.flag_index])
@@ -319,10 +317,8 @@ def RCCigar(cigar):
     res = []
     for n, c in list(pattern.findall(cigar))[::-1]:
         if n:
-            n = int(n)
             res.append(n + c)
         else:
-            n = 1
             res.append(c)
     return "".join(res)
 

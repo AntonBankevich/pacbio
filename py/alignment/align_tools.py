@@ -2,13 +2,15 @@ import itertools
 import os
 import sys
 
+from dag_resolve.line_tools import Line
+
 sys.path.append("py")
 from common.SeqIO import NamedSequence
 from flye.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
 from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, AlignmentPiece
-from typing import Optional, Iterable, Tuple
+from typing import Optional, Iterable, Tuple, Generator
 from common import basic, sam_parser, SeqIO
 
 
@@ -18,6 +20,7 @@ class DirDistributor:
         self.cur_dir = 0
 
     def nextDir(self):
+        # type: () -> str
         name = os.path.join(self.dir, str(self.cur_dir))
         self.cur_dir += 1
         assert self.cur_dir <= 2000
@@ -36,16 +39,43 @@ class DirDistributor:
         except:
             return False
 
-    def CheckAndWriteSequences(self, reads, reads_file):
-        # type: (Iterable[NamedSequence], str) -> bool
-        if self.CheckSequences(reads, reads_file):
-            return True
-        else:
-            f = open(reads_file, "w")
-            for read in reads:
-                SeqIO.write(read, f, "fasta")
-            f.close()
+    def WriteSequences(self, reads, reads_file):
+        # type: (Iterable[NamedSequence], str) -> None
+        f = open(reads_file, "w")
+        for read in reads:
+            SeqIO.write(read, f, "fasta")
+        f.close()
+
+    def hash(self, reads):
+        # type: (Iterable[NamedSequence]) -> int
+        res = 0
+        for read in reads:
+            res += read.seq.__hash__() + read.id.__hash__()
+        return res
+
+    def calculateHash(self, content):
+        # type: (list[Tuple[Iterable[NamedSequence], str]]) -> Generator[Tuple[str, str, str]]
+        for reads, f_name in content:
+            yield f_name, str(self.hash(reads)), str(len(reads))
+
+    def printHash(self, handler, hashs):
+        # type: (file, list[Tuple[str, str, str]]) -> None
+        for rec in hashs:
+            handler.write(" ".join(rec) + "\n")
+
+    def compareHash(self, handler, hashs):
+        # type: (file, list[Tuple[str, str, str]]) -> bool
+        lines = handler.readlines()
+        if len(lines) != len(hashs):
             return False
+        for l, rec in zip(lines, hashs):
+            l = l.split()
+            if len(l) != len(rec):
+                return False
+            for s1, s2 in zip(l, rec):
+                if s1 != s2:
+                    return False
+        return True
 
     def fillNextDir(self, content):
         # type: (list[Tuple[Iterable[NamedSequence], str]]) -> Tuple[str, list[str], bool]
@@ -53,11 +83,16 @@ class DirDistributor:
         dir = self.nextDir()
         content_files = []
         for reads, f_name in content:
+            content_files.append(os.path.join(dir, f_name))
+        hash_file = os.path.join(dir, "hashs.txt")
+        hashs = list(self.calculateHash(content))
+        if os.path.isfile(hash_file) and self.compareHash(open(hash_file, "r"), hashs):
+            return dir, content_files, True
+        self.printHash(open(hash_file, "w"), hashs)
+        for reads, f_name in content:
             f_name = os.path.join(dir, f_name)
-            if not self.CheckAndWriteSequences(reads, f_name):
-                same = False
-            content_files.append(f_name)
-        return dir, content_files, same
+            self.WriteSequences(reads, f_name)
+        return dir, content_files, False
 
 class AlignedSequences:
     def __init__(self, seq_from, seq_to):
@@ -275,6 +310,43 @@ class Aligner:
         contigs = filter(lambda contig: contig.id in contig_ids, contigs)
         reads = filter(lambda read: read.id in read_ids, reads_collection)
         reads_collection.loadFromSam(self.align(reads, contigs))
+
+    def realignCollection(self, reads_collection):
+        # type: (ReadCollection) -> None
+        for read in reads_collection:
+            read.clean()
+        self.alignReadCollection(reads_collection)
+
+    def fixExtendedLine(self, line):
+        # type: (Line) -> None
+        toFix = []
+        for read in line.reads:
+            if not read.noncontradicting(line.asSegment()):
+                toFix.append(read)
+        newAlignments = ReadCollection(line.reads.contigs).extend(toFix)
+        self.alignReadCollection(newAlignments)
+        for read in newAlignments:
+            for al in line.reads[read.id].alignments:
+                if al.noncontradicting(line.asSegment()):
+                    continue
+                for new_al in read.alignments:
+                    if new_al.contains(al) and len(new_al) > len(al):
+                        al.seg_from = new_al.seg_from
+                        al.seg_to = new_al.seg_to
+                        al.cigar = new_al.cigar
+
+    def expandCollection(self, reads_collection, new_reads):
+        # type: (ReadCollection) -> None
+        for read in new_reads:
+            reads_collection.addNewRead(read)
+        reads_collection.loadFromSam(self.align(new_reads, reads_collection.contigs))
+
+    def separateAlignments(self, reads, contigs):
+        # type: (Iterable[NamedSequence], Iterable[Contig]) -> ReadCollection
+        res = ReadCollection(ContigCollection(list(contigs)))
+        for contig in contigs:
+            res.loadFromSam(self.align(reads, [contig]))
+        return res
 
     def align(self, reads, reference):
         # type: (Iterable[NamedSequence], Iterable[Contig]) -> sam_parser.Samfile

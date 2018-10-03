@@ -78,8 +78,11 @@ class NamedSequence:
         return len(self.seq)
 
     def RC(self):
-        # type: () -> SeqRecord
-        return NamedSequence(basic.RC(self.seq), basic.Reverse(id))
+        # type: () -> NamedSequence
+        return NamedSequence(basic.RC(self.seq), basic.Reverse(self.id))
+
+    def __getitem__(self, item):
+        return self.seq[item]
 
 
 class SeqRecord(NamedSequence):
@@ -95,7 +98,7 @@ class SeqRecord(NamedSequence):
         qual = self.qual
         if qual is not None:
             qual = qual[::-1]
-        return SeqRecord(basic.RC(self.seq), basic.Reverse(id), qual)
+        return SeqRecord(basic.RC(self.seq), basic.Reverse(self.id), qual)
 
     def __getitem__(self, key):
         # type: (int) -> str

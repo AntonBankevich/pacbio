@@ -51,8 +51,6 @@ class Polisher:
         best = None
         for read in sorted(list(reads_to_base.__iter__()), key = lambda read: len(read))[::-1]:
             for al in read.alignments:
-                if al.rc:
-                    continue
                 if al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
                     tmp = self.polishAndAnalyse(reads, Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0))
                     if len(tmp.cut()) > len(base_start) - pos_start + min_new_len:
@@ -63,7 +61,10 @@ class Polisher:
                         best = tmp
                     break
         if best is None:
-            best = self.polishAndAnalyse(reads, Contig(base_start[pos_start:], 0))
+            if len(base_start) - pos_start > 500:
+                best = self.polishAndAnalyse(reads, Contig(base_start[pos_start:], 0))
+            else:
+                best = self.polishAndAnalyse(reads, Contig(base_start, 0)).suffix(pos_start)
         return best
 
 

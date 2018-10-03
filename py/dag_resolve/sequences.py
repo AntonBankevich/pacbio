@@ -1,13 +1,12 @@
-import sys
-
 import itertools
+import sys
 
 from common.SeqIO import NamedSequence
 from dag_resolve import params
 
 sys.path.append("py")
 from common import sam_parser, SeqIO, basic
-from typing import Generator, Iterator, Dict, Tuple, Optional, Union, Iterable, Callable
+from typing import Generator, Iterator, Dict, Tuple, Optional, Union, Callable, Iterable, Any
 
 
 class ContigCollection():
@@ -61,14 +60,20 @@ class ContigCollection():
         for contig in self.contigs.values():
             contig.print_fasta(handler)
 
+    def __len__(self):
+        # type: () -> int
+        return len(self.contigs)
+
+    def __contains__(self, item):
+        return item.id in self.contigs
+
 class TmpInfo:
     def __init__(self, l):
         self.misc = l
 
 class Contig(NamedSequence):
     def __init__(self, seq, id, info = None, rc = None):
-        # type: (str, Union[str,int], TmpInfo, Optional[Contig]) -> Contig
-        NamedSequence.__init__(self, seq, id)
+        # type: (str, Union[str,int], Optional[TmpInfo], Optional[Contig]) -> Contig
         if info is None:
             info = []
         if isinstance(info, list):
@@ -77,13 +82,13 @@ class Contig(NamedSequence):
         if rc is None:
             rc = Contig(basic.RC(seq), basic.Reverse(id), info, self)
         self.rc = rc
+        NamedSequence.__init__(self, seq, id)
 
     def suffix(self, pos):
         # type: (int) -> Segment
         if pos < 0:
             pos = self.__len__() + pos
-        len = min(len, self.__len__())
-        return Segment(self, self.__len__() - len, self.__len__())
+        return Segment(self, pos, self.__len__())
 
     def prefix(self, len):
         # type: (int) -> Segment
@@ -119,7 +124,7 @@ class Segment:
             left = 0
         if right is None:
             right = len(contig)
-        assert 0 <= left <= right <= len(contig)
+        assert 0 <= left <= right <= len(contig), str([0, left, right, len(contig), contig.id])
         self.contig = contig
         self.left = left
         self.right = right
@@ -171,47 +176,6 @@ class Segment:
         return self.contig != other.contig or self.left != other.left or self.right != other.right
 
 
-class AlignmentPiece:
-    def __init__(self, seg_from, seg_to, cigar = None):
-        # type: (Segment, Segment, str) -> AlignmentPiece
-        self.seg_from = seg_from
-        self.seg_to = seg_to
-        self.cigar = cigar
-
-    def __str__(self):
-        # type: () -> str
-        return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ")"
-
-    def precedes(self, other, delta = 0):
-        # type: (AlignmentPiece, int) -> bool
-        return self.seg_from.precedes(other.seg_from, delta) and self.seg_to.precedes(other.seg_to, delta)
-
-    def connects(self, other, delta = 0):
-        # type: (AlignmentPiece, int) -> bool
-        return self.seg_from.connects(other.seg_from, delta) and self.seg_to.connects(other.seg_to, delta)
-
-    def merge(self, other):
-        return AlignmentPiece(self.seg_from.merge(other.seg_from), self.seg_to.merge(other.seg_to), self.cigar + other.cigar)
-
-    def __eq__(self, other):
-        return self.seg_from == other.seg_from and self.seg_to == other.seg_to and self.cigar == other.cigar
-
-    def __ne__(self, other):
-        return self.seg_from != other.seg_from or self.seg_to != other.seg_to or self.cigar != other.cigar
-
-    def RC(self):
-        return AlignmentPiece(self.seg_from.RC(), self.seg_to.RC(), sam_parser.RCCigar(self.cigar))
-
-class AlignmentCollection:
-    def __init__(self, alignments, contig):
-        # type: (Iterable[AlignmentPiece], Contig) -> AlignmentCollection
-        self.alignments = list(alignments)
-        self.contig = contig
-
-    def __iter__(self):
-        return self.alignments.__iter__()
-
-
 class AlignedRead(NamedSequence):
     def __init__(self, rec, rc = None):
         # type: (NamedSequence, Optional[AlignedRead]) -> AlignedRead
@@ -240,11 +204,12 @@ class AlignedRead(NamedSequence):
                 new_cigar.append(num)
                 new_cigar.append(s)
         new_cigar = "".join(map(str, new_cigar))
-        seg_to = Segment(contig, rec.pos, rec.pos + rec.alen)
+        seg_to = Segment(contig, rec.pos - 1, rec.pos - 1 + rec.alen)
         if not rec.rc:
             seg_from = Segment(self, ls, len(self.seq) - rs)
         else:
             seg_from = Segment(self.rc, rs, len(self.seq) - ls).RC()
+            seg_to = seg_to.RC()
         piece = AlignmentPiece(seg_from, seg_to, new_cigar)
         self.alignments.append(piece)
         self.rc.alignments.append(piece.RC())
@@ -265,6 +230,9 @@ class AlignedRead(NamedSequence):
     def removeContig(self, contig):
         self.alignments = filter(lambda alignment: alignment.seg_to.contig.id != contig.id, self.alignments)
 
+    def clean(self):
+        self.alignments = []
+
     def contigAlignment(self, contig):
         # type: (Contig) -> Tuple[int,int]
         left = None
@@ -284,6 +252,14 @@ class AlignedRead(NamedSequence):
             if ap.seg_to.inter(other):
                 return True
         return False
+
+    def noncontradicting(self, seg):
+        # type: (Segment) -> bool
+        for al in self.alignments:
+            if al.noncontradicting(seg):
+                return True
+        return False
+
 
     def contains(self, other):
         # type: (Segment) -> bool
@@ -306,27 +282,17 @@ class ReadCollection:
         self.reads = dict() # type: Dict[str, AlignedRead]
         self.contigs = contigs
 
-    def extract(self, contig, filter = lambda al: True):
-        # type: (Contig, Callable[[AlignmentPiece], bool]) -> AlignmentCollection
-        res = []
-        for read in self.reads.values():
-            for al in read.alignments:
-                if al.seg_to.contig == contig and filter(al):
-                    res.append(al)
-        return AlignmentCollection(res, contig)
-
     def extend(self, other_collection):
-        # type: (ReadCollection) -> ReadCollection
-        for read in other_collection.reads.values():
+        # type: (Iterable[AlignedRead]) -> ReadCollection
+        for read in other_collection:
             self.add(read)
         return self
 
     def addNewRead(self, rec):
         # type: (NamedSequence) -> AlignedRead
-        rec.id = rec.id.split()[0]
+        rec.id = str(rec.id).split()[0]
         read = AlignedRead(rec)
         self.reads[read.id] = read
-        self.reads[read.rc.id] = read.rc
         return read
 
     def addNewAlignment(self, rec):
@@ -342,35 +308,35 @@ class ReadCollection:
         # type: (sam_parser.Samfile, Callable[[AlignedRead], bool]) -> ReadCollection
         last = [] # type: list[sam_parser.SAMEntryInfo]
         for new_rec in itertools.chain(sam, [None]):
-            if new_rec is not None and len(last) == 0 or new_rec.query_name == last[-1].query_name:
+            if new_rec is not None and (len(last) == 0 or new_rec.query_name == last[-1].query_name):
                 last.append(new_rec)
             else:
+                if len(last) == 0:
+                    return self
                 seq = None
                 for rec in last:
                     if "H" not in rec.cigar and rec.seq != "*":
-                        seq = rec.seq.split()
+                        seq = rec.seq
                         break
                 addRC = False
                 addStraight = False
-                assert seq is not None
+                assert seq is not None, last[0].query_name + " " + str(len(last))
                 new_read = AlignedRead(SeqIO.SeqRecord(seq, last[0].query_name))
                 for rec in last: #type: sam_parser.SAMEntryInfo
                     if rec.is_unmapped:
                         continue
-                    assert int(rec.tname) in self.contigs
+                    assert int(rec.tname) in self.contigs.contigs
                     contig = self.contigs[int(rec.tname)]
                     alignment = new_read.AddSamAlignment(rec, contig)
-                    if alignment.seg_to.contig.id in self.contigs:
+                    if alignment.seg_to.contig in self.contigs:
                         addStraight = True
-                    if alignment.seg_to.contig.rc.id in self.contigs:
-                        addRC = True
-                    if contig.rc.id in self.contigs:
+                    if alignment.seg_to.contig.rc in self.contigs:
                         addRC = True
                 if addStraight and filter(new_read):
                     self.reads[new_read.id] = new_read
                 if addRC and filter(new_read.rc):
                     self.reads[new_read.rc.id] = new_read.rc
-            last = [new_rec]
+                last = [new_rec]
         return self
 
     def add(self, read):
@@ -412,6 +378,10 @@ class ReadCollection:
     def inter(self, segment):
         # type: (Segment) -> ReadCollection
         return self.filter(lambda read: read.inter(segment))
+
+    def noncontradicting(self, segment):
+        # type: (Segment) -> ReadCollection
+        return self.filter(lambda read: read.noncontradicting(segment))
 
     def contain(self, segment):
         # type: (Segment) -> ReadCollection
@@ -501,7 +471,164 @@ class Consensus:
     def RC(self):
         return Consensus(basic.RC(self.seq), self.cov[::-1])
 
-    def merge(self, other, pos):
-        # type: (Consensus, int) -> None
+    def merge(self, other, pos = None):
+        # type: (Consensus, Optional[int]) -> None
+        if pos is None:
+            pos = len(self)
         self.seq = self.seq[:pos] + other.seq
         self.cov = self.cov[:pos] + other.cov
+
+
+class MatchingSequence:
+    def __init__(self, seq_from, seq_to, matchingPositions):
+        # type: (str, str, list[Tuple[int, int]]) -> MatchingSequence
+        self.seq_from = seq_from
+        self.seq_to = seq_to
+        self.matches = matchingPositions
+
+    def common(self, other):
+        # type: (MatchingSequence) -> Generator(Tuple[int, int])
+        assert self.seq_from == other.seq_from
+        cur_self = 0
+        cur_other = 0
+        while cur_self < len(self) and cur_other < len(other):
+            if self.matches[cur_self][0] < other.matches[cur_other][0]:
+                cur_self += 1
+            elif self.matches[cur_self][0] < other.matches[cur_other][0]:
+                cur_other += 1
+            else:
+                yield (cur_self, cur_other)
+                cur_self += 1
+                cur_other += 1
+
+    def reduce(self, left, right):
+        return MatchingSequence(self.seq_from, self.seq_to, filter(lambda match: left <= match[0] <= right, self.matches))
+
+    def inter(self, other):
+        assert self.seq_from == other.seq_from and self.seq_to == other.seq_to
+        cur_self = 0
+        cur_other = 0
+        matches = []
+        while cur_self < len(self) and cur_other < len(other):
+            if self.matches[cur_self] < other.matches[cur_other]:
+                cur_self += 1
+            elif self.matches[cur_self] < other.matches[cur_other]:
+                cur_other += 1
+            else:
+                matches.append(self.matches[cur_self])
+                cur_self += 1
+                cur_other += 1
+        return MatchingSequence(self.seq_from, self.seq_to, matches)
+
+    def compose(self, other):
+        # type: (MatchingSequence) -> MatchingSequence
+        matchings = [(self.matches[pos_self][1], self.matches[pos_other][1]) for pos_self, pos_other in self.common(other)]
+        return MatchingSequence(self.seq_to, other.seq_to, matchings)
+
+    def combine(self, others):
+        # type: (list[MatchingSequence]) -> MatchingSequence
+        others = filter(lambda other: len(self.inter(other)) > 20, others)
+        matchings = sorted(list(itertools.chain(others)))
+        res = [self.matches[0]]
+        for matching in matchings[1:]:
+            if matching[0] < self.matches[-1][0] and matching[1] < self.matches[-1][1] and matching[0] > res[-1][0] and matching[1] > res[-1][1]:
+                res.append(matching)
+        if len(self.matches) > 1:
+            res.append(self.matches[-1])
+        return MatchingSequence(self.seq_from, self.seq_to, res)
+
+
+    def __len__(self):
+        return len(self.matches)
+
+
+class AlignmentPiece:
+    def __init__(self, seg_from, seg_to, cigar = None):
+        # type: (Segment, Segment, str) -> AlignmentPiece
+        self.seg_from = seg_from
+        self.seg_to = seg_to
+        assert cigar != "X"
+        assert cigar.find("H") == -1 and cigar.find("S") == -1
+        self.cigar = cigar
+
+    def __str__(self):
+        # type: () -> str
+        return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ")"
+
+    def precedes(self, other, delta = 0):
+        # type: (AlignmentPiece, int) -> bool
+        return self.seg_from.precedes(other.seg_from, delta) and self.seg_to.precedes(other.seg_to, delta)
+
+    def connects(self, other, delta = 0):
+        # type: (AlignmentPiece, int) -> bool
+        return self.seg_from.connects(other.seg_from, delta) and self.seg_to.connects(other.seg_to, delta)
+
+    def contains(self, other):
+        return self.seg_from.contains(other) and self.seg_to.contains(other)
+
+    def merge(self, other):
+        return AlignmentPiece(self.seg_from.merge(other.seg_from), self.seg_to.merge(other.seg_to), self.cigar + other.cigar)
+
+    def __eq__(self, other):
+        return self.seg_from == other.seg_from and self.seg_to == other.seg_to and self.cigar == other.cigar
+
+    def __ne__(self, other):
+        return self.seg_from != other.seg_from or self.seg_to != other.seg_to or self.cigar != other.cigar
+
+    def __len__(self):
+        return len(self.seg_from)
+
+    def RC(self):
+        return AlignmentPiece(self.seg_from.RC(), self.seg_to.RC(), sam_parser.RCCigar(self.cigar))
+
+    def replaceQuery(self, seq):
+        return AlignmentPiece()
+
+    def matchingPositions(self, equalOnly = False):
+        # type: (bool) -> list[Tuple[int, int]]
+        if self.cigar == "=":
+            for i in range(len(self.seg_from)):
+                yield (self.seg_from.left + i, self.seg_to.left + i)
+            return
+        cur_tar = self.seg_from.left
+        cur_query = self.seg_to.right
+        for n, c in sam_parser.pattern.findall(self.cigar):
+            if n:
+                n = int(n)
+            else:
+                n = 1
+            if c == 'M':
+                for i in range(n):
+                    if not equalOnly or self.seg_from.contig[cur_query] == self.seg_to.contig[cur_tar]:
+                        yield (cur_query, cur_tar)
+                    cur_tar += 1
+                    cur_query += 1
+            elif c in 'DPN':
+                cur_query += n
+            elif c in "I":
+                cur_tar += n
+
+    def MatchingSequence(self):
+        return MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq, self.matchingPositions(True))
+
+    def percentIdentity(self):
+        res = len(list(self.matchingPositions(True)))
+        return float(res) / max(len(self.seg_from), len(self.seg_to))
+
+    def noncontradicting(self, seg):
+        # type: (Segment) -> bool
+        if not self.seg_to.inter(seg):
+            return True
+        return (self.seg_from.left < 500 or self.seg_to.left < seg.left + 500) and \
+                (self.seg_from.right > len(self.seg_from.contig) - 500 or self.seg_to.right > seg.right - 500)
+
+
+def UniqueList(sequences):
+    # type: (Iterable[NamedSequence]) -> Generator[Any]
+    visited = set()
+    for seq in sequences:
+        if seq.id in visited or basic.Reverse(seq.id) in visited:
+            pass
+        else:
+            yield seq
+            visited.add(seq.id)
