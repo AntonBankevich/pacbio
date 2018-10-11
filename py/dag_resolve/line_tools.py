@@ -4,7 +4,7 @@ from common import basic
 from common.SeqIO import NamedSequence
 from dag_resolve.phasing import Phasing
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
-from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece
+from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece, AlignedRead
 
 
 # class PseudoLineSegment:
@@ -55,36 +55,75 @@ class Line(Contig):
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
         Contig.__init__(self, edge.seq, edge.id, None, self.rc)
         self.chain = [AlignmentPiece(self.asSegment(), edge.asSegment(), "=")] # type: list[AlignmentPiece]
-        if self.reads is None:
-            self.reads = edge.reads.cleanCopy(ContigCollection([self, self.rc]))
-            self.rc.reads = self.reads
+        self.reads = ReadCollection(ContigCollection([self]))
+        self.new_reads = list(edge.reads.reads.values())
+        self.listeners = []
+
+
+    def setConsensus(self, consensus):
+        self.consensus = consensus
+        self.seq = consensus.seq
+        self.rc.consensus = consensus.RC()
+        self.rc.seq = self.rc.consensus.seq
+
+    def cut(self, pos):
+        self.extendRight(Consensus("", []), pos)
 
     def extendRight(self, consensus, pos = None):
         # type: (Consensus, Optional(int)) -> None
         if pos is None:
             pos = len(self.seq)
+        elif pos < 0:
+            pos = len(self.seq) + pos
+        if pos != len(self.seq):
+            self.notifyCutRight(pos)
+            self.rc.notifyCutLeft(len(self) - pos)
+        if len(consensus) != 0:
+            self.notifyExtendRight(len(consensus))
+            self.rc.notifyExtendLeft(len(consensus))
         old_len = len(self)
-        self.consensus.merge(consensus, pos)
-        self.seq = self.consensus.seq
-        for read in self.reads:
+        self.setConsensus(self.consensus.merge(consensus, pos))
+        for read in self.rc.reads:
             for al in read.alignments:
                 if al.seg_to.contig == self.rc:
-                    al.seg_to = al.seg_to.shift(old_len - len(self))
-        self.removeAlignments(pos)
+                    al.seg_to = al.seg_to.shift(len(self) - old_len)
+        self.invalidateReadsAfter(max(0, pos - 500))
+        self.cutAlignments(pos)
         self.fixRC()
 
     def fixRC(self):
         self.rc.seq = basic.RC(self.seq)
         self.rc.chain = [al.RC() for al in self.chain[::-1]]
 
-    def removeAlignments(self, pos):
+    def addRead(self, read):
+        # type: (AlignedRead) -> None
+        self.reads.add(read)
+        self.rc.reads.add(read.rc)
+
+    def invalidateReadsAfter(self, pos):
+        for read in self.reads.inter(self.suffix(pos)):
+            self.invalidateRead(read)
+
+    def invalidateRead(self, read):
+        # type: (AlignedRead) -> None
+        del self.reads.reads[read.id]
+        self.new_reads.append(read)
+        del self.rc.reads.reads[read.rc.id]
+
+    def cutAlignments(self, pos):
         while len(self.chain) > 0 and self.chain[-1].seg_from.right > pos:
-            self.chain.pop()
+            if self.chain[-1].seg_from.left >= pos:
+                self.chain.pop()
+            else:
+                matchingSequence = self.chain[-1].matchingSequence(False).reduceQuery(0, pos)
+                self.chain[-1] = AlignmentPiece(matchingSequence.SegFrom(self),
+                                                matchingSequence.SegTo(self.chain[-1].seg_to.contig),
+                                                matchingSequence.cigar())
         self.fixRC()
 
     def addAlignment(self, piece):
-        self.removeAlignments(piece.seg_from.left)
-        if self.chain[-1].connects(piece, 0):
+        self.cutAlignments(piece.seg_from.left)
+        if self.chain[-1].connects(piece, 5):
             self.chain[-1] = self.chain[-1].merge(piece)
         else:
             self.chain.append(piece)
@@ -107,14 +146,71 @@ class Line(Contig):
                 yield al
 
     def __str__(self):
-        return "[" + ",".join(map(lambda al: str(al.seg_to), self.chain)) + "]"
+        return "Line:" + str(self.id) +"(" + str(len(self)) + "):[" + ",".join(map(lambda al: str(al.seg_to), self.chain)) + "]"
 
     def rcStr(self):
         return "[" + ",".join(map(lambda seg: str(seg.edge.rc.id), self.chain[::-1])) + "]"
 
-    def __getitem__(self, item):
-        # type: (int) -> AlignmentPiece
-        return self.chain[item]
+    def notifyExtendLeft(self, l):
+        for listener in self.listeners:
+            listener.fireExtendLeft(l)
+
+    def notifyCutRight(self, pos):
+        for listener in self.listeners:
+            listener.fireCutRight(pos)
+
+    def notifyExtendRight(self, l):
+        for listener in self.listeners:
+            listener.fireExtendRight(l)
+
+
+    def notifyCutLeft(self, pos):
+        for listener in self.listeners:
+            listener.fireCutLeft(pos)
+
+
+class LinePosition:
+    def __init__(self, line, pos, invalidateOnCut = False):
+        # type: (Line, int, bool) -> LinePosition
+        self.line = line
+        self.pos = pos
+        self.line.listeners.append(self)
+        self.invalidateOnCut = invalidateOnCut
+
+    def fireCutRight(self, pos):
+        if self.pos is None:
+            return
+        if self.pos > pos:
+            if self.invalidateOnCut:
+                self.pos = None
+            else:
+                self.pos = pos
+
+    def fireCutLeft(self, pos):
+        if self.pos is None:
+            return
+        if self.pos < pos:
+            if self.invalidateOnCut:
+                self.pos = None
+            else:
+                self.pos -= pos
+
+    def valid(self):
+        return self.pos is not None
+
+    def fireExtendLeft(self, l):
+        if self.valid():
+            self.pos += l
+
+    def fireExtendRight(self, l):
+        pass
+
+    def suffix(self):
+        assert self.valid()
+        return self.line.suffix(self.pos)
+
+    def close(self):
+        self.line.listeners.remove(self)
 
 class LineStorage:
     def __init__(self, g):

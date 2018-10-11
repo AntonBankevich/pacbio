@@ -309,7 +309,7 @@ class Aligner:
                 read_ids.add(read.id)
         contigs = filter(lambda contig: contig.id in contig_ids, contigs)
         reads = filter(lambda read: read.id in read_ids, reads_collection)
-        reads_collection.loadFromSam(self.align(reads, contigs))
+        reads_collection.fillFromSam(self.align(reads, contigs))
 
     def realignCollection(self, reads_collection):
         # type: (ReadCollection) -> None
@@ -317,35 +317,58 @@ class Aligner:
             read.clean()
         self.alignReadCollection(reads_collection)
 
-    def fixExtendedLine(self, line):
+    def fixLineAlignments(self, line):
         # type: (Line) -> None
-        toFix = []
-        for read in line.reads:
-            if not read.noncontradicting(line.asSegment()):
-                toFix.append(read)
-        newAlignments = ReadCollection(line.reads.contigs).extend(toFix)
-        self.alignReadCollection(newAlignments)
-        for read in newAlignments:
-            for al in line.reads[read.id].alignments:
-                if al.noncontradicting(line.asSegment()):
-                    continue
-                for new_al in read.alignments:
-                    if new_al.contains(al) and len(new_al) > len(al):
-                        al.seg_from = new_al.seg_from
-                        al.seg_to = new_al.seg_to
-                        al.cigar = new_al.cigar
+        to_fix = ReadCollection(ContigCollection([line]))
+        to_fix.extendClean(line.new_reads)
+        self.alignReadCollection(to_fix)
+        for read in to_fix.inter(line.asSegment()):
+            add = True
+            for al in read.alignments:
+                if al.contradicting(line.asSegment()):
+                    add = False
+            if add:
+                assert read.rc not in line.reads
+                new_read = AlignedRead(read)
+                line.addRead(new_read)
+                for al in read.alignments:
+                    if al.seg_to.contig == line:
+                        new_read.addAlignment(al.changeQuery(new_read))
+        line.new_reads = []
+        line.rc.new_reads = []
+
+
+    # def fixExtendedLine(self, line):
+    #     # type: (Line) -> None
+    #     toFix = []
+    #     for read in line.reads:
+    #         if not read.noncontradicting(line.asSegment()):
+    #             toFix.append(read)
+    #     newAlignments = ReadCollection(line.reads.contigs).extend(toFix)
+    #     self.alignReadCollection(newAlignments)
+    #     for read in newAlignments:
+    #         for al in line.reads[read.id].alignments:
+    #             if not al.contradicting(line.asSegment()):
+    #                 continue
+    #             for new_al in read.alignments:
+    #                 if new_al.contains(al) and len(new_al) > len(al):
+    #                     al.seg_from = new_al.seg_from
+    #                     al.seg_to = new_al.seg_to
+    #                     al.cigar = new_al.cigar
 
     def expandCollection(self, reads_collection, new_reads):
-        # type: (ReadCollection) -> None
+        # type: (ReadCollection, list[AlignedRead]) -> None
         for read in new_reads:
             reads_collection.addNewRead(read)
-        reads_collection.loadFromSam(self.align(new_reads, reads_collection.contigs))
+        reads_collection.fillFromSam(self.align(new_reads, reads_collection.contigs))
 
     def separateAlignments(self, reads, contigs):
         # type: (Iterable[NamedSequence], Iterable[Contig]) -> ReadCollection
         res = ReadCollection(ContigCollection(list(contigs)))
+        for read in reads:
+            res.addNewRead(read)
         for contig in contigs:
-            res.loadFromSam(self.align(reads, [contig]))
+            res.fillFromSam(self.align(reads, [contig]))
         return res
 
     def align(self, reads, reference):

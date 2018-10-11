@@ -129,4 +129,4 @@ def Reverse(val):
             return "-" + val
     elif isinstance(val, int):
         return -val
-    assert False, "Tried to reverse an object that is neither number not a string"
+    assert False, "Tried to reverse an object that is neither number nor a string"

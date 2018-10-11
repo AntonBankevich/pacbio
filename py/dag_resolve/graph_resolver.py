@@ -40,24 +40,28 @@ class GraphResolver:
     def resolveVertexForward(self, v):
         # type: (Vertex) -> None
         self.printCurrentGraph([v], [], "Resolving vertex " + str(v.id))
+        print "Resolving vertex", v.id, "inc:", map(str, v.inc), "out:", map(str, v.out)
         for edge in v.out:
             lines_list = self.lineStorage.getEdgeLines(edge)
             if len(lines_list) == 0:
                 print "No line entered edge " + str(edge.id) + ". Skipping vertex."
         for edge in v.out:
+            print "Considering edge", edge
             if edge.id in self.lineStorage.resolved_edges:
                 print "Encountered resolved edge. Skipping."
             elif edge.seq == basic.RC(edge.seq):
                 print "Encountered self-rc edge. Skipping"
             else:
                 lines_list = self.lineStorage.getEdgeLines(edge)
+                for line in lines_list:
+                    print ("oppa", line.id)#NUMBER
                 while edge is not None:
                     finished, new_edge = self.edgeResolver.resolveEdge(edge, lines_list)
                     if finished:
                         self.lineStorage.resolved_edges.add(edge.id)
                         self.lineStorage.resolved_edges.add(edge.rc.id)
                         print "Successfully resolved edge", edge.id, "into", len(lines_list), "lines"
-                        self.lineStorage.resolved_edges.add(edge)
+                        self.lineStorage.resolved_edges.add(edge.id)
                         for line in lines_list:
                             self.lineStorage.edgeLines[line.chain[-1].seg_to.contig.id].append(line)
                         self.printCurrentGraph([], [edge], "Resolved edge " + str(edge.id))
@@ -74,8 +78,10 @@ class GraphResolver:
         visited_vertices = set()
         print "Resolving unique edges"
         for edge in self.graph.E.values():
-            finished, new_edge = self.edgeResolver.resolveEdge(edge, self.lineStorage.getEdgeLines(edge))
-            assert finished
+            if edge.info.unique:# and (len(edge.end.out) != 1 or len(edge.end.inc) != 1):
+                res = self.edgeResolver.processUniqueEdge(edge, self.lineStorage.getEdgeLines(edge)[0])
+                assert res is not None
+                self.lineStorage.edgeLines[res.id].append(self.lineStorage.getEdgeLines(edge)[0])
         while True:
             cnt = 0
             for v in self.graph.V.values():

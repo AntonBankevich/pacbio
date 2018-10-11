@@ -46,19 +46,30 @@ class Polisher:
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 1000):
         # type: (ReadCollection, str, int) -> Optional[Consensus]
         cc = ContigCollection([Contig(base_start, 0)])
-        reads_to_base = ReadCollection(cc).loadFromSam(self.aligner.align(reads, cc))
+        reads_to_base = ReadCollection(cc).extend(reads).fillFromSam(self.aligner.align(reads, cc))
+        # for read in reads:
+        #     print read
+        #     if read.id in reads_to_base.reads:
+        #         print reads_to_base.reads[read.id]
+        #     else:
+        #         print "No alignment"
         print "Polishing quiver of", len(reads_to_base), "reads."
         best = None
         for read in sorted(list(reads_to_base.__iter__()), key = lambda read: len(read))[::-1]:
             for al in read.alignments:
                 if al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
-                    tmp = self.polishAndAnalyse(reads, Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0))
-                    if len(tmp.cut()) > len(base_start) - pos_start + min_new_len:
-                        # print read.__str__(), al.seg_to.right, len(base_start), pos_start, al.seg_from.right, len(tmp)
-                        return tmp
-                    if best is None and len(tmp.cut()) > len(base_start) - pos_start or best is not None and len(tmp.cut()) > len(best.cut()):
-                        # print read.__str__(), al.seg_to.right, len(base_start), pos_start, al.seg_from.right, len(tmp)
-                        best = tmp
+                    base_conig = Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0)
+                    candidate = self.polishAndAnalyse(reads, base_conig)
+                    if len(candidate.cut()) > len(base_start) - pos_start + min_new_len: #len(candidate.cut()) is too slow
+                        print "Final polishing base alignment:", al
+                        print base_conig.seq
+                        print candidate.seq
+                        return candidate
+                    if best is None and len(candidate.cut()) > len(base_start) - pos_start or best is not None and len(candidate.cut()) > len(best.cut()):
+                        print "Updated best polyshing base alignment:", al
+                        print base_conig.seq
+                        print candidate.seq
+                        best = candidate
                     break
         if best is None:
             if len(base_start) - pos_start > 500:

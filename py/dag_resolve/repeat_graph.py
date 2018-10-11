@@ -222,7 +222,9 @@ class Graph:
             edge_id = int(rec.tname)
             if not fill_unique and self.E[edge_id].info.unique and rec.pos > 5000 and rec.pos + rec.alen + 5000 <= self.E[edge_id].__len__():
                 continue
-            self.E[edge_id].reads.add(self.reads[rec.query_name])
+            if rec.query_name not in self.E[edge_id].reads:
+                self.E[edge_id].reads.add(self.reads[rec.query_name])
+                self.E[-edge_id].reads.add(self.reads[rec.query_name].rc)
             self.E[edge_id].reads.addNewAlignment(rec)
         self.newEdges = []
 
