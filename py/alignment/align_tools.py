@@ -9,7 +9,7 @@ from common.SeqIO import NamedSequence
 from flye.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
-from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, AlignmentPiece
+from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, AlignmentPiece, Segment
 from typing import Optional, Iterable, Tuple, Generator
 from common import basic, sam_parser, SeqIO
 
@@ -311,6 +311,18 @@ class Aligner:
         reads = filter(lambda read: read.id in read_ids, reads_collection)
         reads_collection.fillFromSam(self.align(reads, contigs))
 
+    def alignReadsToSegments(self, reads, segments):
+        # type: (ReadCollection, Iterable[Segment]) -> None
+        segments = list(segments)
+        seg_dict = dict()
+        for i, seg in enumerate(segments):
+            seg_dict[i + 1] = seg
+        contigs = map(lambda (i, seg): Contig(seg.Seq(), i + 1), enumerate(segments))
+        read_collection = ReadCollection(ContigCollection(contigs)).extendClean(reads)
+        self.alignReadCollection(read_collection)
+        read_collection.contigsAsSegments(seg_dict)
+        reads.mergeAlignments(read_collection)
+
     def realignCollection(self, reads_collection):
         # type: (ReadCollection) -> None
         for read in reads_collection:
@@ -319,23 +331,23 @@ class Aligner:
 
     def fixLineAlignments(self, line):
         # type: (Line) -> None
+        print "Fixing alignments."
+        for read in line.new_reads:
+            read.removeContig(line)
+            read.rc.removeContig(line.rc)
         to_fix = ReadCollection(ContigCollection([line]))
         to_fix.extendClean(line.new_reads)
         self.alignReadCollection(to_fix)
-        for read in to_fix.inter(line.asSegment()):
-            add = True
-            for al in read.alignments:
-                if al.contradicting(line.asSegment()):
-                    add = False
-            if add:
-                assert read.rc not in line.reads
-                new_read = AlignedRead(read)
-                line.addRead(new_read)
-                for al in read.alignments:
-                    if al.seg_to.contig == line:
-                        new_read.addAlignment(al.changeQuery(new_read))
+        for read in line.new_reads:
+            aligned_read = to_fix[read.id]
+            for al in aligned_read.alignments:
+                if al.seg_to.contig == line and not al.contradicting(line.asSegment()):
+                    print "Adding read", read, "to line", line, "with alignment", al
+                    line.addRead(read)
+                    print "Adding read-to-line alignment", al.changeQuery(read)
+                    read.addAlignment(al.changeQuery(read))
         line.new_reads = []
-        line.rc.new_reads = []
+        line.rc.new_reads = filter(lambda read: read.rc.id not in to_fix.reads,line.rc.new_reads)
 
 
     # def fixExtendedLine(self, line):
@@ -366,9 +378,9 @@ class Aligner:
         # type: (Iterable[NamedSequence], Iterable[Contig]) -> ReadCollection
         res = ReadCollection(ContigCollection(list(contigs)))
         for read in reads:
-            res.addNewRead(read)
+            res.addNewRead(NamedSequence(read.seq, "short_" + str(read.id))) # remove when all ids are str
         for contig in contigs:
-            res.fillFromSam(self.align(reads, [contig]))
+            res.fillFromSam(self.align(res, [contig]))
         return res
 
     def align(self, reads, reference):

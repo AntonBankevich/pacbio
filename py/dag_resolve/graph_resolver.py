@@ -15,11 +15,11 @@ from dag_resolve.sequences import Contig, ReadCollection, Segment, ContigCollect
 from dag_resolve.visualization import DotPrinter, FilterColoring
 
 class GraphResolver:
-    def __init__(self, graph, dir, edgeResolver):
-        # type: (Graph, str, EdgeResolver) -> GraphResolver
+    def __init__(self, graph, dir, lineStorage, edgeResolver):
+        # type: (Graph, str, LineStorage, EdgeResolver) -> GraphResolver
         self.graph = graph
         self.dir = dir
-        self.lineStorage = LineStorage(graph)
+        self.lineStorage = lineStorage
         self.edgeResolver = edgeResolver
         self.printer = DotPrinter(self.graph)
         self.printer.edge_colorings.append(FilterColoring(lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is None, "black"))
@@ -53,8 +53,6 @@ class GraphResolver:
                 print "Encountered self-rc edge. Skipping"
             else:
                 lines_list = self.lineStorage.getEdgeLines(edge)
-                for line in lines_list:
-                    print ("oppa", line.id)#NUMBER
                 while edge is not None:
                     finished, new_edge = self.edgeResolver.resolveEdge(edge, lines_list)
                     if finished:
@@ -139,15 +137,16 @@ class GraphResolver:
             while line is not None:
                 printed.add(line.id)
                 printed.add(line.rc.id)
-                handler.write(line.rcStr())
-                handler.write("-")
-                handler.write(line.rc.__str__())
-                if line.rc.knot is None:
+                handler.write(line.__str__())
+                if line.knot is None:
                     line = None
                 else:
                     handler.write("->")
-                    line = line.rc.knot.line2
+                    line = line.knot.line2
             handler.write("\n")
+        for line in self.lineStorage.lines:
+            print "Reads from line", line
+            line.reads.print_alignments(sys.stdout)
 
         for line in self.lineStorage.lines:
             if line.id in printed:
@@ -156,14 +155,12 @@ class GraphResolver:
             while line is not None and line.id not in printed:
                 printed.add(line.id)
                 printed.add(line.rc.id)
-                handler.write(line.rcStr())
-                handler.write("-")
                 handler.write(line.rc.__str__())
                 if line.rc.knot is None:
                     line = None
                 else:
                     handler.write("->")
-                    line = line.rc.knot.line2
+                    line = line.knot.line2
             handler.write("->\n")
 
 

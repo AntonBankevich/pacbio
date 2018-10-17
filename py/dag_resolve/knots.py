@@ -1,9 +1,10 @@
 import sys
 
+from common import basic
 from dag_resolve import params
 from dag_resolve.line_tools import LineStorage, Line, Knot
 from dag_resolve.repeat_graph import Edge
-from dag_resolve.sequences import AlignedRead, Segment
+from dag_resolve.sequences import AlignedRead, Segment, ReadCollection, ContigCollection
 
 
 class Knotter:
@@ -15,34 +16,23 @@ class Knotter:
     def tryKnot(self, line1, line2):
         # type: (Line, Line) -> bool
         print "Trying to knot lines:", line1, line2
-        same_vertex = line1.chain[-1].edge.end.rc == line2.chain[-1].edge.end
-        extreme_case = line1.rc.id == line2.id and len(line1.chain) == 1 and len(line2.chain) == 1
-        if line1.tail is None or same_vertex:
-            seg1 = line1.chain[-1].edge.asSegment()
-            reads1 = line1.chain[-1].reads
-        else:
-            seg1 = line1.tail.edgeSegment()
-            reads1 = line1.tail.reads
-            extreme_case = False
-        if line2.tail is None or same_vertex:
-            seg2 = line2.chain[-1].edge.asSegment()
-            reads2 = line2.chain[-1].reads
-        else:
-            seg2 = line2.tail.edgeSegment()
-            reads2 = line2.tail.reads
-            extreme_case = False
-        reads = reads1.cap(reads2)
-        if extreme_case:
-            print "Extreme case."
-            reads =reads.filter(lambda read: self.extremeConnect(read, line1.chain[0].edge))
-        else:
-            reads = reads.filter(lambda read: self.checkConnect(read, seg1, seg2))
-        print len(reads), "supporting reads"
-        if len(reads) >= params.min_reads_in_knot:
-            line1.knot = Knot(line1, line2, "", reads)
-            line2.knot = Knot(line2, line1, "", reads)
-            line1.tail = None
-            line2.tail = None
+        # same_vertex = line1.chain[-1].seg_to.contig.end.rc == line2.chain[-1].seg_to.contig.end
+        # extreme_case = line1.rc.id == line2.id and len(line1.chain) == 1 and len(line2.chain) == 1
+        common_reads = line1.reads.cap(line2.reads)
+        if line1 == line2:
+            tmp_reads = ReadCollection(ContigCollection([line1]))
+            for read in common_reads:
+                for al1 in read.alignments:
+                    for al2 in read.alignments:
+                        if (al1.seg_from.inter(al2.seg_from) or al2.seg_from.precedes(al1.seg_from)) and al1.seg_to.precedes(al2.seg_to):
+                            tmp_reads.add(read)
+            common_reads = tmp_reads
+        print len(common_reads), "supporting reads"
+        for read in common_reads:
+            print line1.reads[read.id], line2.reads[read.id], self.graph.reads[read.id]
+        if len(common_reads) >= params.min_reads_in_knot:
+            line1.knot = Knot(line1, line2, "", common_reads)
+            line2.rc.knot = Knot(line2.rc, line1.rc, "", common_reads.RC())
             print "Knotted lines", line1, "and", line2
             return True
         else:
@@ -52,7 +42,7 @@ class Knotter:
         print "Knotting lines"
         for line1 in self.storage.lines:
             for line2 in self.storage.lines:
-                if line1.knot is None and line2.knot is None and line1.id < line2.id:
+                if line1.knot is None and line2.knot is None and line1.id <= line2.id and line1 != line2.rc:
                     if self.tryKnot(line1, line2):
                         break
 

@@ -4,6 +4,7 @@ from typing import Tuple, Optional, Dict
 
 from alignment.align_tools import Aligner, AlignedSequences
 from alignment.polishing import Polisher
+from common import basic
 from common.SeqIO import NamedSequence
 from dag_resolve import params
 from dag_resolve.line_align import Scorer
@@ -14,13 +15,14 @@ from dag_resolve.sequences import ReadCollection, ContigCollection, Segment, Ali
 
 
 class EdgeResolver:
-    def __init__(self, graph, aligner, polisher):
+    def __init__(self, graph, aligner, polisher, reads):
         # type: (Graph, Aligner, Polisher) -> EdgeResolver
         self.graph = graph
         self.aligner = aligner
         self.polisher = polisher
         self.scorer = Scorer()
         self.prolonger = Prolonger(graph, aligner, polisher)
+        self.reads = reads
 
     def processUniqueEdge(self, edge, line):
         # type: (Edge, Line) -> Optional[Edge]
@@ -41,7 +43,7 @@ class EdgeResolver:
 
     def resolveEdge(self, edge, lines):
         # type: (Edge, list[Line]) -> Tuple[bool, Optional[Edge]]
-        print "Resolving edge", edge, "into lines:"
+        print "Resolving edge", edge, "into lines:", ", ".join(map(lambda line: str(line.id), lines))
         for line in lines:
             print line.__str__()
             self.aligner.fixLineAlignments(line)
@@ -55,13 +57,14 @@ class EdgeResolver:
             else:
                 positions.append(LinePosition(line, 0))
         classifier = ReadClassifier(self.graph, self.aligner, lines, positions)
-        uncertain = edge.reads.minusAll([line.reads for line in lines])
+        uncertain = ReadCollection(ContigCollection(lines), map(lambda read: self.reads[read.id], edge.reads))
+        # uncertain = uncertain.minusAll([line.reads for line in lines])
         passedLines = []
         # self.prolongAll(edge, lines)
         while True:
             active_lines = [self.shortestLine(lines, passedLines)]
             classified = classifier.classifyReads(active_lines, uncertain)
-            uncertain = uncertain.minus(classified)
+            uncertain = uncertain.minusBoth(classified)
             total_extention = 0
             jumped = 0
             for line in active_lines:
@@ -90,7 +93,7 @@ class EdgeResolver:
         best = None
         print alignments.reads["tail"]
         for al in alignments.reads["tail"].alignments:
-            if len(al) > 300 and (best is None or al.seg_from.left < best.seg_from.left):
+            if len(al) > 300 and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
                 best = al
         if best is None:
             print "No jump"
@@ -132,8 +135,8 @@ class Prolonger:
         step_back = min(5000, len(line))
         overlap = min(1000, step_back)
         base_consensus = line.seq[-step_back:]
-        # print "inter"
-        # line.reads.inter(line.suffix(-5000)).print_alignments(sys.stdout)
+        # print "inter", line, len(line)
+        # line.reads.inter(line.suffix(-step_back)).print_alignments(sys.stdout)
         reads = line.reads.inter(line.suffix(-step_back)).noncontradicting(line.asSegment())
         # print "Filtered reads:"
         # reads.print_alignments(sys.stdout)
@@ -152,7 +155,7 @@ class Prolonger:
         old_len = len(line)
         line.extendRight(newConsensus, -overlap)
         self.aligner.fixLineAlignments(line)
-        alignments = ReadCollection(ContigCollection([edge])) # alignments to previous edges may become corrupted
+        alignments = ReadCollection(ContigCollection([edge])) # alignments to previous edges may become corrupted!!!
         read = alignments.addNewRead(NamedSequence(newConsensus.seq, "tail"))
         self.aligner.alignReadCollection(alignments)
         read.sort()
@@ -161,17 +164,10 @@ class Prolonger:
                 seg_from = Segment(line, al.seg_from.left + old_len - overlap, al.seg_from.right + old_len - overlap)
                 new_al = AlignmentPiece(seg_from, al.seg_to, al.cigar)
                 print "Candidate alignment:", al, line.chain[-1], line.chain[-1].precedes(new_al)
-                if line.chain[-1].precedes(new_al):
+                if line.chain[-1].seg_to.contig != edge or line.chain[-1].precedes(new_al):
                     line.addAlignment(new_al)
         print "Prolonged line", line, "by", len(line) - old_len, "nucleotides"
         return len(line) - old_len
-
-    def updateAlignments(self, line):
-        # type: (Line) -> None
-        print "Updating alignment for line:", line
-        line.reads = line.reads.cleanCopy(ContigCollection([line,line.rc]))
-        line.rc.reads = line.reads
-        self.aligner.alignReadCollection(line.reads)
 
 class ReadClassifier:
     def __init__(self, graph, aligner, lines, positions):
@@ -188,15 +184,19 @@ class ReadClassifier:
         # type: (list[Line], ReadCollection) -> ReadCollection
         print "Trying to classify reads to lines", map(str, active)
         print "Full list of lines:", map(str, self.lines)
+        print "Active lines:", map(str, active)
         alignments = ReadCollection(ContigCollection(self.lines))
         for read in reads.reads.values():
             alignments.addNewRead(read)
-        for line in UniqueList(self.lines):
-            self.aligner.alignReadCollection(alignments, [line])
+        for line in self.lines:
+            self.aligner.alignReadsToSegments(alignments, [line.centerPos.suffix()])
         line_aligns = self.pairwiseAlign(self.lines)
         classified = dict()
         for line in active:
             classified[line.id] = []
+        n_class = 0
+        n_uncertain = 0
+        n_irrelevant = 0
         for read in alignments:
             candidates = []
             for al in read.alignments:
@@ -206,36 +206,43 @@ class ReadClassifier:
                                 len(al.seg_from) > 500:
                     candidates.append(al)
             if len(candidates) != 0:
-                print "Classifying read", read
+                print "Classifying read", read, "Initial:", reads[read.id]
                 print "Candidates:", map(str, candidates)
+                pass
             else:
+                n_irrelevant += 1
                 continue
             res = self.championship(candidates, line_aligns)
             if res is None:
+                n_uncertain += 1
                 print "Could not determine the champion"
                 continue
             print "Champion:", res, "Active:", (res.seg_to.contig in active)
+            n_class += 1
             if res.seg_to.contig in active:
-                classified[res.seg_to.contig.id].append(read)
-                new_read = AlignedRead(read)
-                seg_from = Segment(new_read, res.seg_from.left, res.seg_from.right)
-                new_read.addAlignment(AlignmentPiece(seg_from, res.seg_to, res.cigar))
-                res.seg_to.contig.addRead(new_read)
+                cread = reads[read.id]
+                classified[res.seg_to.contig.id].append(cread)
+                seg_from = Segment(cread, res.seg_from.left, res.seg_from.right)
+                cread.addAlignment(AlignmentPiece(seg_from, res.seg_to, res.cigar))
+                res.seg_to.contig.addRead(cread)
+                print "New red alignments:", cread
         for line in active:
             print len(classified[line.id]), "reads were classified to line", line
             print map(str, classified[line.id])
         res = ReadCollection(reads.contigs).extend(list(itertools.chain(*classified.values())))
-        print "Classified", len(res), "reads"
+        print "Classified", len(res), "reads. Irrelevant:", n_irrelevant, ". Uncertain:", n_uncertain, ". Nonactive line:", n_class - len(res)
         return res
 
     def pairwiseAlign(self, lines):
         # type: (list[Line]) -> Dict[Tuple[int, int], list[AlignmentPiece]]
+        print "Constructing pairwise line alignments"
         suffix_len = 10000
         for line in lines:
             suffix_len = min(len(line), suffix_len)
         assert suffix_len > 5000
         shortened_lines = map(lambda line: Contig(line.seq[-suffix_len:], line.id), lines)
         lines_dict = dict()
+        print "Aligning reads to lines"
         res = self.aligner.separateAlignments(shortened_lines, shortened_lines)
         res_map = dict() # type: Dict[Tuple[int, int], list[AlignmentPiece]]
         for l1 in lines:
@@ -244,24 +251,28 @@ class ReadClassifier:
                     res_map[(l1.id, l2.id)] = []
         for line in lines:
             lines_dict[line.id] = line
+        print "Scoring reads"
         for read in res.reads.values():
-            line_from = lines_dict[int(read.id)]
+            line_from = lines_dict[basic.parseNegativeNumber(read.id, len("short_"))]
             for al in read.alignments:
+                if int(al.seg_to.contig.id) not in lines_dict:
+                    continue
                 line_to = lines_dict[int(al.seg_to.contig.id)]
                 if line_from == line_to:
                     continue
                 seg_from = Segment(line_from, al.seg_from.left + len(line_from) - suffix_len, al.seg_from.right + len(line_from) - suffix_len)
                 seg_to = Segment(line_to, al.seg_to.left + len(line_to) - suffix_len, al.seg_to.right + len(line_to) - suffix_len)
-                res_map[(int(read.id), al.seg_to.contig.id)].append(AlignmentPiece(seg_from, seg_to, al.cigar))
+                new_piece = AlignmentPiece(seg_from, seg_to, al.cigar)
+                print "Added line alignment:", new_piece
+                res_map[(line_from.id, line_to.id)].append(new_piece)
         return res_map
 
     def fight(self, c1, c2, line_aligns):
         # type: (AlignmentPiece, AlignmentPiece, Dict[Tuple[int, int], list[AlignmentPiece]]) -> Optional[AlignmentPiece]
         assert c1.seg_from.contig == c2.seg_from.contig
-        print "Fight:", c1, c2
         s1, s2, s12 = self.scorer.score3(c1, c2, line_aligns[(c1.seg_to.contig.id, c2.seg_to.contig.id)])
         if s12 is None:
-            print "Comparison results:", None, s12, s1, s2
+            print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2
             if s1 is None and s2 is not None:
                 return c2
             elif s1 is not None and s2 is None:
@@ -270,16 +281,15 @@ class ReadClassifier:
                 return None
             assert False, "Strange comparison results"
         else:
-            print "Comparison results:", abs(s1 - s2), s12, s1, s2
-            if s12 < 30 or abs(s1 - s2) < s12 * 0.8:
-                print "No winner"
+            if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or s12 < 0.65:
+                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "No winner"
                 return None
             if s1 > s2:
-                print "Winner:", c1
-                return c1
-            else:
-                print "Winner:", c2
+                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c2
                 return c2
+            else:
+                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c1
+                return c1
 
     def championship(self, candidates, line_aligns):
         # type: (list[AlignmentPiece], Dict[Tuple[int, int], list[AlignmentPiece]]) -> Optional[AlignmentPiece]
@@ -291,10 +301,11 @@ class ReadClassifier:
                 best = self.fight(candidate, best, line_aligns)
         if best is None:
             return None
-        for candidate in candidates:
-            if candidate == best:
-                continue
-            if self.fight(candidate, best, line_aligns) is None or self.fight(candidate, best, line_aligns) != best:
-                return None
+        if len(candidates) > 2:
+            for candidate in candidates:
+                if candidate == best:
+                    continue
+                if self.fight(candidate, best, line_aligns) is None or self.fight(candidate, best, line_aligns) != best:
+                    return None
         return best
 

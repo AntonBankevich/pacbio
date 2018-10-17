@@ -189,7 +189,7 @@ class AlignedRead(NamedSequence):
         self.alignments = [] # type: list[AlignmentPiece]
         if rc is None:
             rc = AlignedRead(rec.RC(), self)
-        self.rc = rc
+        self.rc = rc # type: AlignedRead
 
     def __len__(self):
         # type: () -> int
@@ -219,7 +219,7 @@ class AlignedRead(NamedSequence):
         piece = AlignmentPiece(seg_from, seg_to, new_cigar)
         self.alignments.append(piece)
         self.rc.alignments.append(piece.RC())
-        if piece.percentIdentity() < 0.5:
+        if piece.percentIdentity() < 0.4:
             print piece
             print rec.pos, rec.rc, rec.query_name, rec.tname, rec.alen
             print rec.cigar
@@ -297,11 +297,35 @@ class AlignedRead(NamedSequence):
         # type: (Contig) -> bool
         return self.inter(Segment(contig, len(contig) - 200, len(contig)))
 
+    def contigsAsSegments(self, seg_dict):
+        # type: (Dict[int, Segment]) -> None
+        self.rc.alignments = []
+        for al in self.alignments:
+            if al.seg_to.contig.id in seg_dict:
+                seg = seg_dict[al.seg_to.contig.id]
+            elif al.seg_to.contig.rc.id in seg_dict: # Fix it!!! This should never happen
+                seg = seg_dict[al.seg_to.contig.rc.id].RC()
+            else:
+                assert False
+            al.contigAsSegment(seg)
+            self.rc.alignments.append(al.RC())
+
+    def mergeAlignments(self, other):
+        # type: (AlignedRead) -> AlignedRead
+        for al in other.alignments:
+            self.alignments.append(al.changeQuery(self))
+            self.rc.alignments.append(al.RC().changeQuery(self.rc))
+        return self
+
+
 class ReadCollection:
-    def __init__(self, contigs = ContigCollection()):
-        # type: (ContigCollection) -> ReadCollection
-        self.reads = dict() # type: Dict[str, AlignedRead]
+    # type: (ContigCollection, Optional[Iterable[AlignedRead]]) -> ReadCollection
+    def __init__(self, contigs = ContigCollection(), reads = None):
         self.contigs = contigs
+        self.reads = dict() # type: Dict[str, AlignedRead]
+        if reads is not None:
+            for read in reads:
+                self.add(read)
 
     def extend(self, other_collection):
         # type: (Iterable[AlignedRead]) -> ReadCollection
@@ -310,11 +334,11 @@ class ReadCollection:
         return self
 
     def extendClean(self, other_collection):
-        # type: (Iterable[AlignedRead]) -> ReadCollection
+        # type: (Iterable[NamedSequence]) -> ReadCollection
         for read in other_collection:
             if read.id not in self.reads:
-                if read.rc.id in self.reads:
-                    self.add(self.reads[read.rc.id].rc)
+                if basic.Reverse(read.id) in self.reads:
+                    self.add(self.reads[basic.Reverse(read.id)].rc)
                 else:
                     self.addNewRead(read)
         return self
@@ -325,20 +349,24 @@ class ReadCollection:
         if new_id in self.reads:
             return self.reads[rec.id]
         if basic.Reverse(new_id) in self.reads:
-            return self.reads[basic.Reverse(new_id)].rc
+            self.add(self.reads[basic.Reverse(new_id)].rc)
+            return self.reads[rec.id]
         read = AlignedRead(rec)
-        self.reads[read.id] = read
+        self.add(read)
         return read
 
     def addNewAlignment(self, rec):
-        # type: (sam_parser.SAMEntryInfo) -> None
+        # type: (sam_parser.SAMEntryInfo) -> bool
         if rec.is_unmapped:
-            return
+            return False
         rname = rec.query_name.split()[0]
         if rname in self.reads:
             self.reads[rname].AddSamAlignment(rec, self.contigs[int(rec.tname)])
+            return True
         elif basic.Reverse(rname) in self.reads:
             self.reads[basic.Reverse(rname)].rc.AddSamAlignment(rec, self.contigs[int(rec.tname)])
+            return True
+        return False
 
     def fillFromSam(self, sam):
         # type: (sam_parser.Samfile) -> ReadCollection
@@ -382,9 +410,10 @@ class ReadCollection:
         return self
 
     def add(self, read):
-        # type: (AlignedRead) -> None
-        assert read.id not in self.reads or read == self.reads[read.id], str(read) + " " + str(self.reads[read.id])
+        # type: (AlignedRead) -> AlignedRead
+        assert read not in self.reads or read == self.reads[read.id], str(read) + " " + str(self.reads[read.id])
         self.reads[read.id] = read
+        return read
 
     def filter(self, condition):
         # type: (callable(AlignedRead)) -> ReadCollection
@@ -400,16 +429,16 @@ class ReadCollection:
 
     def remove(self, read):
         # type: (AlignedRead) -> None
-        if read.id in self.reads:
+        if read in self.reads:
             del self.reads[read.id]
 
     def minus(self, other):
         # type: (ReadCollection) -> ReadCollection
-        return self.filter(lambda read: read.id not in other)
+        return self.filter(lambda read: read not in other)
 
     def minusBoth(self, other):
         # type: (ReadCollection) -> ReadCollection
-        return self.filter(lambda read: read.id not in other and read.rc.id not in other)
+        return self.filter(lambda read: read not in other and read.rc not in other)
 
     def minusAll(self, others):
         # type: (list[ReadCollection]) -> ReadCollection
@@ -420,7 +449,7 @@ class ReadCollection:
 
     def cap(self, other):
         # type: (ReadCollection) -> ReadCollection
-        return self.filter(lambda read: read.id in other)
+        return self.filter(lambda read: read in other)
 
     def inter(self, segment):
         # type: (Segment) -> ReadCollection
@@ -442,8 +471,9 @@ class ReadCollection:
         # type: (str) -> AlignedRead
         return self.reads[read_id.split()[0]]
 
-    def __contains__(self, item):
-        return self.reads.__contains__(item)
+    def __contains__(self, read):
+        # type: (AlignedRead) -> bool
+        return read.id in self.reads
 
     def __len__(self):
         return len(self.reads)
@@ -466,7 +496,7 @@ class ReadCollection:
     def loadFromFasta(self, handler):
         # type: (file) -> ReadCollection
         for rec in SeqIO.parse_fasta(handler):
-            self.add(AlignedRead(rec))
+            new_read = self.add(AlignedRead(rec))
         return self
 
     def nontontradictingCopy(self, contig):
@@ -484,6 +514,13 @@ class ReadCollection:
                         new_read.addAlignment(al.changeQuery(new_read))
         return res
 
+    def contigsAsSegments(self, seg_dict):
+        # type: (Dict[int, Segment]) -> ReadCollection
+        self.contigs = ContigCollection([seg.contig for seg in seg_dict.values()])
+        for read in UniqueList(self.reads.values()):
+            read.contigsAsSegments(seg_dict)
+        return self
+
     def changeTargets(self, contigs):
         # type: (ContigCollection) -> ReadCollection
         for read in self.reads.values():
@@ -495,7 +532,7 @@ class ReadCollection:
         for read in self.reads.values():
             if not filter(read):
                 continue
-            if read.rc.id in res.reads:
+            if read.rc in res.reads:
                 res.add(res.reads[read.rc.id].rc)
             else:
                 res.addNewRead(read)
@@ -505,6 +542,15 @@ class ReadCollection:
         res = ReadCollection(self.contigs.RC())
         for read in self.reads.values():
             res.add(read.rc)
+
+    def mergeAlignments(self, other):
+        # type: (ReadCollection) -> ReadCollection
+        for read in UniqueList(self):
+            if read in other:
+                read.mergeAlignments(other.reads[read.id])
+            elif read.rc in other:
+                read.rc.mergeAlignments(other.reads[read.rc.id])
+        return self
 
 
 class Consensus:
@@ -637,8 +683,12 @@ class MatchingSequence:
                 res.append(matching)
         if len(self.matches) > 1:
             res.append(self.matches[-1])
+        # print "Combining result:"
         # print res
         return MatchingSequence(self.seq_from, self.seq_to, res)
+
+    def reverse(self):
+        return MatchingSequence(self.seq_to, self.seq_from, map(lambda pair: (pair[1], pair[0]), self.matches))
 
     def SegFrom(self, contig):
         return Segment(contig, self.matches[0][0], self.matches[-1][0])
@@ -746,6 +796,13 @@ class AlignmentPiece:
             return False
         return not ((self.seg_from.left < 500 or self.seg_to.left < seg.left + 500) and
                 (self.seg_from.right > len(self.seg_from.contig) - 500 or self.seg_to.right > seg.right - 500))
+
+    def contigAsSegment(self, seg):
+        # type: (Segment) -> AlignmentPiece
+        self.seg_to.contig = seg.contig
+        self.seg_to.shift(seg.left)
+
+
 
 def UniqueList(sequences):
     # type: (Iterable[NamedSequence]) -> Generator[Any]

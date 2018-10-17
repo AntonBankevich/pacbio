@@ -214,15 +214,18 @@ class Graph:
 
     def fillAlignments(self, read_recs, sam, fill_unique = True):
         # type: (Generator[SeqIO.SeqRecord], sam_parser.Samfile) -> None
+        print "Collecting all reads"
         for rec in read_recs:
-            self.reads.addNewRead(rec)
+            new_read = self.reads.addNewRead(rec)
+            self.reads.add(new_read.rc)
+        print "Collecting read alignments"
         for rec in sam:
             if rec.is_unmapped:
                 continue
             edge_id = int(rec.tname)
             if not fill_unique and self.E[edge_id].info.unique and rec.pos > 5000 and rec.pos + rec.alen + 5000 <= self.E[edge_id].__len__():
                 continue
-            if rec.query_name not in self.E[edge_id].reads:
+            if rec.query_name not in self.E[edge_id].reads.reads:
                 self.E[edge_id].reads.add(self.reads[rec.query_name])
                 self.E[-edge_id].reads.add(self.reads[rec.query_name].rc)
             self.E[edge_id].reads.addNewAlignment(rec)

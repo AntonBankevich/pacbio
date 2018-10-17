@@ -51,14 +51,14 @@ class Line(Contig):
         self.id = edge.id
         if rc is None:
             rc = Line(edge.rc, self)
-        self.rc = rc
+        self.rc = rc # type: Line
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
         Contig.__init__(self, edge.seq, edge.id, None, self.rc)
         self.chain = [AlignmentPiece(self.asSegment(), edge.asSegment(), "=")] # type: list[AlignmentPiece]
         self.reads = ReadCollection(ContigCollection([self]))
-        self.new_reads = list(edge.reads.reads.values())
+        self.new_reads = [] # type: list[AlignedRead]
         self.listeners = []
-
+        self.centerPos = LinePosition(self, len(edge) / 2                                    )
 
     def setConsensus(self, consensus):
         self.consensus = consensus
@@ -99,6 +99,11 @@ class Line(Contig):
         # type: (AlignedRead) -> None
         self.reads.add(read)
         self.rc.reads.add(read.rc)
+        print read in self.reads, read.rc in self.rc.reads
+        for al in read.alignments:
+            assert read in al.seg_to.contig.reads, str(read) + " " + str(al) + " " + str(al.seg_to.contig)
+        for al in read.rc.alignments:
+            assert read.rc in al.seg_to.contig.reads, str(read) + " " + str(al) + " " + str(str(al.seg_to.contig))
 
     def invalidateReadsAfter(self, pos):
         for read in self.reads.inter(self.suffix(pos)):
@@ -146,10 +151,11 @@ class Line(Contig):
                 yield al
 
     def __str__(self):
-        return "Line:" + str(self.id) +"(" + str(len(self)) + "):[" + ",".join(map(lambda al: str(al.seg_to), self.chain)) + "]"
+        return "Line:" + str(self.id) + "(" + str(len(self)) + "," + str(self.chain[-1].seg_from.right) + \
+               "):[" + ",".join(map(str, self.chain)) + "]"
 
-    def rcStr(self):
-        return "[" + ",".join(map(lambda seg: str(seg.edge.rc.id), self.chain[::-1])) + "]"
+    # def rcStr(self):
+    #     return "[" + ",".join(map(lambda seg: str(seg.edge.rc.id), self.chain[::-1])) + "]"
 
     def notifyExtendLeft(self, l):
         for listener in self.listeners:
@@ -231,6 +237,12 @@ class LineStorage:
                 self.edgeLines[edge2.id].append(line.rc)
                 self.lines.append(line)
                 self.lines.append(line.rc)
+        self.reads = ReadCollection(ContigCollection(self.lines))
+        for read in self.g.reads:
+            self.reads.addNewRead(read)
+        for line in self.lines:
+            for read in self.g.E[line.id].reads:
+                line.new_reads.append(self.reads[read.id])
 
     def getLine(self, eid):
         for line in self.lines:

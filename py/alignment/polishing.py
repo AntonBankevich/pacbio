@@ -45,8 +45,8 @@ class Polisher:
 
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 1000):
         # type: (ReadCollection, str, int) -> Optional[Consensus]
-        cc = ContigCollection([Contig(base_start, 0)])
-        reads_to_base = ReadCollection(cc).extend(reads).fillFromSam(self.aligner.align(reads, cc))
+        cc = ContigCollection([Contig(base_start, 1)])
+        reads_to_base = ReadCollection(cc).extendClean(reads).fillFromSam(self.aligner.align(reads, cc))
         # for read in reads:
         #     print read
         #     if read.id in reads_to_base.reads:
@@ -57,7 +57,7 @@ class Polisher:
         best = None
         for read in sorted(list(reads_to_base.__iter__()), key = lambda read: len(read))[::-1]:
             for al in read.alignments:
-                if al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
+                if al.seg_to.contig.id == 1 and al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
                     base_conig = Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0)
                     candidate = self.polishAndAnalyse(reads, base_conig)
                     if len(candidate.cut()) > len(base_start) - pos_start + min_new_len: #len(candidate.cut()) is too slow
