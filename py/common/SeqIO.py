@@ -1,14 +1,14 @@
 import itertools
 import sys
 import gzip
-from typing import Generator, Union, Callable, Optional
+from typing import Generator, Union, Callable, Optional, BinaryIO
 
 from common import basic
 
 
 class Reader:
     def __init__(self, handler):
-        # type: (file) -> Reader
+        # type: (BinaryIO) -> Reader
         self.handler = handler
         self.cash = None # type: str
 
@@ -69,8 +69,8 @@ class Reader:
 
 class NamedSequence:
     def __init__(self, seq, id):
-        # type: (str, Union[str, int]) -> NamedSequence
-        self.id = id
+        # type: (str, str) -> NamedSequence
+        self.id = id # type: str
         self.seq = seq.upper()
 
     def __len__(self):
@@ -128,7 +128,7 @@ def parse(handler, file_name):
 
 
 def parse_fasta(handler):
-    # type: (file) -> Generator[SeqRecord]
+    # type: (BinaryIO) -> Generator[SeqRecord]
     reader = Reader(handler)
     while not reader.EOF():
         rec_id = reader.Readline().strip()

@@ -6,7 +6,7 @@ from dag_resolve import params
 
 sys.path.append("py")
 from common import sam_parser, SeqIO, basic
-from typing import Generator, Iterator, Dict, Tuple, Optional, Union, Callable, Iterable, Any
+from typing import Generator, Iterator, Dict, Tuple, Optional, Union, Callable, Iterable, Any, BinaryIO
 
 
 class ContigCollection():
@@ -46,13 +46,13 @@ class ContigCollection():
         return self.contigs.values().__iter__()
 
     def __getitem__(self, contig_id):
-        # type: (int) -> Contig
+        # type: (str) -> Contig
         return self.contigs[contig_id]
 
     def loadFromFasta(self, handler):
-        # type: (file) -> ContigCollection
+        # type: (BinaryIO) -> ContigCollection
         for rec in SeqIO.parse_fasta(handler):
-            self.add(Contig(rec.seq, basic.parseNegativeNumber(rec.id)))
+            self.add(Contig(rec.seq, str(basic.parseNegativeNumber(rec.id))))
         return self
 
     def print_fasta(self, handler):
@@ -76,7 +76,7 @@ class TmpInfo:
 
 class Contig(NamedSequence):
     def __init__(self, seq, id, info = None, rc = None):
-        # type: (str, Union[str,int], Optional[TmpInfo], Optional[Contig]) -> Contig
+        # type: (str, str, Optional[TmpInfo], Optional[Contig]) -> None
         if info is None:
             info = []
         if isinstance(info, list):
@@ -91,6 +91,10 @@ class Contig(NamedSequence):
         # type: (int) -> Segment
         if pos < 0:
             pos = self.__len__() + pos
+        if pos < 0:
+            pos = 0
+        if pos > len(self):
+            pos = len(self)
         return Segment(self, pos, self.__len__())
 
     def prefix(self, len):
@@ -154,7 +158,7 @@ class Segment:
 
     def subcontig(self):
         # type: () -> Contig
-        return Contig(self.contig.seq[self.left:self.right], "(" + str(self.contig.id) + ")[" + str(self.left) + "," + str(self.right) + "]", self.contig.info)
+        return Contig(self.contig.seq[self.left:self.right], "(" + self.contig.id + ")[" + str(self.left) + "," + str(self.right) + "]", self.contig.info)
 
     def merge(self, other):
         return Segment(self.contig, self.left, other.right)
@@ -184,7 +188,7 @@ class Segment:
 
 class AlignedRead(NamedSequence):
     def __init__(self, rec, rc = None):
-        # type: (NamedSequence, Optional[AlignedRead]) -> AlignedRead
+        # type: (NamedSequence, Optional[AlignedRead]) -> None
         NamedSequence.__init__(self, rec.seq, rec.id)
         self.alignments = [] # type: list[AlignmentPiece]
         if rc is None:
@@ -217,8 +221,9 @@ class AlignedRead(NamedSequence):
             seg_to = seg_to.RC()
             new_cigar = sam_parser.RCCigar(new_cigar)
         piece = AlignmentPiece(seg_from, seg_to, new_cigar)
-        self.alignments.append(piece)
-        self.rc.alignments.append(piece.RC())
+        seg_from.contig.alignments.append(piece)
+        seg_from.contig.rc.alignments.append(piece.RC())
+        # self.rc.alignments.append(piece.RC())
         if piece.percentIdentity() < 0.4:
             print piece
             print rec.pos, rec.rc, rec.query_name, rec.tname, rec.alen
@@ -299,6 +304,7 @@ class AlignedRead(NamedSequence):
 
     def contigsAsSegments(self, seg_dict):
         # type: (Dict[int, Segment]) -> None
+        # print "ContigsAsSegments", self, [str(i) + " " + str(seg_dict[i]) for i in seg_dict]
         self.rc.alignments = []
         for al in self.alignments:
             if al.seg_to.contig.id in seg_dict:
@@ -316,6 +322,10 @@ class AlignedRead(NamedSequence):
             self.alignments.append(al.changeQuery(self))
             self.rc.alignments.append(al.RC().changeQuery(self.rc))
         return self
+
+    def invalidate(self, seg):
+        self.alignments = filter(lambda al: not al.seg_to.inter(seg), self.alignments)
+        self.rc.alignments = [al.RC() for al in self.alignments]
 
 
 class ReadCollection:
@@ -361,10 +371,10 @@ class ReadCollection:
             return False
         rname = rec.query_name.split()[0]
         if rname in self.reads:
-            self.reads[rname].AddSamAlignment(rec, self.contigs[int(rec.tname)])
+            self.reads[rname].AddSamAlignment(rec, self.contigs[rec.tname])
             return True
         elif basic.Reverse(rname) in self.reads:
-            self.reads[basic.Reverse(rname)].rc.AddSamAlignment(rec, self.contigs[int(rec.tname)])
+            self.reads[basic.Reverse(rname)].rc.AddSamAlignment(rec, self.contigs[rec.tname])
             return True
         return False
 
@@ -396,7 +406,7 @@ class ReadCollection:
                     if rec.is_unmapped:
                         continue
                     assert int(rec.tname) in self.contigs.contigs
-                    contig = self.contigs[int(rec.tname)]
+                    contig = self.contigs[rec.tname]
                     alignment = new_read.AddSamAlignment(rec, contig)
                     if alignment.seg_to.contig in self.contigs:
                         addStraight = True
@@ -494,7 +504,7 @@ class ReadCollection:
             yield SeqIO.SeqRecord(read.seq, read.id)
 
     def loadFromFasta(self, handler):
-        # type: (file) -> ReadCollection
+        # type: (BinaryIO) -> ReadCollection
         for rec in SeqIO.parse_fasta(handler):
             new_read = self.add(AlignedRead(rec))
         return self
@@ -515,7 +525,7 @@ class ReadCollection:
         return res
 
     def contigsAsSegments(self, seg_dict):
-        # type: (Dict[int, Segment]) -> ReadCollection
+        # type: (Dict[str, Segment]) -> ReadCollection
         self.contigs = ContigCollection([seg.contig for seg in seg_dict.values()])
         for read in UniqueList(self.reads.values()):
             read.contigsAsSegments(seg_dict)
@@ -607,7 +617,7 @@ class MatchingSequence:
         self.matches = matchingPositions
 
     def common(self, other):
-        # type: (MatchingSequence) -> Generator(Tuple[int, int])
+        # type: (MatchingSequence) -> Generator[Tuple[int, int]]
         assert self.seq_from == other.seq_from
         cur_self = 0
         cur_other = 0
@@ -711,10 +721,16 @@ class AlignmentPiece:
         assert cigar != "X"
         assert cigar.find("H") == -1 and cigar.find("S") == -1
         self.cigar = cigar
+        assert self.percentIdentity() > 0.4, str(self)
 
     def __str__(self):
         # type: () -> str
-        return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ":" + ("%0.2f" % self.percentIdentity()) + ")"
+        pid = self.percentIdentity()
+        if pid > 0.99:
+            spid = "%0.3f" % pid
+        else:
+            spid = "%0.2f" % pid
+        return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ":" + spid + ")"
 
     def changeQuery(self, read):
         return AlignmentPiece(self.seg_from.changeContig(read), self.seg_to, self.cigar)
@@ -799,8 +815,9 @@ class AlignmentPiece:
 
     def contigAsSegment(self, seg):
         # type: (Segment) -> AlignmentPiece
+        # print "ContigAsSegment", self, seg
         self.seg_to.contig = seg.contig
-        self.seg_to.shift(seg.left)
+        self.seg_to = self.seg_to.shift(seg.left)
 
 
 

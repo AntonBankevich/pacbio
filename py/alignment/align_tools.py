@@ -316,8 +316,8 @@ class Aligner:
         segments = list(segments)
         seg_dict = dict()
         for i, seg in enumerate(segments):
-            seg_dict[i + 1] = seg
-        contigs = map(lambda (i, seg): Contig(seg.Seq(), i + 1), enumerate(segments))
+            seg_dict[str(i + 1)] = seg
+        contigs = map(lambda (i, seg): Contig(seg.Seq(), str(i + 1)), enumerate(segments))
         read_collection = ReadCollection(ContigCollection(contigs)).extendClean(reads)
         self.alignReadCollection(read_collection)
         read_collection.contigsAsSegments(seg_dict)
@@ -332,22 +332,32 @@ class Aligner:
     def fixLineAlignments(self, line):
         # type: (Line) -> None
         print "Fixing alignments."
-        for read in line.new_reads:
-            read.removeContig(line)
-            read.rc.removeContig(line.rc)
-        to_fix = ReadCollection(ContigCollection([line]))
+        to_fix = ReadCollection(ContigCollection([Contig(line.centerPos.suffix().Seq(), "half")]))
         to_fix.extendClean(line.new_reads)
         self.alignReadCollection(to_fix)
+        seg_dict = {"half": line.centerPos.suffix()}
+        to_fix.contigsAsSegments(seg_dict)
         for read in line.new_reads:
             aligned_read = to_fix[read.id]
+            has_contradicting = False
+            has_noncontradicting = False
             for al in aligned_read.alignments:
-                if al.seg_to.contig == line and not al.contradicting(line.asSegment()):
-                    print "Adding read", read, "to line", line, "with alignment", al
-                    line.addRead(read)
-                    print "Adding read-to-line alignment", al.changeQuery(read)
-                    read.addAlignment(al.changeQuery(read))
+                if al.seg_to.contig == line:
+                    if not al.contradicting(line.asSegment()):
+                        print "Adding read", read, "to line", line, "with alignment", al
+                        line.addRead(read)
+                        print "Adding read-to-line alignment", al.changeQuery(read)
+                        read.addAlignment(al.changeQuery(read))
+                        has_noncontradicting = True
+                    else:
+                        has_contradicting = True
+            if has_contradicting and not has_noncontradicting:
+                print "REMOVING READ!!!", aligned_read, "since it only has contradicting alignments to the line"
+                line.removeRead(read)
         line.new_reads = []
-        line.rc.new_reads = filter(lambda read: read.rc.id not in to_fix.reads,line.rc.new_reads)
+        for read in line.rc.new_reads:
+            if read.rc.id in to_fix.reads:
+                line.rc.addRead(read)
 
 
     # def fixExtendedLine(self, line):
@@ -378,7 +388,7 @@ class Aligner:
         # type: (Iterable[NamedSequence], Iterable[Contig]) -> ReadCollection
         res = ReadCollection(ContigCollection(list(contigs)))
         for read in reads:
-            res.addNewRead(NamedSequence(read.seq, "short_" + str(read.id))) # remove when all ids are str
+            res.addNewRead(NamedSequence(read.seq, read.id)) # remove when all ids are str
         for contig in contigs:
             res.fillFromSam(self.align(res, [contig]))
         return res

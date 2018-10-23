@@ -4,7 +4,8 @@ from common import basic
 from common.SeqIO import NamedSequence
 from dag_resolve.phasing import Phasing
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
-from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece, AlignedRead
+from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece, AlignedRead, \
+    Segment
 
 
 # class PseudoLineSegment:
@@ -70,11 +71,12 @@ class Line(Contig):
         self.extendRight(Consensus("", []), pos)
 
     def extendRight(self, consensus, pos = None):
-        # type: (Consensus, Optional(int)) -> None
+        # type: (Consensus, Optional[int]) -> None
         if pos is None:
             pos = len(self.seq)
         elif pos < 0:
             pos = len(self.seq) + pos
+        assert pos >= self.centerPos.pos
         if pos != len(self.seq):
             self.notifyCutRight(pos)
             self.rc.notifyCutLeft(len(self) - pos)
@@ -99,21 +101,21 @@ class Line(Contig):
         # type: (AlignedRead) -> None
         self.reads.add(read)
         self.rc.reads.add(read.rc)
-        print read in self.reads, read.rc in self.rc.reads
-        for al in read.alignments:
-            assert read in al.seg_to.contig.reads, str(read) + " " + str(al) + " " + str(al.seg_to.contig)
-        for al in read.rc.alignments:
-            assert read.rc in al.seg_to.contig.reads, str(read) + " " + str(al) + " " + str(str(al.seg_to.contig))
 
     def invalidateReadsAfter(self, pos):
         for read in self.reads.inter(self.suffix(pos)):
-            self.invalidateRead(read)
+            self.invalidateRead(read, self.suffix(pos))
 
-    def invalidateRead(self, read):
-        # type: (AlignedRead) -> None
-        del self.reads.reads[read.id]
+    def invalidateRead(self, read, seg):
+        # type: (AlignedRead, Segment) -> None
+        read.invalidate(seg)
         self.new_reads.append(read)
-        del self.rc.reads.reads[read.rc.id]
+        self.rc.new_reads.append(read.rc)
+
+    def removeRead(self, read):
+        # type: (AlignedRead) -> None
+        self.reads.remove(read)
+        self.rc.reads.remove(read.rc)
 
     def cutAlignments(self, pos):
         while len(self.chain) > 0 and self.chain[-1].seg_from.right > pos:
@@ -223,7 +225,7 @@ class LineStorage:
         # type: (Graph) -> LineStorage
         self.g = g
         self.lines = [] #type: list[Line]
-        self.edgeLines = dict() # type: Dict[int, list[Line]]
+        self.edgeLines = dict() # type: Dict[str, list[Line]]
         for edge in g.E.values():
             self.edgeLines[edge.id] = []
         self.resolved_edges = set() #type: Set[int]

@@ -30,12 +30,14 @@ class Polisher:
             job.run()
         return list(SeqIO.parse_fasta(open(polished_file, "r")))[0].seq
 
-    def polishAndAnalyse(self, reads, polishing_base):
-        # type: (ReadCollection, Contig) -> Consensus
-        seq = Contig(self.polish(reads, polishing_base), 0)
+    def polishAndAnalyse(self, reads, polishing_base, reliable_start = None):
+        # type: (ReadCollection, Contig, Optional[int]) -> Consensus
+        if reliable_start is None:
+            reliable_start = len(polishing_base)
+        seq = Contig(self.polish(reads, polishing_base), "contig")
         res = [0] * (len(seq) + 1)
         for rec in self.aligner.align(reads, ContigCollection([seq])):
-            if rec.is_unmapped:
+            if rec.is_unmapped or rec.pos > reliable_start or rec.rc:
                 continue
             res[rec.pos - 1] += 1
             res[rec.pos + rec.alen - 1] -= 1
@@ -44,8 +46,8 @@ class Polisher:
         return Consensus(seq.seq, res)
 
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 1000):
-        # type: (ReadCollection, str, int) -> Optional[Consensus]
-        cc = ContigCollection([Contig(base_start, 1)])
+        # type: (ReadCollection, str, int, int) -> Optional[Consensus]
+        cc = ContigCollection([Contig(base_start, "base_start")])
         reads_to_base = ReadCollection(cc).extendClean(reads).fillFromSam(self.aligner.align(reads, cc))
         # for read in reads:
         #     print read
@@ -57,9 +59,9 @@ class Polisher:
         best = None
         for read in sorted(list(reads_to_base.__iter__()), key = lambda read: len(read))[::-1]:
             for al in read.alignments:
-                if al.seg_to.contig.id == 1 and al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
-                    base_conig = Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], 0)
-                    candidate = self.polishAndAnalyse(reads, base_conig)
+                if al.seg_to.contig.id == "base_start" and al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
+                    base_conig = Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], "base")
+                    candidate = self.polishAndAnalyse(reads, base_conig, al.seg_to.right - pos_start + 100)
                     if len(candidate.cut()) > len(base_start) - pos_start + min_new_len: #len(candidate.cut()) is too slow
                         print "Final polishing base alignment:", al
                         print base_conig.seq
@@ -73,9 +75,9 @@ class Polisher:
                     break
         if best is None:
             if len(base_start) - pos_start > 500:
-                best = self.polishAndAnalyse(reads, Contig(base_start[pos_start:], 0))
+                best = self.polishAndAnalyse(reads, Contig(base_start[pos_start:], "base"), len(base_start) - pos_start + 100)
             else:
-                best = self.polishAndAnalyse(reads, Contig(base_start, 0)).suffix(pos_start)
+                best = self.polishAndAnalyse(reads, Contig(base_start, "base"), len(base_start) + 100).suffix(pos_start)
         return best
 
 

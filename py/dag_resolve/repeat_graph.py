@@ -1,5 +1,5 @@
 from common import basic, sam_parser, SeqIO
-from typing import Generator, Dict, Optional, Tuple
+from typing import Generator, Dict, Optional, Tuple, BinaryIO
 from dag_resolve.sequences import Contig, ReadCollection, ContigCollection, TmpInfo
 
 
@@ -39,7 +39,7 @@ class Vertex:
 
 class Edge(Contig):
     def __init__(self, id, start, end, consensus, info, rc = None):
-        # type: (int, Vertex, Vertex, str, EdgeInfo) -> Edge
+        # type: (str, Vertex, Vertex, str, EdgeInfo) -> Edge
         self.start = start
         self.end = end
         start.out.append(self)
@@ -55,7 +55,7 @@ class Graph:
     def __init__(self):
         # type: () -> Graph
         self.V = dict() # type: Dict[int, Vertex]
-        self.E = dict() # type: Dict[int, Edge]
+        self.E = dict() # type: Dict[str, Edge]
         self.source = self.addVertex(10000, label = "source") # type: Vertex
         self.sink = self.source.rc # type: Vertex
         self.sink.label = "sink"
@@ -83,7 +83,7 @@ class Graph:
         return vertex
 
     def printToFile(self, handler):
-        # type: (file) -> None
+        # type: (BinaryIO) -> None
         handler.write("Graph:\n")
         for edge in self.E.values():
             handler.write(str(edge.id) + "(" + str(len(edge)) + ")" + ": " + str(edge.start.id) + " -> " + str(edge.end.id) + "\n")
@@ -92,9 +92,9 @@ class Graph:
         return ContigCollection(self.E.values())
 
     def addEdge(self, edge_id, start_id, end_id, consensus, info):
-        # type: (Optional[int], int, int, str, EdgeInfo) -> Edge
+        # type: (Optional[str], int, int, str, EdgeInfo) -> Edge
         if edge_id is None:
-            edge_id = self.min_new_eid
+            edge_id = str(self.min_new_eid)
             self.min_new_eid += 1
         if edge_id in self.E:
             return self.E[edge_id]
@@ -201,7 +201,7 @@ class Graph:
                 v_map[start] = self.addVertex()
             if end not in v_map:
                 v_map[end] = self.addVertex()
-            seq = contigs[abs(eid)].seq
+            seq = contigs[str(abs(eid))].seq
             if eid < 0:
                 seq = basic.RC(seq)
             if info.selfrc:
@@ -209,26 +209,26 @@ class Graph:
                 v_map[end] = self.addVertex(None, True)
                 seq = seq[:len(seq) / 2]
                 info.selfrc = False
-            self.addEdge(eid, v_map[start].id, v_map[end].id, seq, info)
+            self.addEdge(str(eid), v_map[start].id, v_map[end].id, seq, info)
         return self
 
     def fillAlignments(self, read_recs, sam, fill_unique = True):
-        # type: (Generator[SeqIO.SeqRecord], sam_parser.Samfile) -> None
+        # type: (Generator[SeqIO.SeqRecord], sam_parser.Samfile, bool) -> None
         print "Collecting all reads"
         for rec in read_recs:
-            new_read = self.reads.addNewRead(rec)
-            self.reads.add(new_read.rc)
+            read = self.reads.addNewRead(rec)
+            self.reads.add(read.rc)
         print "Collecting read alignments"
         for rec in sam:
             if rec.is_unmapped:
                 continue
-            edge_id = int(rec.tname)
+            edge_id = rec.tname
             if not fill_unique and self.E[edge_id].info.unique and rec.pos > 5000 and rec.pos + rec.alen + 5000 <= self.E[edge_id].__len__():
                 continue
-            if rec.query_name not in self.E[edge_id].reads.reads:
-                self.E[edge_id].reads.add(self.reads[rec.query_name])
-                self.E[-edge_id].reads.add(self.reads[rec.query_name].rc)
-            self.E[edge_id].reads.addNewAlignment(rec)
+            read = self.reads[rec.query_name]
+            new_al = read.AddSamAlignment(rec, self.E[edge_id])
+            new_al.seg_to.contig.reads.add(read)
+            new_al.seg_to.contig.rc.reads.add(read.rc)
         self.newEdges = []
 
     def fillRelevant(self, relevants, reads):
@@ -237,16 +237,16 @@ class Graph:
         cnt = 0
         for s in open(relevants, "r").readlines():
             if s.startswith("#Repeat") or s.startswith("#Input") or s.startswith("Output"):
-                cedge = self.E[basic.parseNumber(s)]
+                cedge = self.E[str(basic.parseNumber(s))]
             elif s.startswith("+"):
                 rname = s.strip()[1:]
-                assert rname in reads
+                assert rname in reads.reads
                 if rname not in cedge.reads:
                     cedge.reads.addNewRead(reads[rname])
                     cnt += 1
             elif s.startswith("-"):
                 rname = s.strip()[1:]
-                assert rname in reads
+                assert rname in reads.reads
                 if rname not in cedge.reads:
                     cedge.rc.reads.addNewRead(reads[rname].rc)
                     cnt += 1
@@ -259,7 +259,7 @@ class Graph:
 
 class DotParser:
     def __init__(self, dot):
-        # type: (file) -> DotParser
+        # type: (BinaryIO) -> DotParser
         self.dot = dot
 
     def parse(self, edge_ids = None):

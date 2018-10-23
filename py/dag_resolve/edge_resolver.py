@@ -16,7 +16,7 @@ from dag_resolve.sequences import ReadCollection, ContigCollection, Segment, Ali
 
 class EdgeResolver:
     def __init__(self, graph, aligner, polisher, reads):
-        # type: (Graph, Aligner, Polisher) -> EdgeResolver
+        # type: (Graph, Aligner, Polisher, ReadCollection) -> None
         self.graph = graph
         self.aligner = aligner
         self.polisher = polisher
@@ -27,6 +27,9 @@ class EdgeResolver:
     def processUniqueEdge(self, edge, line):
         # type: (Edge, Line) -> Optional[Edge]
         print "Processing uniue line", line
+        line.reads.print_alignments(sys.stdout)
+        print "Relevent:"
+        line.reads.inter(line.suffix(-10000)).print_alignments(sys.stdout)
         self.aligner.fixLineAlignments(line)
         cut_pos = len(line)
         for read in line.reads:
@@ -58,7 +61,13 @@ class EdgeResolver:
                 positions.append(LinePosition(line, 0))
         classifier = ReadClassifier(self.graph, self.aligner, lines, positions)
         uncertain = ReadCollection(ContigCollection(lines), map(lambda read: self.reads[read.id], edge.reads))
-        # uncertain = uncertain.minusAll([line.reads for line in lines])
+        print "All reads:"
+        edge.reads.print_alignments(sys.stdout)
+        print "All on line:"
+        uncertain.print_alignments(sys.stdout)
+        uncertain = uncertain.minusAll([line.reads.inter(line.centerPos.suffix()) for line in lines])
+        print "Uncertain:"
+        uncertain.print_alignments(sys.stdout)
         passedLines = []
         # self.prolongAll(edge, lines)
         while True:
@@ -81,7 +90,7 @@ class EdgeResolver:
                     return False, None
 
     def attemptJump(self, edge, line):
-        # type: (Edge, Line) -> Optional[edge]
+        # type: (Edge, Line) -> Optional[Edge]
         print "Jumping with line", line, "from edge", edge
         shift = line.chain[-1].seg_from.right
         seq = line.seq[shift:]
@@ -205,12 +214,17 @@ class ReadClassifier:
                         al.seg_to.inter(self.positions[al.seg_to.contig.id].suffix()) and \
                                 len(al.seg_from) > 500:
                     candidates.append(al)
-            if len(candidates) != 0:
-                print "Classifying read", read, "Initial:", reads[read.id]
-                print "Candidates:", map(str, candidates)
-                pass
-            else:
+            if len(candidates) == 0:
                 n_irrelevant += 1
+                continue
+            print "Classifying read", read, "Initial:", reads[read.id]
+            print "Candidates:", map(str, candidates)
+            has_active_choice = False
+            for candidate in candidates:
+                if candidate.seg_to in active:
+                    has_active_choice = True
+            if not has_active_choice:
+                print "No active candidates"
                 continue
             res = self.championship(candidates, line_aligns)
             if res is None:
@@ -240,9 +254,9 @@ class ReadClassifier:
         for line in lines:
             suffix_len = min(len(line), suffix_len)
         assert suffix_len > 5000
-        shortened_lines = map(lambda line: Contig(line.seq[-suffix_len:], line.id), lines)
+        shortened_lines = map(lambda line: Contig(line.seq[-suffix_len:], "short_" + str(line.id)), lines)
         lines_dict = dict()
-        print "Aligning reads to lines"
+        print "Aligning lines to lines"
         res = self.aligner.separateAlignments(shortened_lines, shortened_lines)
         res_map = dict() # type: Dict[Tuple[int, int], list[AlignmentPiece]]
         for l1 in lines:
@@ -251,17 +265,25 @@ class ReadClassifier:
                     res_map[(l1.id, l2.id)] = []
         for line in lines:
             lines_dict[line.id] = line
-        print "Scoring reads"
+        print "Collecting line alignments"
         for read in res.reads.values():
-            line_from = lines_dict[basic.parseNegativeNumber(read.id, len("short_"))]
+            line_from = lines_dict[read.id[len("short_"):]]
             for al in read.alignments:
-                if int(al.seg_to.contig.id) not in lines_dict:
+                print al
+                line_to_id = read.id[len("short_"):]
+                if line_to_id not in lines_dict:
                     continue
-                line_to = lines_dict[int(al.seg_to.contig.id)]
+                line_to = lines_dict[line_to_id]
                 if line_from == line_to:
                     continue
                 seg_from = Segment(line_from, al.seg_from.left + len(line_from) - suffix_len, al.seg_from.right + len(line_from) - suffix_len)
                 seg_to = Segment(line_to, al.seg_to.left + len(line_to) - suffix_len, al.seg_to.right + len(line_to) - suffix_len)
+                # print seg_from, seg_to
+                # print al.seg_from.Seq()
+                # print seg_from.Seq()
+                # print al.seg_to.Seq()
+                # print al.cigar
+                # print seg_to.Seq()
                 new_piece = AlignmentPiece(seg_from, seg_to, al.cigar)
                 print "Added line alignment:", new_piece
                 res_map[(line_from.id, line_to.id)].append(new_piece)
@@ -281,7 +303,7 @@ class ReadClassifier:
                 return None
             assert False, "Strange comparison results"
         else:
-            if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or s12 < 0.65:
+            if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or abs(s1 - s2) < s12 * 0.65:
                 print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "No winner"
                 return None
             if s1 > s2:
@@ -305,7 +327,8 @@ class ReadClassifier:
             for candidate in candidates:
                 if candidate == best:
                     continue
-                if self.fight(candidate, best, line_aligns) is None or self.fight(candidate, best, line_aligns) != best:
+                fight_results = self.fight(candidate, best, line_aligns)
+                if fight_results is None or fight_results != best:
                     return None
         return best
 

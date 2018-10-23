@@ -2,6 +2,7 @@ import os
 import sys
 import time
 
+import shutil
 from typing import Dict
 
 sys.path.append("py")
@@ -13,7 +14,7 @@ from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.graph_resolver import GraphResolver
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
-from dag_resolve.sequences import ContigCollection, ReadCollection
+from dag_resolve.sequences import ContigCollection, ReadCollection, UniqueList
 from common import basic
 
 def analyse(graph, storage):
@@ -85,10 +86,17 @@ if __name__ == "__main__":
     if params.clean:
         basic.recreate(dir)
     dir_distributor = DirDistributor(os.path.join(dir, "alignment"))
-    log = open(os.path.join(dir, "log.info"), "w")
+    old_logs_dir = os.path.join(dir, "old")
+    basic.ensure_dir_existance(old_logs_dir)
+    log_file = os.path.join(dir, "log.info")
+    if os.path.isfile(log_file):
+        num = len(os.listdir(old_logs_dir))
+        shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
+    log = open(log_file, "w")
     sys.stdout = basic.OStreamWrapper(sys.stdout, log)
     sys.stderr = sys.stdout
     print " ".join(sys.argv)
+    print (time.strftime("%d.%m.%Y  %I:%M:%S"))
     sys.stdout.write("Collecting contig collection\n")
     edge_sequences = ContigCollection().loadFromFasta(open(edge_sequences, "r"))
     sys.stdout.write("Loading dot\n")
@@ -99,7 +107,7 @@ if __name__ == "__main__":
     al = Aligner(dir_distributor)
     polisher = Polisher(al, dir_distributor)
     reads = ReadCollection().loadFromFasta(open(reads_file, "r"))
-    alignment = al.align(reads, ContigCollection(graph.E.values()))
+    alignment = al.align(reads, ContigCollection(list(UniqueList(graph.E.values()))))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
     relevant = graph.fillRelevant(relevant_reads, reads)

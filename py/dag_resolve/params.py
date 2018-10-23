@@ -11,7 +11,7 @@ class Scores:
     ins_score = 8
     del_score = 7
     sub_score = 10
-    homo_score = 5
+    homo_score = 4
     switch_core = 1
     center_score = 20
     inf = 10000000
