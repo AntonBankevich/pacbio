@@ -199,6 +199,12 @@ class AlignedRead(NamedSequence):
         # type: () -> int
         return len(self.seq)
 
+    def alignmentsTo(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
+        for al in self.alignments:
+            if al.seg_to.inter(seg):
+                yield al
+
     def AddSamAlignment(self, rec, contig):
         # type: (sam_parser.SAMEntryInfo, Contig) -> AlignmentPiece
         cigar_list = list(sam_parser.CigarToList(rec.cigar))
@@ -324,8 +330,9 @@ class AlignedRead(NamedSequence):
         return self
 
     def invalidate(self, seg):
+        # type: (Segment) -> None
         self.alignments = filter(lambda al: not al.seg_to.inter(seg), self.alignments)
-        self.rc.alignments = [al.RC() for al in self.alignments]
+        self.rc.alignments = filter(lambda al: not al.seg_to.inter(seg.RC()), self.rc.alignments)
 
 
 class ReadCollection:

@@ -217,6 +217,10 @@ class LinePosition:
         assert self.valid()
         return self.line.suffix(self.pos)
 
+    def prefix(self):
+        assert self.valid()
+        return self.line.prefix(self.pos)
+
     def close(self):
         self.line.listeners.remove(self)
 

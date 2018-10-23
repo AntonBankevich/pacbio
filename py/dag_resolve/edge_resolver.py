@@ -221,7 +221,7 @@ class ReadClassifier:
             print "Candidates:", map(str, candidates)
             has_active_choice = False
             for candidate in candidates:
-                if candidate.seg_to in active:
+                if candidate.seg_to.contig in active:
                     has_active_choice = True
             if not has_active_choice:
                 print "No active candidates"

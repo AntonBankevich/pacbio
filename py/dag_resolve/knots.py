@@ -18,15 +18,9 @@ class Knotter:
         print "Trying to knot lines:", line1, line2
         # same_vertex = line1.chain[-1].seg_to.contig.end.rc == line2.chain[-1].seg_to.contig.end
         # extreme_case = line1.rc.id == line2.id and len(line1.chain) == 1 and len(line2.chain) == 1
-        common_reads = line1.reads.cap(line2.reads)
-        if line1 == line2:
-            tmp_reads = ReadCollection(ContigCollection([line1]))
-            for read in common_reads:
-                for al1 in read.alignments:
-                    for al2 in read.alignments:
-                        if (al1.seg_from.inter(al2.seg_from) or al2.seg_from.precedes(al1.seg_from)) and al1.seg_to.precedes(al2.seg_to):
-                            tmp_reads.add(read)
-            common_reads = tmp_reads
+        common_reads = line1.reads.cap(line2.reads).filter(
+            lambda read: len(list(read.alignmentsTo(line1.centerPos.suffix()))) != 0 and
+                         len(list(read.alignmentsTo(line2.centerPos.prefix()))) != 0)
         print len(common_reads), "supporting reads"
         for read in common_reads:
             print line1.reads[read.id], line2.reads[read.id], self.graph.reads[read.id]
