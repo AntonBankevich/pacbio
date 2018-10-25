@@ -44,7 +44,7 @@ from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigColle
 
 class Line(Contig):
     def __init__(self, edge, rc = None):
-        # type: (Edge) -> Line
+        # type: (Edge) -> None
         assert edge.info.unique
         self.reads = None # type: ReadCollection
         self.rc = None # type: Line
@@ -59,7 +59,8 @@ class Line(Contig):
         self.reads = ReadCollection(ContigCollection([self]))
         self.new_reads = [] # type: list[AlignedRead]
         self.listeners = []
-        self.centerPos = LinePosition(self, len(edge) / 2                                    )
+        self.centerPos = LinePosition(self, len(edge) / 2)
+        self.discarded = []
 
     def setConsensus(self, consensus):
         self.consensus = consensus
@@ -103,6 +104,7 @@ class Line(Contig):
         self.rc.reads.add(read.rc)
 
     def invalidateReadsAfter(self, pos):
+        assert pos > self.centerPos.pos
         for read in self.reads.inter(self.suffix(pos)):
             self.invalidateRead(read, self.suffix(pos))
 
@@ -110,12 +112,15 @@ class Line(Contig):
         # type: (AlignedRead, Segment) -> None
         read.invalidate(seg)
         self.new_reads.append(read)
-        self.rc.new_reads.append(read.rc)
+        # self.rc.new_reads.append(read.rc)
 
     def removeRead(self, read):
         # type: (AlignedRead) -> None
+        read.removeContig(self)
         self.reads.remove(read)
         self.rc.reads.remove(read.rc)
+        self.discarded.append(read)
+        self.rc.discarded.append(read)
 
     def cutAlignments(self, pos):
         while len(self.chain) > 0 and self.chain[-1].seg_from.right > pos:

@@ -224,9 +224,10 @@ class ReadClassifier:
                 if candidate.seg_to.contig in active:
                     has_active_choice = True
             if not has_active_choice:
+                n_class += 1
                 print "No active candidates"
                 continue
-            res = self.championship(candidates, line_aligns)
+            res = self.tournament(candidates, line_aligns)
             if res is None:
                 n_uncertain += 1
                 print "Could not determine the champion"
@@ -294,12 +295,14 @@ class ReadClassifier:
         assert c1.seg_from.contig == c2.seg_from.contig
         s1, s2, s12 = self.scorer.score3(c1, c2, line_aligns[(c1.seg_to.contig.id, c2.seg_to.contig.id)])
         if s12 is None:
-            print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2
             if s1 is None and s2 is not None:
+                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c2
                 return c2
             elif s1 is not None and s2 is None:
+                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c1
                 return c1
             elif s1 is None and s2 is None:
+                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner"
                 return None
             assert False, "Strange comparison results"
         else:
@@ -313,7 +316,7 @@ class ReadClassifier:
                 print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c1
                 return c1
 
-    def championship(self, candidates, line_aligns):
+    def tournament(self, candidates, line_aligns):
         # type: (list[AlignmentPiece], Dict[Tuple[int, int], list[AlignmentPiece]]) -> Optional[AlignmentPiece]
         best = None
         for candidate in candidates:

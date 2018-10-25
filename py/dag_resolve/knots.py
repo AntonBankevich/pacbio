@@ -23,7 +23,7 @@ class Knotter:
                          len(list(read.alignmentsTo(line2.centerPos.prefix()))) != 0)
         print len(common_reads), "supporting reads"
         for read in common_reads:
-            print line1.reads[read.id], line2.reads[read.id], self.graph.reads[read.id]
+            print line1.reads[read.id], line1.reads[read.id] == line2.reads[read.id], self.graph.reads[read.id]
         if len(common_reads) >= params.min_reads_in_knot:
             line1.knot = Knot(line1, line2, "", common_reads)
             line2.rc.knot = Knot(line2.rc, line1.rc, "", common_reads.RC())
@@ -36,25 +36,11 @@ class Knotter:
         print "Knotting lines"
         for line1 in self.storage.lines:
             for line2 in self.storage.lines:
-                if line1.knot is None and line2.knot is None and line1.id <= line2.id and line1 != line2.rc:
-                    if self.tryKnot(line1, line2):
-                        break
-
-    def checkConnect(self, read, seg1, seg2):
-        # type: (AlignedRead, Segment, Segment) -> bool
-        for aln1 in read.alignments:
-            if not aln1.seg_to.common(seg1):
-                continue
-            for aln2 in read.alignments:
-                if not aln2.seg_to.common(seg2):
-                    continue
-                if aln1.rc == aln2.rc:
-                    continue
-                if aln1.rc == (aln1.seg_from.right > aln2.seg_from.right):
-                    return True
-                if aln1.seg_to.contig == aln2.seg_to.contig and aln1.seg_from.left == aln2.seg_from.right and aln2.seg_from.right == aln2.seg_from.left:
-                    return True
-        return False
+                if line1 != line2.rc:
+                    self.tryKnot(line1, line2)
+                # if line1.knot is None and line2.knot is None and line1 != line2.rc:
+                #     if self.tryKnot(line1, line2):
+                #         break
 
     def extremeConnect(self, read, edge):
         # type: (AlignedRead, Edge) -> bool
