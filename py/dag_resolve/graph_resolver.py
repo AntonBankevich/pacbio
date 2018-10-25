@@ -131,8 +131,9 @@ class GraphResolver:
 
     def printResults(self, handler):
         printed = set()
+        print "Linear line chains:"
         for line in self.lineStorage.lines:
-            if line.id in printed or line.knot is not None:
+            if line.id in printed or line.rc.knot is not None:
                 continue
             while line is not None:
                 printed.add(line.id)
@@ -144,10 +145,7 @@ class GraphResolver:
                     handler.write("->")
                     line = line.knot.line2
             handler.write("\n")
-        for line in self.lineStorage.lines:
-            print "Reads from line", line
-            line.reads.print_alignments(sys.stdout)
-
+        print "Circular line chains:"
         for line in self.lineStorage.lines:
             if line.id in printed:
                 continue
@@ -155,8 +153,8 @@ class GraphResolver:
             while line is not None and line.id not in printed:
                 printed.add(line.id)
                 printed.add(line.rc.id)
-                handler.write(line.rc.__str__())
-                if line.rc.knot is None:
+                handler.write(line.__str__())
+                if line.knot is None:
                     line = None
                 else:
                     handler.write("->")
