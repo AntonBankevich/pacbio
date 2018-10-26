@@ -241,13 +241,13 @@ class Graph:
             elif s.startswith("+"):
                 rname = s.strip()[1:]
                 assert rname in reads.reads
-                if rname not in cedge.reads:
+                if rname not in cedge.reads.reads:
                     cedge.reads.addNewRead(reads[rname])
                     cnt += 1
             elif s.startswith("-"):
                 rname = s.strip()[1:]
                 assert rname in reads.reads
-                if rname not in cedge.reads:
+                if rname not in cedge.reads.reads:
                     cedge.rc.reads.addNewRead(reads[rname].rc)
                     cnt += 1
         return cnt

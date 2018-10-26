@@ -115,6 +115,30 @@ class EdgeResolver:
         print "Connected line", line, "to edge", best.seg_to.contig, "using alignment", best
         return best.seg_to.contig
 
+    def attemptReattach(self, line):
+        shift = line.chain[-1].seg_from.right
+        seq = line.seq[shift:]
+        if len(seq) < 1000:
+            return None
+        alignments = ReadCollection(ContigCollection(edge.end.out))
+        alignments.addNewRead(NamedSequence(seq, "tail"))
+        self.aligner.alignReadCollection(alignments)
+        best = None
+        print alignments.reads["tail"]
+        for al in alignments.reads["tail"].alignments:
+            if len(al) > 300 and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
+                best = al
+        if best is None:
+            print "No jump"
+            alignments = ReadCollection(ContigCollection(self.graph.E.values()))
+            alignments.addNewRead(NamedSequence(seq, "tail"))
+            self.aligner.alignReadCollection(alignments)
+            alignments.print_alignments(sys.stdout)
+            return None
+        line.addAlignment(AlignmentPiece(Segment(line, best.seg_from.left + shift, best.seg_from.right + shift), best.seg_to, best.cigar))
+        print "Connected line", line, "to edge", best.seg_to.contig, "using alignment", best
+        return best.seg_to.contig
+
     def prolongAll(self, edge, lines):
         # type: (Edge, list[Line]) -> int
         res = 0
@@ -234,13 +258,14 @@ class ReadClassifier:
                 continue
             print "Champion:", res, "Active:", (res.seg_to.contig in active)
             n_class += 1
-            if res.seg_to.contig in active:
+            # if res.seg_to.contig in active:
+            if True:
                 cread = reads[read.id]
                 classified[res.seg_to.contig.id].append(cread)
                 seg_from = Segment(cread, res.seg_from.left, res.seg_from.right)
                 cread.addAlignment(AlignmentPiece(seg_from, res.seg_to, res.cigar))
                 res.seg_to.contig.addRead(cread)
-                print "New red alignments:", cread
+                print "New read alignments:", cread
         for line in active:
             print len(classified[line.id]), "reads were classified to line", line
             print map(str, classified[line.id])
