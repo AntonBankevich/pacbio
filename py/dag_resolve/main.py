@@ -80,6 +80,8 @@ if __name__ == "__main__":
     dir = sys.argv[3]
     edge_sequences = os.path.join(indir, "2-repeat", "graph_final.fasta")
     dot_file = os.path.join(indir, "2-repeat", "graph_final.dot")
+    if not os.path.isfile(dot_file):
+        dot_file = os.path.join(indir, "2-repeat", "graph_final.gv")
     reads_file = os.path.join(indir, os.path.split(indir)[1] + ".fasta")
     relevant_reads = os.path.join(indir, "2-repeat", "repeats_dump.txt")
     basic.ensure_dir_existance(dir)
