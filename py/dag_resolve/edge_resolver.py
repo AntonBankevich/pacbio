@@ -73,7 +73,7 @@ class EdgeResolver:
         while True:
             active_lines = [self.shortestLine(lines, passedLines)]
             classified = classifier.classifyReads(active_lines, uncertain)
-            uncertain = uncertain.minusBoth(classified)
+            uncertain = uncertain.minusBoth(classified) #this should not be important !! Check!!
             total_extention = 0
             jumped = 0
             for line in active_lines:
@@ -225,7 +225,7 @@ class ReadClassifier:
             self.aligner.alignReadsToSegments(alignments, [line.centerPos.suffix()])
         line_aligns = self.pairwiseAlign(self.lines)
         classified = dict()
-        for line in active:
+        for line in self.lines:
             classified[line.id] = []
         n_class = 0
         n_uncertain = 0
@@ -266,7 +266,7 @@ class ReadClassifier:
                 cread.addAlignment(AlignmentPiece(seg_from, res.seg_to, res.cigar))
                 res.seg_to.contig.addRead(cread)
                 print "New read alignments:", cread
-        for line in active:
+        for line in self.lines:
             print len(classified[line.id]), "reads were classified to line", line
             print map(str, classified[line.id])
         res = ReadCollection(reads.contigs).extend(list(itertools.chain(*classified.values())))
