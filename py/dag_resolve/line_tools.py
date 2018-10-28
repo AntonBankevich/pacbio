@@ -90,7 +90,7 @@ class Line(Contig):
             for al in read.alignments:
                 if al.seg_to.contig == self.rc:
                     al.seg_to = al.seg_to.shift(len(self) - old_len)
-        self.invalidateReadsAfter(max(0, pos - 500))
+        self.invalidateReadsAfter(max(self.centerPos.pos, pos - 500))
         self.cutAlignments(pos)
         self.fixRC()
 
@@ -104,7 +104,7 @@ class Line(Contig):
         self.rc.reads.add(read.rc)
 
     def invalidateReadsAfter(self, pos):
-        assert pos > self.centerPos.pos
+        assert pos >= self.centerPos.pos
         for read in self.reads.inter(self.suffix(pos)):
             self.invalidateRead(read, self.suffix(pos))
 

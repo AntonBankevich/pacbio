@@ -78,7 +78,7 @@ class GraphResolver:
         for edge in self.graph.E.values():
             if edge.info.unique:# and (len(edge.end.out) != 1 or len(edge.end.inc) != 1):
                 res = self.edgeResolver.processUniqueEdge(edge, self.lineStorage.getEdgeLines(edge)[0])
-                assert res is not None
+                assert res is not None or len(edge.end.out) == 0
                 self.lineStorage.edgeLines[res.id].append(self.lineStorage.getEdgeLines(edge)[0])
         while True:
             cnt = 0
