@@ -45,7 +45,7 @@ class Polisher:
             res[i] += res[i - 1]
         return Consensus(seq.seq, res)
 
-    def polishQuiver(self, reads, base_start, pos_start, min_new_len = 1000):
+    def polishQuiver(self, reads, base_start, pos_start, min_new_len = 3000):
         # type: (ReadCollection, str, int, int) -> Optional[Consensus]
         cc = ContigCollection([Contig(base_start, "base_start")])
         reads_to_base = ReadCollection(cc).extendClean(reads).fillFromSam(self.aligner.align(reads, cc))
