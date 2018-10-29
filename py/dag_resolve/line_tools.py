@@ -44,7 +44,7 @@ from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigColle
 
 class Line(Contig):
     def __init__(self, edge, rc = None):
-        # type: (Edge) -> None
+        # type: (Edge, Optional[Line]) -> None
         assert edge.info.unique
         self.reads = None # type: ReadCollection
         self.rc = None # type: Line
@@ -77,7 +77,7 @@ class Line(Contig):
             pos = len(self.seq)
         elif pos < 0:
             pos = len(self.seq) + pos
-        assert pos >= self.centerPos.pos
+        # assert pos >= self.centerPos.pos
         if pos != len(self.seq):
             self.notifyCutRight(pos)
             self.rc.notifyCutLeft(len(self) - pos)

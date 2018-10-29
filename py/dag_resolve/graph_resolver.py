@@ -79,7 +79,8 @@ class GraphResolver:
             if edge.info.unique:# and (len(edge.end.out) != 1 or len(edge.end.inc) != 1):
                 res = self.edgeResolver.processUniqueEdge(edge, self.lineStorage.getEdgeLines(edge)[0])
                 assert res is not None or len(edge.end.out) == 0
-                self.lineStorage.edgeLines[res.id].append(self.lineStorage.getEdgeLines(edge)[0])
+                if res is not None:
+                    self.lineStorage.edgeLines[res.id].append(self.lineStorage.getEdgeLines(edge)[0])
         while True:
             cnt = 0
             for v in self.graph.V.values():
@@ -136,6 +137,7 @@ class GraphResolver:
             if line.id in printed or line.rc.knot is not None:
                 continue
             while line is not None:
+                assert line.id not in printed
                 printed.add(line.id)
                 printed.add(line.rc.id)
                 handler.write(line.__str__())
