@@ -238,6 +238,11 @@ class ReadClassifier:
                         al.seg_to.inter(self.positions[al.seg_to.contig.id].suffix()) and \
                                 len(al.seg_from) > 500:
                     candidates.append(al)
+            for al1 in candidates:
+                for al2 in candidates:
+                    if al1 != al2 and al1.seg_to.contig == al2.seg_to.contig and len(al1.seg_from) < 1000 and len(al2.seg_from) < 1000:
+                        n_irrelevant += 1
+                        continue
             if len(candidates) == 0:
                 n_irrelevant += 1
                 continue

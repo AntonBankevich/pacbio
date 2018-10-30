@@ -61,6 +61,8 @@ class Polisher:
             for al in read.alignments:
                 if al.seg_to.contig.id == "base_start" and al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
                     base_conig = Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], "base")
+                    if len(base_conig) <len(best.cut()):
+                        continue
                     candidate = self.polishAndAnalyse(reads, base_conig, al.seg_to.right - pos_start + 100)
                     if len(candidate.cut()) > len(base_start) - pos_start + min_new_len: #len(candidate.cut()) is too slow
                         print "Final polishing base alignment:", al
