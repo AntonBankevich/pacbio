@@ -115,8 +115,7 @@ class EdgeResolver:
                 classifier.classifyReads(lines, uncertain)
                 return True, None
             if len(classified) == 0 and total_extention < 100 and jumped == 0:
-                if self.prolongAll(edge, lines) < 300:
-                    return False, None
+                return False, None
 
     def attemptJump(self, edge, line):
         # type: (Edge, Line) -> Optional[Edge]
@@ -132,7 +131,8 @@ class EdgeResolver:
         best = None
         print alignments.reads["tail"]
         for al in alignments.reads["tail"].alignments:
-            if len(al) > 300 and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
+            if (len(al) > 300 or (line.chain[-1].seg_to.contig == edge and line.chain[-1].seg_to.right> len(edge) - 100)) \
+                    and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
                 best = al
         if best is None:
             print "No jump"
@@ -314,7 +314,7 @@ class ReadClassifier:
         suffix_len = 10000
         for line in lines:
             suffix_len = min(len(line), suffix_len)
-        assert suffix_len > 5000
+        assert suffix_len > 1000
         shortened_lines = map(lambda line: Contig(line.seq[-suffix_len:], "short_" + str(line.id)), lines)
         lines_dict = dict()
         print "Aligning lines to lines"
