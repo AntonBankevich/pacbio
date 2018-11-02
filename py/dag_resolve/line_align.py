@@ -75,8 +75,8 @@ class Scorer:
         return prev.get(alignment[-1][1])
 
 
-    def score3(self, piece1, piece2, alignments):
-        # type: (AlignmentPiece, AlignmentPiece, list[AlignmentPiece]) -> Tuple[Optional[int], Optional[int], Optional[int]]
+    def score3(self, piece1, piece2):
+        # type: (AlignmentPiece, AlignmentPiece) -> Tuple[Optional[int], Optional[int], Optional[int]]
         pid1 = piece1.percentIdentity()
         pid2 = piece2.percentIdentity()
         # print "Percent identities:", pid1, pid2
@@ -100,7 +100,7 @@ class Scorer:
         # print matches2.matches
         # print "Line alignment:"
         # print map(str, alignments)
-        tmp_composite = composite.combine(map(lambda al: al.matchingSequence(), alignments)) # refactor
+        # tmp_composite = composite.combine(map(lambda al: al.matchingSequence(), alignments)) # refactor
         # print "Old scores:", self.score(matches1), self.score(matches2), self.score(tmp_composite)
         accurate1 = self.accurateScore(matches1)
         accurate2 = self.accurateScore(matches2)

@@ -251,9 +251,9 @@ class LineStorage:
         self.reads = ReadCollection(ContigCollection(self.lines))
         for read in self.g.reads:
             self.reads.addNewRead(read)
-        for line in self.lines:
-            for read in self.g.E[line.id].reads:
-                line.new_reads.append(self.reads[read.id])
+        # for line in self.lines:
+        #     for read in self.g.E[line.id].reads:
+        #         line.new_reads.append(self.reads[read.id])
 
     def getLine(self, eid):
         for line in self.lines:

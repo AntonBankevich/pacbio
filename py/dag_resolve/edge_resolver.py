@@ -4,14 +4,11 @@ from typing import Tuple, Optional, Dict
 
 from alignment.align_tools import Aligner, AlignedSequences
 from alignment.polishing import Polisher
-from common import basic
 from common.SeqIO import NamedSequence
-from dag_resolve import params
 from dag_resolve.line_align import Scorer
 from dag_resolve.line_tools import Line, LinePosition
-from dag_resolve.repeat_graph import Graph, Edge
-from dag_resolve.sequences import ReadCollection, ContigCollection, Segment, AlignedRead, Contig, AlignmentPiece, \
-    UniqueList
+from dag_resolve.repeat_graph import Graph, Edge, Vertex
+from dag_resolve.sequences import ReadCollection, ContigCollection, Segment, Contig, AlignmentPiece
 
 
 class EdgeResolver:
@@ -24,28 +21,60 @@ class EdgeResolver:
         self.prolonger = Prolonger(graph, aligner, polisher)
         self.reads = reads
 
-    def processUniqueEdge(self, edge, line):
-        # type: (Edge, Line) -> Optional[Edge]
-        print "Processing uniue line", line
-        line.reads.print_alignments(sys.stdout)
-        print "Relevent:"
-        line.reads.inter(line.suffix(-10000)).print_alignments(sys.stdout)
-        self.aligner.fixLineAlignments(line)
-        cut_pos = len(line)
-        for read in line.reads:
-            for al in read.alignments:
-                if al.seg_to.contig == line:
-                    cut_pos = max(cut_pos, al.seg_to.right)
-        if cut_pos < len(line):
-            print "Cutting last", len(line) - cut_pos, "nucleotides of line", line
-            line.cut(cut_pos)
-        self.prolonger.prolongConsensus(edge, line)
-        return self.attemptJump(edge, line)
+    # def processUniqueEdge(self, edge, line):
+    #     # type: (Edge, Line) -> Optional[Edge]
+    #     print "Processing uniue line", line
+    #     line.reads.print_alignments(sys.stdout)
+    #     print "Relevent:"
+    #     line.reads.inter(line.suffix(-10000)).print_alignments(sys.stdout)
+    #     self.aligner.fixLineAlignments(line)
+    #     cut_pos = len(line)
+    #     for read in line.reads:
+    #         for al in read.alignments:
+    #             if al.seg_to.contig == line:
+    #                 cut_pos = max(cut_pos, al.seg_to.right)
+    #     if cut_pos < len(line):
+    #         print "Cutting last", len(line) - cut_pos, "nucleotides of line", line
+    #         line.cut(cut_pos)
+    #     self.prolonger.prolongConsensus(edge, line)
+    #     return self.attemptJump(edge, line)
 
-
+    def resolveVertex(self, v, lines):
+        # type: (Vertex, list[Line]) -> list[Optional[Edge]]
+        uncertain = ReadCollection()
+        for edge in v.inc:
+            uncertain.extend(map(lambda read: self.reads[read.id], edge.reads))
+        uncertain = uncertain.minusAll([line.reads.inter(line.centerPos.suffix()) for line in lines])
+        positions = []
+        edges = []
+        for line in lines:
+            cur = len(line.chain) - 1
+            while cur > 0 and line.chain[cur].seg_to.contig not in v.inc:
+                cur -= 1
+            assert line.chain[cur].seg_to.contig in v.inc
+            edges.append(line.chain[cur].seg_to.contig)
+            while cur > 0 and line.chain[cur].seg_to.contig == line.chain[cur-1].seg_to.contig and line.chain[-1].precedes(line.chain[cur]):
+                cur -= 1
+            if cur >= 0:
+                positions.append(LinePosition(line, max(line.centerPos.pos, line.chain[cur - 1].seg_from.left)))
+            else:
+                positions.append(line.centerPos)
+        classifier = ReadClassifier(self.graph, self.aligner, lines, positions)
+        classifier.classifyReads(lines, uncertain)
+        res = []
+        for edge, line in zip(edges, lines):
+            if line.chain[-1].seg_to.contig not in v.out:
+                self.prolonger.prolongConsensus(edge, line)
+                res.append(self.attemptJump(edge, line))
+            else:
+                res.append(line.chain[-1].seg_to.contig)
+        return res
 
     def resolveEdge(self, edge, lines):
         # type: (Edge, list[Line]) -> Tuple[bool, Optional[Edge]]
+        if len(lines) == 0:
+            print "WARNING: EDGE", edge, "HAD ZERO LINES PASSING THROUGH IT!!!"
+            return True, None
         print "Resolving edge", edge, "into lines:", ", ".join(map(lambda line: str(line.id), lines))
         for line in lines:
             print line.__str__()
@@ -95,6 +124,7 @@ class EdgeResolver:
         shift = line.chain[-1].seg_from.right
         seq = line.seq[shift:]
         if len(seq) < 200:
+            print "Tail too short"
             return None
         alignments = ReadCollection(ContigCollection(edge.end.out))
         alignments.addNewRead(NamedSequence(seq, "tail"))
@@ -115,29 +145,29 @@ class EdgeResolver:
         print "Connected line", line, "to edge", best.seg_to.contig, "using alignment", best
         return best.seg_to.contig
 
-    def attemptReattach(self, line):
-        shift = line.chain[-1].seg_from.right
-        seq = line.seq[shift:]
-        if len(seq) < 1000:
-            return None
-        alignments = ReadCollection(ContigCollection(edge.end.out))
-        alignments.addNewRead(NamedSequence(seq, "tail"))
-        self.aligner.alignReadCollection(alignments)
-        best = None
-        print alignments.reads["tail"]
-        for al in alignments.reads["tail"].alignments:
-            if len(al) > 300 and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
-                best = al
-        if best is None:
-            print "No jump"
-            alignments = ReadCollection(ContigCollection(self.graph.E.values()))
-            alignments.addNewRead(NamedSequence(seq, "tail"))
-            self.aligner.alignReadCollection(alignments)
-            alignments.print_alignments(sys.stdout)
-            return None
-        line.addAlignment(AlignmentPiece(Segment(line, best.seg_from.left + shift, best.seg_from.right + shift), best.seg_to, best.cigar))
-        print "Connected line", line, "to edge", best.seg_to.contig, "using alignment", best
-        return best.seg_to.contig
+    # def attemptReattach(self, line):
+    #     shift = line.chain[-1].seg_from.right
+    #     seq = line.seq[shift:]
+    #     if len(seq) < 1000:
+    #         return None
+    #     alignments = ReadCollection(ContigCollection(edge.end.out))
+    #     alignments.addNewRead(NamedSequence(seq, "tail"))
+    #     self.aligner.alignReadCollection(alignments)
+    #     best = None
+    #     print alignments.reads["tail"]
+    #     for al in alignments.reads["tail"].alignments:
+    #         if len(al) > 300 and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
+    #             best = al
+    #     if best is None:
+    #         print "No jump"
+    #         alignments = ReadCollection(ContigCollection(self.graph.E.values()))
+    #         alignments.addNewRead(NamedSequence(seq, "tail"))
+    #         self.aligner.alignReadCollection(alignments)
+    #         alignments.print_alignments(sys.stdout)
+    #         return None
+    #     line.addAlignment(AlignmentPiece(Segment(line, best.seg_from.left + shift, best.seg_from.right + shift), best.seg_to, best.cigar))
+    #     print "Connected line", line, "to edge", best.seg_to.contig, "using alignment", best
+    #     return best.seg_to.contig
 
     def prolongAll(self, edge, lines):
         # type: (Edge, list[Line]) -> int
@@ -323,7 +353,7 @@ class ReadClassifier:
     def fight(self, c1, c2, line_aligns):
         # type: (AlignmentPiece, AlignmentPiece, Dict[Tuple[int, int], list[AlignmentPiece]]) -> Optional[AlignmentPiece]
         assert c1.seg_from.contig == c2.seg_from.contig
-        s1, s2, s12 = self.scorer.score3(c1, c2, line_aligns[(c1.seg_to.contig.id, c2.seg_to.contig.id)])
+        s1, s2, s12 = self.scorer.score3(c1, c2)
         if s12 is None:
             if s1 is None and s2 is not None:
                 print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c2

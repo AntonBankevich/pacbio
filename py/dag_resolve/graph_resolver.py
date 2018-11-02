@@ -41,14 +41,28 @@ class GraphResolver:
         # type: (Vertex) -> None
         self.printCurrentGraph([v], [], "Resolving vertex " + str(v.id))
         print "Resolving vertex", v.id, "inc:", map(str, v.inc), "out:", map(str, v.out)
+        lines = list(itertools.chain(*[self.lineStorage.edgeLines[edge.id] for edge in v.inc]))
+        resolved = self.edgeResolver.resolveVertex(v, lines)
+        for edge, line in zip(resolved, lines):
+            if edge is not None:
+                self.lineStorage.edgeLines[edge.id].append(line)
+        if None not in resolved:
+            print "Successfully resolved vertex", v
+            self.printCurrentGraph([v], [], "Successfully resolved vertex " + str(v))
+        else:
+            print "Failed to resolve vertex", v
+            print "WARNING: VERTEX WAS NOT RESOLVED"
+            print map(str, zip(map(str, resolved), map(str, lines)))
+            self.printCurrentGraph([v], [], "Failed to resolve vertex " + str(v))
+            return
         for edge in v.out:
             lines_list = self.lineStorage.getEdgeLines(edge)
             if len(lines_list) == 0:
                 print "No line entered edge " + str(edge.id) + ". Skipping vertex."
         for edge in v.out:
             print "Considering edge", edge
-            if edge.id in self.lineStorage.resolved_edges:
-                print "Encountered resolved edge. Skipping."
+            if edge.rc.id in self.lineStorage.resolved_edges:
+                print "Encountered edge resolved from opposite side. Skipping."
             elif edge.seq == basic.RC(edge.seq):
                 print "Encountered self-rc edge. Skipping"
             else:
@@ -56,12 +70,12 @@ class GraphResolver:
                 while edge is not None:
                     finished, new_edge = self.edgeResolver.resolveEdge(edge, lines_list)
                     if finished:
-                        self.lineStorage.resolved_edges.add(edge.id)
-                        self.lineStorage.resolved_edges.add(edge.rc.id)
+                        # self.lineStorage.resolved_edges.add(edge.id)
+                        # self.lineStorage.resolved_edges.add(edge.rc.id)
                         print "Successfully resolved edge", edge.id, "into", len(lines_list), "lines"
                         self.lineStorage.resolved_edges.add(edge.id)
-                        for line in lines_list:
-                            self.lineStorage.edgeLines[line.chain[-1].seg_to.contig.id].append(line)
+                        # for line in lines_list:
+                        #     self.lineStorage.edgeLines[line.chain[-1].seg_to.contig.id].append(line)
                         self.printCurrentGraph([], [edge], "Resolved edge " + str(edge.id))
                     else:
                         print "Failed to resolve edge", edge.id
@@ -75,12 +89,12 @@ class GraphResolver:
         self.graph.printToFile(sys.stdout)
         visited_vertices = set()
         print "Resolving unique edges"
-        for edge in self.graph.E.values():
-            if edge.info.unique:# and (len(edge.end.out) != 1 or len(edge.end.inc) != 1):
-                res = self.edgeResolver.processUniqueEdge(edge, self.lineStorage.getEdgeLines(edge)[0])
-                assert res is not None or len(edge.end.out) == 0
-                if res is not None:
-                    self.lineStorage.edgeLines[res.id].append(self.lineStorage.getEdgeLines(edge)[0])
+        # for edge in self.graph.E.values():
+        #     if edge.info.unique:# and (len(edge.end.out) != 1 or len(edge.end.inc) != 1):
+        #         # res = self.edgeResolver.processUniqueEdge(edge, self.lineStorage.getEdgeLines(edge)[0])
+        #         # assert res is not None or len(edge.end.out) == 0
+        #         # if res is not None:
+        #         self.lineStorage.edgeLines[res.id].append(self.lineStorage.getEdgeLines(edge)[0])
         while True:
             cnt = 0
             for v in self.graph.V.values():
@@ -93,7 +107,7 @@ class GraphResolver:
                     cnt += 1
             if cnt == 0:
                 break
-        Knotter(self.lineStorage).knotGraph()
+        Knotter(self.lineStorage, self.edgeResolver.aligner).knotGraph()
         self.printCurrentGraph([], [])
 
     # def printResults(self, handler):
