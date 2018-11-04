@@ -5,7 +5,7 @@ from typing import Optional
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO
 from dag_resolve import params
-from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection
+from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece
 from flye.polysh_job import JobPolishing
 
 
@@ -36,11 +36,14 @@ class Polisher:
             reliable_start = len(polishing_base)
         seq = Contig(self.polish(reads, polishing_base), "contig")
         res = [0] * (len(seq) + 1)
-        for rec in self.aligner.align(reads, ContigCollection([seq])):
-            if rec.is_unmapped or rec.pos > reliable_start or rec.rc:
-                continue
-            res[rec.pos - 1] += 1
-            res[rec.pos + rec.alen - 1] -= 1
+        alignment = ReadCollection(ContigCollection([seq])).extendClean(reads)
+        self.aligner.alignReadCollection(alignment)
+        for read in alignment:
+            for al in read.alignmentsTo(seq.asSegment()):# type: AlignmentPiece
+                if al.seg_to.left > reliable_start or al.contradicting(seq.asSegment()):
+                    continue
+                res[al.seg_to.left] += 1
+                res[al.seg_to.right] -= 1
         for i in range(1, len(res)):
             res[i] += res[i - 1]
         return Consensus(seq.seq, res)
