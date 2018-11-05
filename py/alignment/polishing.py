@@ -38,14 +38,23 @@ class Polisher:
         res = [0] * (len(seq) + 1)
         alignment = ReadCollection(ContigCollection([seq])).extendClean(reads)
         self.aligner.alignReadCollection(alignment)
+        contra = 0
+        ok = 0
+        late = 0
         for read in alignment:
             for al in read.alignmentsTo(seq.asSegment()):# type: AlignmentPiece
                 if al.seg_to.left > reliable_start or al.contradicting(seq.asSegment()):
+                    if al.contradicting(seq.asSegment()):
+                        contra += 1
+                    else:
+                        late += 1
                     continue
                 res[al.seg_to.left] += 1
                 res[al.seg_to.right] -= 1
+                ok += 1
         for i in range(1, len(res)):
             res[i] += res[i - 1]
+        print "Polyshed and analysed using", len(alignment), reads, "Ok:", ok, "late:", late, "contra:", contra
         return Consensus(seq.seq, res)
 
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 3000):
