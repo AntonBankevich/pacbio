@@ -217,8 +217,10 @@ class LinePosition:
         return self.pos is not None
 
     def fireExtendLeft(self, l):
+        print "Changing position. Old:", self.line.id, self.pos
         if self.valid():
             self.pos += l
+        print "Changed position. New:", self.line.id, self.pos
 
     def fireExtendRight(self, l):
         pass
