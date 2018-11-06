@@ -55,7 +55,7 @@ class EdgeResolver:
             edges.append(line.chain[cur].seg_to.contig)
             while cur > 0 and line.chain[cur].seg_to.contig == line.chain[cur-1].seg_to.contig and line.chain[-1].precedes(line.chain[cur]):
                 cur -= 1
-            if cur >= 0:
+            if cur > 0:
                 positions.append(LinePosition(line, max(line.centerPos.pos, line.chain[cur - 1].seg_from.left)))
             else:
                 positions.append(line.centerPos)
@@ -314,7 +314,7 @@ class ReadClassifier:
         suffix_len = 10000
         for line in lines:
             suffix_len = min(len(line), suffix_len)
-        assert suffix_len > 1000
+        assert suffix_len > 100
         shortened_lines = map(lambda line: Contig(line.seq[-suffix_len:], "short_" + str(line.id)), lines)
         lines_dict = dict()
         print "Aligning lines to lines"
