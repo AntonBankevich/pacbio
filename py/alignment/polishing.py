@@ -54,7 +54,7 @@ class Polisher:
                 ok += 1
         for i in range(1, len(res)):
             res[i] += res[i - 1]
-        print "Polyshed and analysed using", len(alignment), reads, "Ok:", ok, "late:", late, "contra:", contra
+        print "Polyshed and analysed using", len(alignment), "reads. Ok:", ok, "late:", late, "contra:", contra
         return Consensus(seq.seq, res)
 
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 3000):
