@@ -189,10 +189,8 @@ class LinePosition:
         self.pos = pos
         self.line.listeners.append(self)
         self.invalidateOnCut = invalidateOnCut
-        print "Line position:", line.id, pos
 
     def fireCutRight(self, pos):
-        print "Changing position. Old:", self.line.id, self.pos
         if self.pos is None:
             return
         if self.pos > pos:
@@ -200,39 +198,34 @@ class LinePosition:
                 self.pos = None
             else:
                 self.pos = pos
-        print "Changed position. New:", self.line.id, self.pos
 
     def fireCutLeft(self, pos):
-        print "Changing position. Old:", self.line.id, self.pos
         if self.pos is None:
             return
         if self.pos < pos:
             if self.invalidateOnCut:
                 self.pos = None
             else:
-                self.pos = max(0, self.pos - pos)
-        print "Changed position. New:", self.line.id, self.pos
+                self.pos = 0
+        else:
+            self.pos = self.pos - pos
 
     def valid(self):
         return self.pos is not None
 
     def fireExtendLeft(self, l):
-        print "Changing position. Old:", self.line.id, self.pos
         if self.valid():
             self.pos += l
-        print "Changed position. New:", self.line.id, self.pos
 
     def fireExtendRight(self, l):
         pass
 
     def suffix(self):
         assert self.valid()
-        print "Suffix:", self.line.id, self.pos
         return self.line.suffix(self.pos)
 
     def prefix(self):
         assert self.valid()
-        print "Prefix:", self.line.id, self.pos
         return self.line.prefix(self.pos)
 
     def close(self):
