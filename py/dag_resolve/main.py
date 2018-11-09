@@ -94,10 +94,13 @@ def main(argv):
         indir = indir[:-1]
     edges = ParseEdges(argv[2])
     dir = argv[3]
-    edge_sequences = os.path.join(indir, "2-repeat", "graph_final.fasta")
-    dot_file = os.path.join(indir, "2-repeat", "graph_final.dot")
+    stage_name = "graph_final"
+    if params.use_unresolved:
+        stage_name = "graph_before_rr"
+    edge_sequences = os.path.join(indir, "2-repeat", stage_name + ".fasta")
+    dot_file = os.path.join(indir, "2-repeat", stage_name + ".dot")
     if not os.path.isfile(dot_file):
-        dot_file = os.path.join(indir, "2-repeat", "graph_final.gv")
+        dot_file = os.path.join(indir, "2-repeat", stage_name + ".gv")
     reads_file = os.path.join(indir, os.path.split(indir)[1] + ".fasta")
     relevant_reads = os.path.join(indir, "2-repeat", "repeats_dump.txt")
     basic.ensure_dir_existance(dir)
@@ -128,8 +131,9 @@ def main(argv):
     alignment = al.align(reads, ContigCollection(UniqueList(graph.E.values())))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
-    relevant = graph.fillRelevant(relevant_reads, reads)
-    sys.stdout.write("Added " + str(relevant) + " reads\n")
+    if not params.use_unresolved:
+        relevant = graph.fillRelevant(relevant_reads, reads)
+        sys.stdout.write("Added " + str(relevant) + " reads\n")
     sys.stdout.write("Resolving repeats\n")
     picture_dir = os.path.join(dir, "pictures")
     basic.recreate(picture_dir)

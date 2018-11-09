@@ -7,6 +7,7 @@ num_iters = 2
 min_reads_in_knot = 2
 min_expected_Pacbio_PI = 0.78
 min_allowed_Pacbio_PI = 0.7
+use_unresolved = True
 
 class Scores:
     ins_score = 8
