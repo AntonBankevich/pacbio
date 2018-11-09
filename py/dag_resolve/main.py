@@ -117,7 +117,7 @@ if __name__ == "__main__":
     sys.stdout.write("Resolving repeats\n")
     picture_dir = os.path.join(dir, "pictures")
     basic.recreate(picture_dir)
-    lineStorage = LineStorage(graph)
+    lineStorage = LineStorage(graph, al)
     res = GraphResolver(graph, picture_dir, lineStorage, EdgeResolver(graph, al, polisher, lineStorage.reads))
     res.resolve()
     sys.stdout.write("Printing results\n")

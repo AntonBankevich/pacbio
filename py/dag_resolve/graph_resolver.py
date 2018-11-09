@@ -107,6 +107,15 @@ class GraphResolver:
                     cnt += 1
             if cnt == 0:
                 break
+        for v in self.graph.V.values():# Aligning reads to remaining lines
+            if v.id in visited_vertices:
+                continue
+            for edge in v.inc:
+                if not edge.info.unique:
+                    continue
+                line = self.lineStorage.edgeLines[edge.id][0]
+                line.addReads([self.lineStorage.reads[read.id] for read in edge.reads])
+                line.fixLineAlignments([self.lineStorage.reads[read.id] for read in edge.reads])
         Knotter(self.lineStorage, self.edgeResolver.aligner).knotGraph()
         self.printCurrentGraph([], [])
 

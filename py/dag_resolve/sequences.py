@@ -144,7 +144,7 @@ class Segment:
 
     def inter(self, other):
         # type: (Segment) -> bool
-        return self.contig.id == other.contig.id and not (self.right < other.left or self.left > other.right)
+        return self.contig.id == other.contig.id and not (self.right <= other.left or self.left >= other.right)
 
     def contains(self, other):
         # type: (Segment) -> bool

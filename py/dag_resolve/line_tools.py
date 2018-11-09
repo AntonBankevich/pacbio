@@ -1,5 +1,6 @@
-from typing import Generator, Dict, Set, Optional
+from typing import Generator, Dict, Set, Optional, Iterable
 
+from alignment.align_tools import Aligner
 from common import basic
 from common.SeqIO import NamedSequence
 from dag_resolve.phasing import Phasing
@@ -43,24 +44,25 @@ from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigColle
 
 
 class Line(Contig):
-    def __init__(self, edge, rc = None):
-        # type: (Edge, Optional[Line]) -> None
+    def __init__(self, edge, aligner, rc = None):
+        # type: (Edge, Aligner, Optional[Line]) -> None
         assert edge.info.unique
         self.reads = None # type: ReadCollection
         self.rc = None # type: Line
         self.knot = None # type: Knot
         self.id = edge.id
         if rc is None:
-            rc = Line(edge.rc, self)
+            rc = Line(edge.rc, aligner, self)
         self.rc = rc # type: Line
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
         Contig.__init__(self, edge.seq, edge.id, None, self.rc)
         self.chain = [AlignmentPiece(self.asSegment(), edge.asSegment(), "=")] # type: list[AlignmentPiece]
         self.reads = ReadCollection(ContigCollection([self]))
-        self.new_reads = [] # type: list[AlignedRead]
+        self.invalidated_reads = [] # type: list[AlignedRead]
         self.listeners = []
         self.centerPos = LinePosition(self, len(edge) / 2)
         self.discarded = []
+        self.aligner = aligner
 
     def setConsensus(self, consensus):
         self.consensus = consensus
@@ -68,51 +70,42 @@ class Line(Contig):
         self.rc.consensus = consensus.RC()
         self.rc.seq = self.rc.consensus.seq
 
-    def cut(self, pos):
-        self.extendRight(Consensus("", []), pos)
-
     def extendRight(self, consensus, pos = None):
         # type: (Consensus, Optional[int]) -> None
         if pos is None:
             pos = len(self.seq)
         elif pos < 0:
             pos = len(self.seq) + pos
-        # assert pos >= self.centerPos.pos
+        assert pos >= self.centerPos.pos
         if pos != len(self.seq):
-            self.notifyCutRight(pos)
-            self.rc.notifyCutLeft(len(self) - pos)
+            self.notifyCutRightBefore(pos)
+            cut_len = len(self) - pos
+            self.notifyCutLeftBefore(cut_len)
+            self.setConsensus(self.consensus.cut(length=pos))
+            assert len(self) == pos
+            self.notifyCutRightAfter(pos)
+            self.rc.notifyCutLeftAfter(cut_len)
         if len(consensus) != 0:
-            self.notifyExtendRight(len(consensus))
-            self.rc.notifyExtendLeft(len(consensus))
-        old_len = len(self)
-        self.setConsensus(self.consensus.merge(consensus, pos))
-        for read in self.rc.reads:
-            for al in read.alignments:
-                if al.seg_to.contig == self.rc:
-                    al.seg_to = al.seg_to.shift(len(self) - old_len)
-        self.invalidateReadsAfter(max(self.centerPos.pos, pos - 500))
-        self.cutAlignments(pos)
-        self.fixRC()
-
-    def fixRC(self):
-        self.rc.seq = basic.RC(self.seq)
-        self.rc.chain = [al.RC() for al in self.chain[::-1]]
+            self.rc.notifyExtendLeftBefore(len(consensus))
+            self.notifyExtendRightBefore(len(consensus))
+            self.setConsensus(self.consensus.merge(consensus))
+            self.rc.notifyExtendLeftAfter(len(consensus))
+            self.notifyExtendRightAfter(len(consensus))
 
     def addRead(self, read):
         # type: (AlignedRead) -> None
         self.reads.add(read)
         self.rc.reads.add(read.rc)
 
-    def invalidateReadsAfter(self, pos):
-        assert pos >= self.centerPos.pos
-        for read in self.reads.inter(self.suffix(pos)):
-            self.invalidateRead(read, self.suffix(pos))
+    def addReads(self, reads):
+        # type: (Iterable[AlignedRead]) -> None
+        for read in reads:
+            self.addRead(read)
 
-    def invalidateRead(self, read, seg):
-        # type: (AlignedRead, Segment) -> None
-        read.invalidate(seg)
-        self.new_reads.append(read)
-        # self.rc.new_reads.append(read.rc)
+    def invalidateRead(self, read):
+        # type: (AlignedRead) -> None
+        read.invalidate(self.centerPos.suffix())
+        self.invalidated_reads.append(read)
 
     def removeRead(self, read):
         # type: (AlignedRead) -> None
@@ -120,7 +113,7 @@ class Line(Contig):
         self.reads.remove(read)
         self.rc.reads.remove(read.rc)
         self.discarded.append(read)
-        self.rc.discarded.append(read)
+        self.rc.discarded.append(read.rc)
 
     def cutAlignments(self, pos):
         while len(self.chain) > 0 and self.chain[-1].seg_from.right > pos:
@@ -131,7 +124,7 @@ class Line(Contig):
                 self.chain[-1] = AlignmentPiece(matchingSequence.SegFrom(self),
                                                 matchingSequence.SegTo(self.chain[-1].seg_to.contig),
                                                 matchingSequence.cigar())
-        self.fixRC()
+        self.rc.chain = [al.RC() for al in self.chain[::-1]]
 
     def addAlignment(self, piece):
         self.cutAlignments(piece.seg_from.left)
@@ -139,17 +132,10 @@ class Line(Contig):
             self.chain[-1] = self.chain[-1].merge(piece)
         else:
             self.chain.append(piece)
-        self.fixRC()
+        self.rc.chain = [al.RC() for al in self.chain[::-1]]
 
     def isSimpleLoop(self):
         return self.knot is not None and len(self.chain) == 1 and len(self.rc.chain) == 1 and self.knot.line2.rc.id == self.id
-
-    # def freezeTail(self):
-    #     tail_seq = self.tail.alignment.alignedSequence()
-    #     new_segment = LineSegment(self, self.chain[-1].pos + 1, self.tail.edge, tail_seq,
-    #                               self.tail.phasing, self.tail.reads)
-    #     self.chain.append(new_segment)
-    #     self.tail = None
 
     def findEdge(self, edge):
         # type: (Edge) -> Generator[AlignmentPiece]
@@ -161,25 +147,121 @@ class Line(Contig):
         return "Line:" + str(self.id) + "(" + str(len(self)) + "," + str(self.chain[-1].seg_from.right) + \
                "):[" + ",".join(map(str, self.chain)) + "]"
 
-    # def rcStr(self):
-    #     return "[" + ",".join(map(lambda seg: str(seg.edge.rc.id), self.chain[::-1])) + "]"
+    def fixLineAlignments(self, additional_reads = None):
+        # type: (Optional[list[AlignedRead]]) -> None
+        if additional_reads is not None:
+            self.invalidated_reads.extend(additional_reads)
+        print "Fixing alignments."
+        to_fix = ReadCollection(ContigCollection([Contig(self.centerPos.suffix().Seq(), "half")]))
+        to_fix.extendClean(self.invalidated_reads)
+        new_new_reads = []
+        self.aligner.alignReadCollection(to_fix)
+        seg_dict = {"half": self.centerPos.suffix()}
+        to_fix.contigsAsSegments(seg_dict)
+        to_fix_center = []
+        for read in self.invalidated_reads: # type: AlignedRead
+            if read.inter(self.centerPos.suffix()):
+                continue
+            aligned_read = to_fix[read.id]
+            has_contradicting = False
+            noncontradicting_al = None
+            has_center = False
+            for al in aligned_read.alignmentsTo(self.asSegment()):
+                if not al.contradicting(self.asSegment()):
+                    noncontradicting_al = al
+                elif not al.contradicting(self.centerPos.suffix()):
+                    has_center = True
+                else:
+                    has_contradicting = True
+            if noncontradicting_al is not None:
+                if noncontradicting_al.seg_to.left - noncontradicting_al.seg_from.left < self.centerPos.pos:
+                    to_fix_center.append(read)
+                else:
+                    print "Adding read", read, "to line", self, "with alignment", noncontradicting_al
+                    assert read in self.reads
+                    print "Adding read-to-line alignment", noncontradicting_al.changeQuery(read)
+                    read.addAlignment(noncontradicting_al.changeQuery(read))
+            else:
+                if has_contradicting:
+                    print "REMOVING READ!!!", aligned_read, "since it only has contradicting alignments to the line"
+                    self.removeRead(read)
+                elif has_center:
+                    to_fix_center.append(read)
+                else:
+                    new_new_reads.append(read)
+        self.invalidated_reads = new_new_reads
+        if len(to_fix_center) == 0:
+            return
+        to_fix = ReadCollection(ContigCollection([self]))
+        to_fix.extendClean(to_fix_center)
+        self.aligner.alignReadCollection(to_fix)
+        for read in to_fix_center:
+            aligned_read = to_fix[read.id]
+            has_contradicting = False
+            noncontradicting_al = None
+            for al in aligned_read.alignmentsTo(self.asSegment()):
+                if not al.contradicting(self.asSegment()):
+                    noncontradicting_al = al
+                else:
+                    has_contradicting = True
+            if noncontradicting_al is not None:
+                print "Adding read", read, "to line", self, "with alignment", noncontradicting_al
+                assert read in self.reads
+                print "Adding read-to-line alignment", noncontradicting_al.changeQuery(read)
+                read.addAlignment(noncontradicting_al.changeQuery(read))
+            else:
+                if has_contradicting:
+                    print "REMOVING READ!!!", aligned_read, "since it only has contradicting alignments to the line"
+                    self.removeRead(read)
 
-    def notifyExtendLeft(self, l):
+
+    def notifyExtendLeftBefore(self, l):
         for listener in self.listeners:
-            listener.fireExtendLeft(l)
+            listener.fireExtendLeftBefore(l)
 
-    def notifyCutRight(self, pos):
+    def notifyExtendLeftAfter(self, l):
         for listener in self.listeners:
-            listener.fireCutRight(pos)
+            listener.fireExtendLeftAfter(l)
+        for read in self.reads:
+            for al in read.alignments:
+                if al.seg_to.contig == self:
+                    al.seg_to = al.seg_to.shift(l)
+        self.chain = [al.RC() for al in self.rc.chain[::-1]]
 
-    def notifyExtendRight(self, l):
+    def notifyCutRightBefore(self, pos):
         for listener in self.listeners:
-            listener.fireExtendRight(l)
+            listener.fireCutRightBefore(pos)
+        for read in self.reads.inter(self.suffix(pos)):
+            self.invalidateRead(read)
 
-
-    def notifyCutLeft(self, pos):
+    def notifyCutRightAfter(self, pos):
         for listener in self.listeners:
-            listener.fireCutLeft(pos)
+            listener.fireCutRightAfter(pos)
+        self.cutAlignments(pos)
+
+    def notifyExtendRightBefore(self, l):
+        for listener in self.listeners:
+            listener.fireExtendRightBefore(l)
+
+    def notifyExtendRightAfter(self, l):
+        for listener in self.listeners:
+            listener.fireExtendRightAfter(l)
+        self.fixLineAlignments()
+
+    def notifyCutLeftBefore(self, pos):
+        for listener in self.listeners:
+            listener.fireCutLeftBefore(pos)
+
+    def notifyCutLeftAfter(self, pos):
+        for listener in self.listeners:
+            listener.fireCutLeftAfter(pos)
+        # print "CutLeftAfter. Position:", pos
+        for read in self.reads:
+            # print read
+            for al in read.alignments:
+                if al.seg_to.contig == self:
+                    # print al
+                    al.seg_to = al.seg_to.shift(-pos)
 
 
 class LinePosition:
@@ -190,7 +272,10 @@ class LinePosition:
         self.line.listeners.append(self)
         self.invalidateOnCut = invalidateOnCut
 
-    def fireCutRight(self, pos):
+    def fireCutRightBefore(self, pos):
+        pass
+
+    def fireCutRightAfter(self, pos):
         if self.pos is None:
             return
         if self.pos > pos:
@@ -199,7 +284,10 @@ class LinePosition:
             else:
                 self.pos = pos
 
-    def fireCutLeft(self, pos):
+    def fireCutLeftBefore(self, pos):
+        pass
+
+    def fireCutLeftAfter(self, pos):
         if self.pos is None:
             return
         if self.pos < pos:
@@ -213,11 +301,17 @@ class LinePosition:
     def valid(self):
         return self.pos is not None
 
-    def fireExtendLeft(self, l):
+    def fireExtendLeftBefore(self, l):
+        pass
+
+    def fireExtendLeftAfter(self, l):
         if self.valid():
             self.pos += l
 
-    def fireExtendRight(self, l):
+    def fireExtendRightBefore(self, l):
+        pass
+
+    def fireExtendRightAfter(self, l):
         pass
 
     def suffix(self):
@@ -232,8 +326,8 @@ class LinePosition:
         self.line.listeners.remove(self)
 
 class LineStorage:
-    def __init__(self, g):
-        # type: (Graph) -> LineStorage
+    def __init__(self, g, aligner):
+        # type: (Graph, Aligner) -> LineStorage
         self.g = g
         self.lines = [] #type: list[Line]
         self.edgeLines = dict() # type: Dict[str, list[Line]]
@@ -245,7 +339,7 @@ class LineStorage:
                 assert edge2.info.unique
                 self.resolved_edges.add(edge1.id)
                 self.resolved_edges.add(edge2.id)
-                line = Line(edge1)
+                line = Line(edge1, aligner)
                 self.edgeLines[edge1.id].append(line)
                 self.edgeLines[edge2.id].append(line.rc)
                 self.lines.append(line)

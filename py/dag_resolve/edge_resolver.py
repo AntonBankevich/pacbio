@@ -21,24 +21,6 @@ class EdgeResolver:
         self.prolonger = Prolonger(graph, aligner, polisher)
         self.reads = reads
 
-    # def processUniqueEdge(self, edge, line):
-    #     # type: (Edge, Line) -> Optional[Edge]
-    #     print "Processing uniue line", line
-    #     line.reads.print_alignments(sys.stdout)
-    #     print "Relevent:"
-    #     line.reads.inter(line.suffix(-10000)).print_alignments(sys.stdout)
-    #     self.aligner.fixLineAlignments(line)
-    #     cut_pos = len(line)
-    #     for read in line.reads:
-    #         for al in read.alignments:
-    #             if al.seg_to.contig == line:
-    #                 cut_pos = max(cut_pos, al.seg_to.right)
-    #     if cut_pos < len(line):
-    #         print "Cutting last", len(line) - cut_pos, "nucleotides of line", line
-    #         line.cut(cut_pos)
-    #     self.prolonger.prolongConsensus(edge, line)
-    #     return self.attemptJump(edge, line)
-
     def resolveVertex(self, v, lines):
         # type: (Vertex, list[Line]) -> list[Optional[Edge]]
         uncertain = ReadCollection()
@@ -76,9 +58,6 @@ class EdgeResolver:
             print "WARNING: EDGE", edge, "HAD ZERO LINES PASSING THROUGH IT!!!"
             return True, None
         print "Resolving edge", edge, "into lines:", ", ".join(map(lambda line: str(line.id), lines))
-        for line in lines:
-            print line.__str__()
-            self.aligner.fixLineAlignments(line)
         positions = []
         for line in lines:
             cur = len(line.chain) - 1
@@ -196,7 +175,7 @@ class Prolonger:
         # type: (Edge, Line) -> int
         print "Prolonging line", line
         step_back = min(5000, len(line))
-        overlap = min(1000, step_back)
+        overlap = min(1000, step_back, len(line) - line.centerPos.pos)
         base_consensus = line.seq[-step_back:]
         # print "inter", line, len(line)
         # line.reads.inter(line.suffix(-step_back)).print_alignments(sys.stdout)
@@ -217,7 +196,6 @@ class Prolonger:
                     break
         old_len = len(line)
         line.extendRight(newConsensus, -overlap)
-        self.aligner.fixLineAlignments(line)
         alignments = ReadCollection(ContigCollection([edge])) # alignments to previous edges may become corrupted!!!
         read = alignments.addNewRead(NamedSequence(newConsensus.seq, "tail"))
         self.aligner.alignReadCollection(alignments)

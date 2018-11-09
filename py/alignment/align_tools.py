@@ -2,8 +2,6 @@ import itertools
 import os
 import sys
 
-from dag_resolve.line_tools import Line
-
 sys.path.append("py")
 from common.SeqIO import NamedSequence
 from flye.alignment import make_alignment
@@ -328,37 +326,6 @@ class Aligner:
         for read in reads_collection:
             read.clean()
         self.alignReadCollection(reads_collection)
-
-    def fixLineAlignments(self, line):
-        # type: (Line) -> None
-        print "Fixing alignments."
-        to_fix = ReadCollection(ContigCollection([Contig(line.centerPos.suffix().Seq(), "half")]))
-        to_fix.extendClean(line.new_reads)
-        self.alignReadCollection(to_fix)
-        seg_dict = {"half": line.centerPos.suffix()}
-        to_fix.contigsAsSegments(seg_dict)
-        for read in line.new_reads:
-            aligned_read = to_fix[read.id]
-            has_contradicting = False
-            has_noncontradicting = False
-            for al in aligned_read.alignments:
-                if al.seg_to.contig == line:
-                    if not al.contradicting(line.asSegment()):
-                        print "Adding read", read, "to line", line, "with alignment", al
-                        line.addRead(read)
-                        print "Adding read-to-line alignment", al.changeQuery(read)
-                        read.addAlignment(al.changeQuery(read))
-                        has_noncontradicting = True
-                    else:
-                        has_contradicting = True
-            if has_contradicting and not has_noncontradicting:
-                print "REMOVING READ!!!", aligned_read, "since it only has contradicting alignments to the line"
-                line.removeRead(read)
-        line.new_reads = []
-        for read in line.rc.new_reads:
-            if read.rc.id in to_fix.reads:
-                line.rc.addRead(read)
-
 
     # def fixExtendedLine(self, line):
     #     # type: (Line) -> None
