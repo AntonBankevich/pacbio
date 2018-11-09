@@ -4,7 +4,7 @@ radius = 8
 alignment_correction_radius = 4
 full_stats = False
 num_iters = 2
-min_reads_in_knot = 3
+min_reads_in_knot = 2
 min_expected_Pacbio_PI = 0.78
 min_allowed_Pacbio_PI = 0.7
 
