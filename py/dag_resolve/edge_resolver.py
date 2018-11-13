@@ -242,9 +242,8 @@ class ReadClassifier:
             candidates = []
             for al in read.alignments:
                 if al.seg_to.contig in self.lines and \
-                        not al.contradicting(al.seg_to.contig.asSegment()) and \
-                        al.seg_to.inter(self.positions[al.seg_to.contig.id].suffix()) and \
-                                len(al.seg_from) > 500:
+                        al.seg_from.left < 500 and len(al.seg_from) > 700 and \
+                        al.seg_to.inter(self.positions[al.seg_to.contig.id].suffix()):
                     candidates.append(al)
             for al1 in candidates:
                 for al2 in candidates:
@@ -255,7 +254,7 @@ class ReadClassifier:
                 n_irrelevant += 1
                 continue
             print "Classifying read", read, "Initial:", reads[read.id]
-            print "Candidates:", map(str, candidates)
+            print "Candidates:", map(lambda al: str(al) + "-" + str(al.contradicting(al.seg_to.contig.asSegment())), candidates)
             has_active_choice = False
             for candidate in candidates:
                 if candidate.seg_to.contig in active:

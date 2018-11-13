@@ -807,8 +807,10 @@ class AlignmentPiece:
         res = len(list(self.matchingPositions(True)))
         return float(res) / max(len(self.seg_from), len(self.seg_to))
 
-    def contradicting(self, seg):
+    def contradicting(self, seg = None):
         # type: (Segment) -> bool
+        if seg is None:
+            return self.seg_to.contig.asSegment()
         if not self.seg_to.inter(seg):
             return False
         return not ((self.seg_from.left < 500 or self.seg_to.left < seg.left + 500) and

@@ -82,9 +82,9 @@ class Scorer:
         # print "Percent identities:", pid1, pid2
         if pid1 < params.min_expected_Pacbio_PI and pid2 < params.min_expected_Pacbio_PI:
             return None, None, None
-        if pid1 < params.min_allowed_Pacbio_PI:
+        if pid1 < params.min_allowed_Pacbio_PI or (piece1.contradicting() and piece2.seg_from.right > piece1.seg_from.right + 500):
             return None, self.score(piece2.matchingSequence()), None
-        if pid2 < params.min_allowed_Pacbio_PI:
+        if pid2 < params.min_allowed_Pacbio_PI or (piece2.contradicting() and piece1.seg_from.right > piece2.seg_from.right + 500):
             return self.score(piece1.matchingSequence()), None, None
         matches1 = piece1.matchingSequence()
         matches2 = piece2.matchingSequence()
