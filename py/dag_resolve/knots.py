@@ -68,6 +68,8 @@ class Knotter:
             return False
 
     def knotGraph(self):
+        for line in self.storage.lines:
+            print "Line center:", line, len(line), line.centerPos.pos, line.rc.centerPos.pos, len(line.reads.inter(line.centerPos.suffix())), len(line.reads.inter(line.centerPos.prefix()))
         print "Knotting lines"
         for line1 in self.storage.lines:
             for line2 in self.storage.lines:

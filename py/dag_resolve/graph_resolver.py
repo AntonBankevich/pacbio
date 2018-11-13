@@ -22,10 +22,16 @@ class GraphResolver:
         self.lineStorage = lineStorage
         self.edgeResolver = edgeResolver
         self.printer = DotPrinter(self.graph)
-        self.printer.edge_colorings.append(FilterColoring(lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is None, "black"))
-        self.printer.edge_colorings.append(FilterColoring(lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is not None, "brown"))
-        self.printer.edge_colorings.append(FilterColoring(lambda e: not e.info.unique and e.id in self.lineStorage.resolved_edges, "green"))
-        self.printer.edge_colorings.append(FilterColoring(lambda e: not e.info.unique and e.id not in self.lineStorage.resolved_edges, "blue"))
+        self.printer.edge_colorings.append(FilterColoring(
+            lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is None, "black"))
+        self.printer.edge_colorings.append(FilterColoring(
+            lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is not None, "brown"))
+        self.printer.edge_colorings.append(FilterColoring(
+            lambda e: not e.info.unique and e.id in self.lineStorage.resolved_edges, "green"))
+        self.printer.edge_colorings.append(FilterColoring(
+            lambda e: not e.info.unique and e.rc.id in self.lineStorage.resolved_edges, "cyan"))
+        self.printer.edge_colorings.append(FilterColoring(
+            lambda e: not e.info.unique and e.id not in self.lineStorage.resolved_edges and e.rc.id not in self.lineStorage.resolved_edges, "blue"))
         # self.printer.edge_colorings.append(FilterColoring(lambda e: abs(e.id) >= 6000, "red"))
         self.cur_picture = 1
 
