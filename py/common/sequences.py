@@ -1,7 +1,8 @@
 import itertools
 import sys
 
-from common.SeqIO import NamedSequence
+import common.seq_records
+from common.seq_records import NamedSequence
 from dag_resolve import params
 
 sys.path.append("py")
@@ -402,7 +403,7 @@ class ReadCollection:
                 addRC = False
                 addStraight = False
                 assert seq is not None, last[0].query_name + " " + str(len(last))
-                new_read = AlignedRead(SeqIO.SeqRecord(seq, last[0].query_name))
+                new_read = AlignedRead(common.seq_records.SeqRecord(seq, last[0].query_name))
                 for rec in last: #type: sam_parser.SAMEntryInfo
                     if rec.is_unmapped:
                         continue
@@ -502,7 +503,7 @@ class ReadCollection:
     def asSeqRecords(self):
         # type: () -> Generator[SeqIO.SeqRecord]
         for read in self.reads.values():
-            yield SeqIO.SeqRecord(read.seq, read.id)
+            yield common.seq_records.SeqRecord(read.seq, read.id)
 
     def loadFromFasta(self, handler):
         # type: (BinaryIO) -> ReadCollection

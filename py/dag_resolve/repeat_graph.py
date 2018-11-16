@@ -1,6 +1,6 @@
 from common import basic, sam_parser, SeqIO
 from typing import Generator, Dict, Optional, Tuple, BinaryIO
-from dag_resolve.sequences import Contig, ReadCollection, ContigCollection, TmpInfo
+from common.sequences import Contig, ReadCollection, ContigCollection, TmpInfo
 
 
 class EdgeInfo(TmpInfo):
@@ -39,7 +39,7 @@ class Vertex:
 
 class Edge(Contig):
     def __init__(self, id, start, end, consensus, info, rc = None):
-        # type: (str, Vertex, Vertex, str, EdgeInfo) -> Edge
+        # type: (str, Vertex, Vertex, str, EdgeInfo, Optional[Edge]) -> Edge
         self.start = start
         self.end = end
         start.out.append(self)
@@ -109,19 +109,19 @@ class Graph:
         return edge
 
     def splitEdge(self, edge, pos_list):
-        # type: (Edge, list[int]) -> list
+        # type: (Edge, list[int]) -> list[Vertex]
         print "Splitting edge", edge.id, "at positions", pos_list
         pos_list.append(0)
         pos_list.append(len(edge))
         pos_ind = sorted([(pos, i) for i, pos in enumerate(pos_list)])
-        groups = [[pos_ind[0]]]
+        groups = [[pos_ind[0]]] # type: list[list[Tuple[int, int]]]
         prev = pos_ind[0][0]
         for pos, ind in pos_ind[1:]:
             if pos - prev > 500:
                 groups.append([])
             groups[-1].append((pos, ind))
             prev = pos
-        res = [None] * (len(pos_list))
+        res = [None] * (len(pos_list)) # type: list[Optional[Vertex]]
         assert len(groups) >= 2
         if len(groups) == 2:
             for pos, ind in groups[0]:

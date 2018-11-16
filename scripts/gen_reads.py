@@ -1,5 +1,8 @@
 import sys
 import os
+
+import common.seq_records
+
 sys.path.append("py")
 import common.SeqIO as SeqIO
 
@@ -14,6 +17,6 @@ for seq in SeqIO.parse_fasta(open(sys.argv[1], "r")):
         if i > cur:
             sys.stderr.write(str(cur) + "\n")
             cur = cur * 3 / 2
-        SeqIO.write(SeqIO.SeqRecord(seq.seq[i:min(len(seq), i + read_len)], seq.id +"_" + str(i)), sys.stdout, "fasta")
+        SeqIO.write(common.seq_records.SeqRecord(seq.seq[i:min(len(seq), i + read_len)], seq.id + "_" + str(i)), sys.stdout, "fasta")
     break
 

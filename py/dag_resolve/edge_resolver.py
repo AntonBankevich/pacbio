@@ -2,13 +2,13 @@ import sys
 import itertools
 from typing import Tuple, Optional, Dict
 
-from alignment.align_tools import Aligner, AlignedSequences
+from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
-from common.SeqIO import NamedSequence
+from common.seq_records import NamedSequence
 from dag_resolve.line_align import Scorer
 from dag_resolve.line_tools import Line, LinePosition
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
-from dag_resolve.sequences import ReadCollection, ContigCollection, Segment, Contig, AlignmentPiece
+from common.sequences import ReadCollection, ContigCollection, Segment, Contig, AlignmentPiece
 
 
 class EdgeResolver:

@@ -4,9 +4,6 @@ import os
 
 from typing import Dict
 
-from dag_resolve.repeat_graph import Graph, DotParser
-from dag_resolve.sequences import ContigCollection
-
 
 def analyse(name, myprog, trestile):
     # type: (str, str) -> Dict[str, int]

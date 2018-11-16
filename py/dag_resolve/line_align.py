@@ -1,6 +1,6 @@
 from typing import Optional, Tuple
 
-from dag_resolve.sequences import AlignmentPiece, MatchingSequence
+from common.sequences import AlignmentPiece, MatchingSequence
 from dag_resolve import params
 
 

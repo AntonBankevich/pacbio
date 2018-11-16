@@ -1,5 +1,8 @@
 import sys
 import os
+
+import common.seq_records
+
 sys.path.append("py")
 import common.SeqIO as SeqIO
 from common.basic import RC
@@ -33,5 +36,5 @@ for rec in SeqIO.parse_fasta(open(sys.argv[1])):
         tmp = d[id]
         if ("reads", "-") in [(a[1], a[2]) for a in tmp]:
             rec.seq = RC(rec.seq)
-        SeqIO.write(SeqIO.SeqRecord(rec.seq, id + "_" + str(d[id])), sys.stdout, "fasta")
+        SeqIO.write(common.seq_records.SeqRecord(rec.seq, id + "_" + str(d[id])), sys.stdout, "fasta")
         sys.stderr.write(id + "_" + str(d[id]) + "\n")

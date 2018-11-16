@@ -2,16 +2,12 @@ import itertools
 import sys
 
 import os
-from typing import Optional
 
-from alignment.align_tools import Aligner
-from alignment.polishing import Polisher
-from common import sam_parser, basic
+from common import basic
 from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.knots import Knotter
 from dag_resolve.line_tools import LineStorage
-from dag_resolve.repeat_graph import Graph, Edge, Vertex
-from dag_resolve.sequences import Contig, ReadCollection, Segment, ContigCollection
+from dag_resolve.repeat_graph import Graph, Vertex
 from dag_resolve.visualization import DotPrinter, FilterColoring
 
 class GraphResolver:

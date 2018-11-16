@@ -1,11 +1,8 @@
-import sys
-
 from alignment.align_tools import Aligner
-from common import basic
 from dag_resolve import params
 from dag_resolve.line_tools import LineStorage, Line, Knot
 from dag_resolve.repeat_graph import Edge
-from dag_resolve.sequences import AlignedRead, Segment, ReadCollection, ContigCollection, AlignmentPiece
+from common.sequences import AlignedRead, ReadCollection, ContigCollection, AlignmentPiece
 
 
 class Knotter:

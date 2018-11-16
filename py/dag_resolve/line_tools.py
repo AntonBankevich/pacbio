@@ -1,12 +1,8 @@
 from typing import Generator, Dict, Set, Optional, Iterable
 
 from alignment.align_tools import Aligner
-from common import basic
-from common.SeqIO import NamedSequence
-from dag_resolve.phasing import Phasing
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
-from dag_resolve.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece, AlignedRead, \
-    Segment
+from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece, AlignedRead
 
 
 # class PseudoLineSegment:

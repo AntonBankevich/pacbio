@@ -3,11 +3,11 @@ import os
 import sys
 
 sys.path.append("py")
-from common.SeqIO import NamedSequence
+from common.seq_records import NamedSequence
 from flye.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
-from dag_resolve.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, AlignmentPiece, Segment
+from common.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, Segment
 from typing import Optional, Iterable, Tuple, Generator
 from common import basic, sam_parser, SeqIO
 

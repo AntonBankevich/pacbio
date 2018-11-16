@@ -1,6 +1,5 @@
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, BinaryIO, List
 
-from common import basic
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
 
 
@@ -8,15 +7,19 @@ def FilterColoring(filter, color):
     # type: (Callable[[Union[Edge, Vertex]], bool], str) -> Callable[[Union[Edge, Vertex]], Optional[str]]
     return lambda edge: color if filter(edge) else None
 
+def SimplePrintDot(graph, file):
+    printer = DotPrinter(graph, [FilterColoring(lambda edge: not edge.info.unique, "red")], [])
+    printer.printToFile(open(file, "w"))
+
 class DotPrinter:
     def __init__(self, graph, edge_colorings = None, vertex_colorings = None):
-        # type: (Graph, Optional[list[Callable[[Edge], Optional[str]]]]) -> DotPrinter
+        # type: (Graph, Optional[List[Callable[[Edge], Optional[str]]]], Optional[List[Callable[[Edge], Optional[str]]]]) -> DotPrinter
         if edge_colorings is None:
             edge_colorings = []
         if vertex_colorings is None:
             vertex_colorings = []
-        self.edge_colorings = edge_colorings # type: list[Callable[[Edge], Optional[str]]]
-        self.vertex_colorings = vertex_colorings # type: list[Callable[[Edge], Optional[str]]]
+        self.edge_colorings = edge_colorings # type: List[Callable[[Edge], Optional[str]]]
+        self.vertex_colorings = vertex_colorings # type: List[Callable[[Edge], Optional[str]]]
         self.graph = graph
         self.defaultEdgeColor = "black"
         self.defaultVertexColor = "white"
@@ -25,7 +28,7 @@ class DotPrinter:
         return "\"" + str(val) + "\""
 
     def getEdgeColor(self, e, additionalColorings = None):
-        # type: (Edge, Optional[list[Callable[[Edge], Optional[str]]]]) -> str
+        # type: (Edge, Optional[List[Callable[[Edge], Optional[str]]]]) -> str
         if additionalColorings is None:
             additionalColorings = []
         res = set()
@@ -38,7 +41,7 @@ class DotPrinter:
         return ":".join(res)
 
     def getVertexColor(self, v, additionalColorings = None):
-        # type: (Vertex, Optional[list[Callable[[Vertex], Optional[str]]]]) -> str
+        # type: (Vertex, Optional[List[Callable[[Vertex], Optional[str]]]]) -> str
         if additionalColorings is None:
             additionalColorings = []
         res = set()
@@ -51,7 +54,7 @@ class DotPrinter:
         return ":".join(res)
 
     def printToFile(self, handler, additionalEdgeColorings = None, additionalVertexColorings = None):
-        # type: (file, Optional[list[Callable[[Edge], Optional[str]]]], Optional[list[Callable[[Vertex], Optional[str]]]]) -> None
+        # type: (BinaryIO, Optional[List[Callable[[Edge], Optional[str]]]], Optional[List[Callable[[Vertex], Optional[str]]]]) -> None
         handler.write("digraph {\n")
         handler.write("nodesep = 0.5;\n")
         handler.write("node[shape = circle, label = \"\", height = 0.3];\n")

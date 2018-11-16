@@ -14,7 +14,7 @@ from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.graph_resolver import GraphResolver
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
-from dag_resolve.sequences import ContigCollection, ReadCollection, UniqueList
+from common.sequences import ContigCollection, ReadCollection, UniqueList
 from common import basic
 
 def analyse(graph, storage):
