@@ -274,10 +274,17 @@ class ReadClassifier:
             if True:
                 cread = reads[read.id]
                 classified[res.seg_to.contig.id].append(cread)
-                seg_from = Segment(cread, res.seg_from.left, res.seg_from.right)
-                cread.addAlignment(AlignmentPiece(seg_from, res.seg_to, res.cigar))
-                res.seg_to.contig.addRead(cread)
-                print "New read alignments:", cread
+                line = res.seg_to.contig #type: Line
+                line.addRead(cread)
+                if res.seg_to.left > res.seg_to.contig.centerPos.pos + 500: # if read does not intercect the center we use the selected alignment
+                    seg_from = Segment(cread, res.seg_from.left, res.seg_from.right)
+                    cread.addAlignment(AlignmentPiece(seg_from, res.seg_to, res.cigar))
+                    print "New read alignments:", cread
+                else: # otherwise we need to fix the alignment so that full read alignment is recorded
+                    line.invalidateRead(cread)
+                    print "Read intersects line center and alignments will be added later"
+        for line in self.lines: # fixing read alignments for reads intersecting line center
+            line.fixLineAlignments()
         for line in self.lines:
             print len(classified[line.id]), "reads were classified to line", line
             print map(str, classified[line.id])

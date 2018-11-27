@@ -21,7 +21,7 @@ class DirDistributor:
         # type: () -> str
         name = os.path.join(self.dir, str(self.cur_dir))
         self.cur_dir += 1
-        assert self.cur_dir <= 2000
+        assert self.cur_dir <= 10000
         basic.ensure_dir_existance(name)
         return name
 

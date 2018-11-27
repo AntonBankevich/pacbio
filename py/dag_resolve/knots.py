@@ -68,8 +68,9 @@ class Knotter:
         for line in self.storage.lines:
             print "Line center:", line, len(line), line.centerPos.pos, line.rc.centerPos.pos, len(line.reads.inter(line.centerPos.suffix())), len(line.reads.inter(line.centerPos.prefix()))
         print "Knotting lines"
-        for line1 in self.storage.lines:
-            for line2 in self.storage.lines:
+        relevant_lines = filter(lambda line: len(line.baseEdge.end.out) > 0 or len(line.baseEdge.start.inc) > 0, self.storage.lines)
+        for line1 in relevant_lines:
+            for line2 in relevant_lines:
                 if line1 != line2.rc:
                     self.tryKnot(line1, line2)
                 # if line1.knot is None and line2.knot is None and line1 != line2.rc:

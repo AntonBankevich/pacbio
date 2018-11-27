@@ -82,9 +82,12 @@ class Scorer:
         # print "Percent identities:", pid1, pid2
         if pid1 < params.min_expected_Pacbio_PI and pid2 < params.min_expected_Pacbio_PI:
             return None, None, None
-        if pid1 < params.min_allowed_Pacbio_PI or (piece1.contradicting() and piece2.seg_from.right > piece1.seg_from.right + 500):
+        # we only consider contradictions with the right part of the line since reads were aligned to line center suffixes
+        contra1 = piece1.contradicting(piece1.seg_to.contig.centerPos.suffix())
+        contra2 = piece2.contradicting(piece2.seg_to.contig.centerPos.suffix())
+        if pid1 < params.min_allowed_Pacbio_PI or (contra1 and piece2.seg_from.right > piece1.seg_from.right + 500):
             return None, self.score(piece2.matchingSequence()), None
-        if pid2 < params.min_allowed_Pacbio_PI or (piece2.contradicting() and piece1.seg_from.right > piece2.seg_from.right + 500):
+        if pid2 < params.min_allowed_Pacbio_PI or (contra2 and piece1.seg_from.right > piece2.seg_from.right + 500):
             return self.score(piece1.matchingSequence()), None, None
         matches1 = piece1.matchingSequence()
         matches2 = piece2.matchingSequence()
