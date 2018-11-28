@@ -16,6 +16,8 @@ from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
 from common.sequences import ContigCollection, ReadCollection, UniqueList
 from common import basic
+from dag_resolve.visualization import DotPrinter, FilterColoring, HistoryPrinter
+
 
 def analyse(graph, storage):
     # type: (Graph, LineStorage) -> None
@@ -69,6 +71,21 @@ def ParseEdges(e_str):
             edges[-eid] = s
     return edges
 
+def createPrinter(garph, lineStorage, dir):
+    # type: (Graph, LineStorage, str) -> HistoryPrinter
+    printer = DotPrinter(graph)
+    printer.edge_colorings.append(FilterColoring(
+        lambda e: e.info.unique and lineStorage.getLine(e.id) is not None and lineStorage.getLine(e.id).knot is None, "black"))
+    printer.edge_colorings.append(FilterColoring(
+        lambda e: e.info.unique and lineStorage.getLine(e.id) is not None and lineStorage.getLine(e.id).knot is not None, "brown"))
+    printer.edge_colorings.append(FilterColoring(
+        lambda e: not e.info.unique and e.id in lineStorage.resolved_edges, "green"))
+    printer.edge_colorings.append(FilterColoring(
+        lambda e: not e.info.unique and e.rc.id in lineStorage.resolved_edges, "cyan"))
+    printer.edge_colorings.append(FilterColoring(
+        lambda e: not e.info.unique and e.id not in lineStorage.resolved_edges and e.rc.id not in lineStorage.resolved_edges, "blue"))
+    return HistoryPrinter(printer, dir)
+
 
 if __name__ == "__main__":
     start = time.time()
@@ -118,7 +135,8 @@ if __name__ == "__main__":
     picture_dir = os.path.join(dir, "pictures")
     basic.recreate(picture_dir)
     lineStorage = LineStorage(graph, al)
-    res = GraphResolver(graph, picture_dir, lineStorage, EdgeResolver(graph, al, polisher, lineStorage.reads))
+    printer = createPrinter(graph, lineStorage, picture_dir)
+    res = GraphResolver(graph, printer, lineStorage, EdgeResolver(graph, al, polisher, lineStorage.reads))
     res.resolve()
     sys.stdout.write("Printing results\n")
     res.printResults(sys.stdout)

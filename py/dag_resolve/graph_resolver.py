@@ -8,40 +8,21 @@ from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.knots import Knotter
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, Vertex
-from dag_resolve.visualization import DotPrinter, FilterColoring
+from dag_resolve.visualization import DotPrinter, FilterColoring, HistoryPrinter
+
 
 class GraphResolver:
-    def __init__(self, graph, dir, lineStorage, edgeResolver):
-        # type: (Graph, str, LineStorage, EdgeResolver) -> GraphResolver
+    def __init__(self, graph, printer, lineStorage, edgeResolver):
+        # type: (Graph, HistoryPrinter, LineStorage, EdgeResolver) -> GraphResolver
         self.graph = graph
-        self.dir = dir
         self.lineStorage = lineStorage
         self.edgeResolver = edgeResolver
-        self.printer = DotPrinter(self.graph)
-        self.printer.edge_colorings.append(FilterColoring(
-            lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is None, "black"))
-        self.printer.edge_colorings.append(FilterColoring(
-            lambda e: e.info.unique and self.lineStorage.getLine(e.id) is not None and self.lineStorage.getLine(e.id).knot is not None, "brown"))
-        self.printer.edge_colorings.append(FilterColoring(
-            lambda e: not e.info.unique and e.id in self.lineStorage.resolved_edges, "green"))
-        self.printer.edge_colorings.append(FilterColoring(
-            lambda e: not e.info.unique and e.rc.id in self.lineStorage.resolved_edges, "cyan"))
-        self.printer.edge_colorings.append(FilterColoring(
-            lambda e: not e.info.unique and e.id not in self.lineStorage.resolved_edges and e.rc.id not in self.lineStorage.resolved_edges, "blue"))
+        self.printer = printer
         # self.printer.edge_colorings.append(FilterColoring(lambda e: abs(e.id) >= 6000, "red"))
-        self.cur_picture = 1
-
-    def printCurrentGraph(self, vertices, edges, message = ""):
-        fn = os.path.join(self.dir, str(self.cur_picture) + "_" + "_".join(message.split()) + ".dot")
-        f = open(fn, "w")
-        self.printer.printToFile(f, [FilterColoring(lambda e: e in edges, "purple")], [FilterColoring(lambda v: v in vertices, "purple")])
-        f.close()
-        self.cur_picture += 1
-
 
     def resolveVertexForward(self, v):
         # type: (Vertex) -> None
-        self.printCurrentGraph([v], [], "Resolving vertex " + str(v.id))
+        self.printer.printCurrentGraph([v], [], "Resolving vertex " + str(v.id))
         print "Resolving vertex", v.id, "inc:", map(str, v.inc), "out:", map(str, v.out)
         lines = list(itertools.chain(*[self.lineStorage.edgeLines[edge.id] for edge in v.inc]))
         resolved = self.edgeResolver.resolveVertex(v, lines)
@@ -50,12 +31,12 @@ class GraphResolver:
                 self.lineStorage.edgeLines[edge.id].append(line)
         if None not in resolved:
             print "Successfully resolved vertex", v
-            self.printCurrentGraph([v], [], "Successfully resolved vertex " + str(v))
+            self.printer.printCurrentGraph([v], [], "Successfully resolved vertex " + str(v))
         else:
             print "Failed to resolve vertex", v
             print "WARNING: VERTEX WAS NOT RESOLVED"
             print map(str, zip(map(str, resolved), map(str, lines)))
-            self.printCurrentGraph([v], [], "Failed to resolve vertex " + str(v))
+            self.printer.printCurrentGraph([v], [], "Failed to resolve vertex " + str(v))
             return
         for edge in v.out:
             lines_list = self.lineStorage.getEdgeLines(edge)
@@ -78,12 +59,12 @@ class GraphResolver:
                         self.lineStorage.resolved_edges.add(edge.id)
                         # for line in lines_list:
                         #     self.lineStorage.edgeLines[line.chain[-1].seg_to.contig.id].append(line)
-                        self.printCurrentGraph([], [edge], "Resolved edge " + str(edge.id))
+                        self.printer.printCurrentGraph([], [edge], "Resolved edge " + str(edge.id))
                     else:
                         print "Failed to resolve edge", edge.id
                         if new_edge is not None:
                             print "Graph modification detected. Trying to resolve again with edge:", new_edge.id, "of length", len(new_edge)
-                            self.printCurrentGraph([], [edge])
+                            self.printer.printCurrentGraph([], [edge])
                             self.graph.printToFile(sys.stdout)
                     edge = new_edge
 
@@ -119,7 +100,7 @@ class GraphResolver:
                 line.addReads([self.lineStorage.reads[read.id] for read in edge.reads])
                 line.fixLineAlignments([self.lineStorage.reads[read.id] for read in edge.reads])
         Knotter(self.lineStorage, self.edgeResolver.aligner).knotGraph()
-        self.printCurrentGraph([], [])
+        self.printer.printCurrentGraph([], [])
 
     # def printResults(self, handler):
     #     # type: (file) -> None

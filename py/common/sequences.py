@@ -166,7 +166,10 @@ class Segment:
 
     def __str__(self):
         # type: () -> str
-        return str(self.contig.id) + "[" + str(self.left) + ":" + str(self.right) + "]"
+        if self.right < len(self.contig) * 0.6 or (self.right < 0.9 * len(self.contig) and len(self.contig) - self.right > 500):
+            return str(self.contig.id) + "[" + str(self.left) + ":" + str(self.right) + "]"
+        else:
+            return str(self.contig.id) + "[" + str(self.left) + ":" + str(len(self.contig)) + "-" + str(len(self.contig) - self.right) + "]"
 
     def __len__(self):
         return self.right - self.left
@@ -732,7 +735,10 @@ class AlignmentPiece:
             spid = "%0.3f" % pid
         else:
             spid = "%0.2f" % pid
-        return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ":" + spid + ")"
+        suffix = ""
+        if self.contradicting():
+            suffix = "!!!"
+        return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ":" + spid + suffix + ")"
 
     def changeQuery(self, read):
         return AlignmentPiece(self.seg_from.changeContig(read), self.seg_to, self.cigar)

@@ -1,5 +1,8 @@
+import os
+
 from typing import Callable, Optional, Union, BinaryIO, List
 
+from common import basic
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
 
 
@@ -10,6 +13,25 @@ def FilterColoring(filter, color):
 def SimplePrintDot(graph, file):
     printer = DotPrinter(graph, [FilterColoring(lambda edge: not edge.info.unique, "red")], [])
     printer.printToFile(open(file, "w"))
+
+class HistoryPrinter:
+    def __init__(self, printer, dir):
+        self.printer = printer
+        basic.recreate(dir)
+        self.dir = dir
+        self.cur_picture = 1
+
+    def printCurrentGraph(self, vertices = None, edges = None, message = ""):
+        # type: (Optional[List[Vertex]], Optional[List[Edge]], str) -> None
+        if vertices is None:
+            vertices = []
+        if edges is None:
+            edges = []
+        fn = os.path.join(self.dir, str(self.cur_picture) + "_" + "_".join(message.split()) + ".dot")
+        f = open(fn, "w")
+        self.printer.printToFile(f, [FilterColoring(lambda e: e in edges, "purple")], [FilterColoring(lambda v: v in vertices, "purple")])
+        f.close()
+        self.cur_picture += 1
 
 class DotPrinter:
     def __init__(self, graph, edge_colorings = None, vertex_colorings = None):
