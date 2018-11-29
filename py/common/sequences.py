@@ -726,7 +726,7 @@ class AlignmentPiece:
         assert cigar != "X"
         assert cigar.find("H") == -1 and cigar.find("S") == -1
         self.cigar = cigar
-        assert self.percentIdentity() > 0.4, str(self)
+        assert self.matchingPercentIdentity() > 0.5, str(self)
 
     def __str__(self):
         # type: () -> str
@@ -807,12 +807,18 @@ class AlignmentPiece:
             elif c in "I":
                 cur_query += n
 
-    def matchingSequence(self, equalOnly = True):
-        return MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq, list(self.matchingPositions(equalOnly)))
-
     def percentIdentity(self):
         res = len(list(self.matchingPositions(True)))
         return float(res) / max(len(self.seg_from), len(self.seg_to))
+
+    def matchingPercentIdentity(self):
+        res = len(list(self.matchingPositions(True)))
+        all = len(list(self.matchingPositions(False)))
+        return float(res) / all
+
+
+    def matchingSequence(self, equalOnly = True):
+        return MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq, list(self.matchingPositions(equalOnly)))
 
     def contradicting(self, seg = None):
         # type: (Segment) -> bool

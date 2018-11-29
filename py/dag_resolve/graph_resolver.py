@@ -97,7 +97,9 @@ class GraphResolver:
                 if not edge.info.unique:
                     continue
                 line = self.lineStorage.edgeLines[edge.id][0]
-                line.invalidated_reads.extend([self.lineStorage.reads[read.id] for read in edge.reads if read.id not in line.reads.reads])
+                relevant_reads = [self.lineStorage.reads[read.id] for read in edge.reads if read.id not in line.reads.reads]
+                line.addReads(relevant_reads)
+                line.invalidated_reads.extend(relevant_reads)
                 line.fixLineAlignments()
         Knotter(self.lineStorage, self.edgeResolver.aligner).knotGraph()
         self.printer.printCurrentGraph([], [])

@@ -139,6 +139,22 @@ class AlignedSequences:
                 match += 1
         return float(match) / max(self.last - self.first + 1, self[self.last] - self[self.first] + 1)
 
+    def matchingPercentIdentity(self):
+        assert self.aligned
+        match = 0
+        all = 0
+        for i in range(self.first, self.last + 1):
+            if self.alignment[i] != -1:
+                all += 1
+            else:
+                continue
+            if self.seq_from[self.alignment[i]] == self.seq_to[i]:
+                match += 1
+        if all == 0:
+            return float(0)
+        else:
+            return float(match) / all
+
     def printToFile(self, handler):
         handler.write("Aligned sequences: " + str(self.first) + " " + str(self.last) + " " +
                       str(self.alignment[self.first]) + " " + str(self.alignment[self.last]) + "\n")
