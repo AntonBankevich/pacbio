@@ -12,7 +12,7 @@ from typing import Generator, Iterator, Dict, Tuple, Optional, Union, Callable, 
 
 class ContigCollection():
     def __init__(self, contigs_list = None):
-        # type: (Optional[list[Contig]]) -> ContigCollection
+        # type: (Optional[Iterable[Contig]]) -> ContigCollection
         self.contigs = dict() # type: Dict[str, Contig]
         if contigs_list is not None:
             for contig in contigs_list:

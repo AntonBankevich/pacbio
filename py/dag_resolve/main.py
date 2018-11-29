@@ -71,7 +71,7 @@ def ParseEdges(e_str):
             edges[-eid] = s
     return edges
 
-def createPrinter(garph, lineStorage, dir):
+def createPrinter(graph, lineStorage, dir):
     # type: (Graph, LineStorage, str) -> HistoryPrinter
     printer = DotPrinter(graph)
     printer.edge_colorings.append(FilterColoring(
@@ -86,15 +86,14 @@ def createPrinter(garph, lineStorage, dir):
         lambda e: not e.info.unique and e.id not in lineStorage.resolved_edges and e.rc.id not in lineStorage.resolved_edges, "blue"))
     return HistoryPrinter(printer, dir)
 
-
-if __name__ == "__main__":
+def main(argv):
     start = time.time()
     sys.stdout.write("Started\n")
-    indir = sys.argv[1]
+    indir = argv[1]
     if indir.endswith("/"):
         indir = indir[:-1]
-    edges = ParseEdges(sys.argv[2])
-    dir = sys.argv[3]
+    edges = ParseEdges(argv[2])
+    dir = argv[3]
     edge_sequences = os.path.join(indir, "2-repeat", "graph_final.fasta")
     dot_file = os.path.join(indir, "2-repeat", "graph_final.dot")
     if not os.path.isfile(dot_file):
@@ -114,7 +113,7 @@ if __name__ == "__main__":
     log = open(log_file, "w")
     sys.stdout = basic.OStreamWrapper(sys.stdout, log)
     sys.stderr = sys.stdout
-    print " ".join(sys.argv)
+    print " ".join(argv)
     print (time.strftime("%d.%m.%Y  %I:%M:%S"))
     sys.stdout.write("Collecting contig collection\n")
     edge_sequences = ContigCollection().loadFromFasta(open(edge_sequences, "r"))
@@ -126,7 +125,7 @@ if __name__ == "__main__":
     al = Aligner(dir_distributor)
     polisher = Polisher(al, dir_distributor)
     reads = ReadCollection().loadFromFasta(open(reads_file, "r"))
-    alignment = al.align(reads, ContigCollection(list(UniqueList(graph.E.values()))))
+    alignment = al.align(reads, ContigCollection(UniqueList(graph.E.values())))
     sys.stdout.write("Filling alignments\n")
     graph.fillAlignments(reads.asSeqRecords(), alignment, False)
     relevant = graph.fillRelevant(relevant_reads, reads)
@@ -143,3 +142,6 @@ if __name__ == "__main__":
     analyse(graph, res.lineStorage)
     print "Finished in " + str(time.time() - start) + " seconds"
     log.close()
+
+if __name__ == "__main__":
+    main(sys.argv)

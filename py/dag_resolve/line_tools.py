@@ -144,10 +144,8 @@ class Line(Contig):
         return "Line:" + str(self.id) + "(" + str(len(self)) + "," + str(self.chain[-1].seg_from.right) + \
                "):[" + ",".join(map(str, self.chain)) + "]"
 
-    def fixLineAlignments(self, additional_reads = None):
+    def fixLineAlignments(self):
         # type: (Optional[list[AlignedRead]]) -> None
-        if additional_reads is not None:
-            self.invalidated_reads.extend(additional_reads)
         print "Fixing alignments."
         to_fix = ReadCollection(ContigCollection([Contig(self.centerPos.suffix().Seq(), "half")]))
         to_fix.extendClean(self.invalidated_reads)

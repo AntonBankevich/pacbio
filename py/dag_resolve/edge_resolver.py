@@ -226,12 +226,12 @@ class ReadClassifier:
         print "Trying to classify reads to lines", map(str, active)
         print "Full list of lines:", map(str, self.lines)
         print "Active lines:", map(str, active)
+        line_aligns = self.pairwiseAlign(self.lines)
         alignments = ReadCollection(ContigCollection(self.lines))
         for read in reads.reads.values():
             alignments.addNewRead(read)
         for line in self.lines:
             self.aligner.alignReadsToSegments(alignments, [line.centerPos.suffix()])
-        line_aligns = self.pairwiseAlign(self.lines)
         classified = dict()
         for line in self.lines:
             classified[line.id] = []
@@ -242,7 +242,8 @@ class ReadClassifier:
             candidates = []
             for al in read.alignments:
                 if al.seg_to.contig in self.lines and \
-                        al.seg_from.left < 500 and len(al.seg_from) > 700 and \
+                        al.seg_from.left < 500 and \
+                        len(al.seg_from) > min(700, len(al.seg_to.contig.centerPos.suffix()) * 0.8) and \
                         al.seg_to.inter(self.positions[al.seg_to.contig.id].suffix()):
                     candidates.append(al)
             # for al1 in candidates:
