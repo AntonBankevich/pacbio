@@ -145,7 +145,7 @@ class Line(Contig):
                "):[" + ",".join(map(str, self.chain)) + "]"
 
     def fixLineAlignments(self):
-        # type: (Optional[list[AlignedRead]]) -> None
+        # type: () -> None
         print "Fixing alignments."
         to_fix = ReadCollection(ContigCollection([Contig(self.centerPos.suffix().Seq(), "half")]))
         to_fix.extendClean(self.invalidated_reads)
@@ -191,11 +191,11 @@ class Line(Contig):
             aligned_read = to_fix[read.id]
             has_contradicting = False
             noncontradicting_al = None
-            for al in aligned_read.alignmentsTo(self.asSegment()):
-                if not al.contradicting(self.asSegment()):
-                    noncontradicting_al = al
-                else:
+            for al in aligned_read.alignmentsTo(self.asSegment()): # type: AlignmentPiece
+                if al.contradicting(self.asSegment()):
                     has_contradicting = True
+                elif al.seg_to.inter(self.centerPos.suffix()):
+                    noncontradicting_al = al
             if noncontradicting_al is not None:
                 print "Adding read", read, "to line", self, "with alignment", noncontradicting_al
                 assert read in self.reads
