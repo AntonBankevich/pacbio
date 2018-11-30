@@ -15,17 +15,17 @@ import json
 import shutil
 import subprocess
 
-import flye.alignment as aln
-import flye.bubbles as bbl
-import flye.polish as pol
-import flye.fasta_parser as fp
-import flye.assemble as asm
-import flye.repeat_graph as repeat
-import flye.consensus as cons
-import flye.scaffolder as scf
-from flye.__version__ import __version__
-import flye.config as config
-from flye.bytes2human import human2bytes
+import flye_tools.alignment as aln
+import flye_tools.bubbles as bbl
+import flye_tools.polish as pol
+import flye_tools.fasta_parser as fp
+import flye_tools.assemble as asm
+import flye_tools.repeat_graph as repeat
+import flye_tools.consensus as cons
+import flye_tools.scaffolder as scf
+from flye_tools.__version__ import __version__
+import flye_tools.config as config
+from flye_tools.bytes2human import human2bytes
 
 logger = logging.getLogger()
 

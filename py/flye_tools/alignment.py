@@ -15,9 +15,9 @@ import logging
 import multiprocessing
 import ctypes
 
-import flye.fasta_parser as fp
-from flye.utils import which
-import flye.config as config
+import flye_tools.fasta_parser as fp
+from flye_tools.utils import which
+import flye_tools.config as config
 
 
 logger = logging.getLogger()

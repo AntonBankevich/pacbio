@@ -7,8 +7,8 @@ import pickle
 sys.path.append("py")
 from common import sam_parser, basic
 from common.basic import RC
-from flye.alignment import make_alignment
-from flye import polysh_job
+from flye_tools.alignment import make_alignment
+from flye_tools import polysh_job
 
 import common.SeqIO as SeqIO
 

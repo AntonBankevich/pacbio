@@ -8,7 +8,7 @@ sys.path.append("py")
 import alignment as aln
 import bubbles as bbl
 import polish as pol
-from flye import config
+from flye_tools import config
 
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)

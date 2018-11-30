@@ -16,9 +16,9 @@ import signal
 
 import sys
 
-import flye.fasta_parser as fp
-import flye.config as config
-from flye.alignment import shift_gaps, SynchronizedSamReader
+import flye_tools.fasta_parser as fp
+import flye_tools.config as config
+from flye_tools.alignment import shift_gaps, SynchronizedSamReader
 
 
 logger = logging.getLogger()

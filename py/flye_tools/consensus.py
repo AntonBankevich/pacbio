@@ -12,9 +12,9 @@ from itertools import izip
 import multiprocessing
 import signal
 
-from flye.alignment import shift_gaps, SynchronizedSamReader
-import flye.config as config
-import flye.fasta_parser as fp
+from flye_tools.alignment import shift_gaps, SynchronizedSamReader
+import flye_tools.config as config
+import flye_tools.fasta_parser as fp
 
 logger = logging.getLogger()
 

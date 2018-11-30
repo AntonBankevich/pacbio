@@ -6,7 +6,7 @@ from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO
 from dag_resolve import params
 from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece
-from flye.polysh_job import JobPolishing
+from flye_tools.polysh_job import JobPolishing
 
 
 class Polisher:

@@ -13,10 +13,10 @@ import os
 from collections import defaultdict
 from threading import Thread
 
-import flye.bubbles as bbl
-import flye.fasta_parser as fp
-from flye.utils import which
-import flye.config as config
+import flye_tools.bubbles as bbl
+import flye_tools.fasta_parser as fp
+from flye_tools.utils import which
+import flye_tools.config as config
 
 
 POLISH_BIN = "bin/flye-polish"

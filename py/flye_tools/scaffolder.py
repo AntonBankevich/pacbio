@@ -9,8 +9,8 @@ Final output generator
 import sys
 import logging
 
-import flye.fasta_parser as fp
-import flye.config as config
+import flye_tools.fasta_parser as fp
+import flye_tools.config as config
 
 logger = logging.getLogger()
 

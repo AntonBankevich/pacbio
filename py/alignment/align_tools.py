@@ -4,7 +4,7 @@ import sys
 
 sys.path.append("py")
 from common.seq_records import NamedSequence
-from flye.alignment import make_alignment
+from flye_tools.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
 from common.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, Segment

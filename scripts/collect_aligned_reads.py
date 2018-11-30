@@ -4,7 +4,7 @@ sys.path.append("py")
 
 from common import sam_parser
 from common.basic import RC
-from flye.alignment import make_alignment
+from flye_tools.alignment import make_alignment
 
 import common.SeqIO as SeqIO
 

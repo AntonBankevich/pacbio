@@ -10,7 +10,7 @@ import subprocess
 import logging
 import os
 
-from flye.utils import which
+from flye_tools.utils import which
 
 ASSEMBLE_BIN = "flye-assemble"
 logger = logging.getLogger()
