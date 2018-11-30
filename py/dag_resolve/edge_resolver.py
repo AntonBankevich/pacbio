@@ -111,7 +111,7 @@ class EdgeResolver:
         best = None
         print alignments.reads["tail"]
         for al in alignments.reads["tail"].alignments:
-            if al.seg_to.start > params.max_jump:
+            if al.seg_to.left > params.max_jump:
                 continue
             if (len(al) > 300 or (line.chain[-1].seg_to.contig == edge and line.chain[-1].seg_to.right> len(edge) - 100)) \
                     and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:

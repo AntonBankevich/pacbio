@@ -11,12 +11,19 @@ import matplotlib as mplt
 import matplotlib.pyplot as plt
 import matplotlib.colors
 
-def GetColorByNormalizedValue(cmap_name, norm_value):
-    if norm_value < 0 or norm_value > 1:
-        print "ERROR: value " + str(norm_value) + ' does not belong to [0, 1]'
-    cmap = plt.cm.get_cmap(cmap_name)
-    color = cmap(norm_value)
-    return mplt.colors.rgb2hex(color[:3])
+class Palette:
+    def __init__(self, num, cmap = "virdis"):
+        self.num = num
+        self.cmap = cmap
+
+    def getColor(self, val):
+        norm_value = float(val) / (self.num - 1)
+        if norm_value < 0 or norm_value > 1:
+            print "ERROR: value " + str(norm_value) + ' does not belong to [0, 1]'
+        cmap = plt.cm.get_cmap(self.cmap)
+        color = cmap(norm_value)
+        return mplt.colors.rgb2hex(color[:3])
+
 
 def FilterColoring(filter, color):
     # type: (Callable[[Union[Edge, Vertex]], bool], str) -> Callable[[Union[Edge, Vertex]], Optional[str]]
@@ -104,7 +111,7 @@ class DotLinePrinter:
         # type: (Graph, LineStorage) -> None
         self.graph = graph
         self.storage = storage
-        self.step = 100
+        self.step = 50
 
     def splitEdges(self):
         res = dict() # type: Dict[str, List[Tuple[str, int]]]
@@ -136,7 +143,6 @@ class DotLinePrinter:
         handler.write("node[shape = circle, label = \"\", height = 0.3];\n")
         for v in self.graph.V.values():
             handler.write(basic.quoted(v.id) + " [style = \"filled\", height = 0.6, fillcolor = " + basic.quoted("black") + "];\n")
-        mpl.colo
         for edge in self.graph.E.values():
             for v in vIndex[edge.id][1:-1]:
                 handler.write(basic.quoted(v[0]) + " [style = \"filled\", fillcolor = \"" + "black" + "\"];\n")
