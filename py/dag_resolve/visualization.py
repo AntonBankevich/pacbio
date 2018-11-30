@@ -116,7 +116,7 @@ class DotLinePrinter:
     def splitEdges(self):
         res = dict() # type: Dict[str, List[Tuple[str, int]]]
         for edge in UniqueList(self.graph.E.values()):
-            if not edge.unique():
+            if not edge.unique() or len(edge) < self.step * 30:
                 n = min(1, len(edge) / self.step)
                 step = len(edge) / n
                 lens = [step] * n
@@ -128,6 +128,21 @@ class DotLinePrinter:
                 cpos = 0
                 for i in range(n - 1):
                     cpos += lens[i]
+                    v.append((edge.id + "-" + str(cpos), cpos))
+                    v1.append((edge.rc.id + "-" + str(len(edge) - cpos), len(edge) - cpos))
+                v.append((edge.end.id, len(edge)))
+                v1.append((edge.end.rc.id, 0))
+                res[edge.id] = v
+                res[edge.rc.id] = v1[::-1]
+            else:
+                v = [(edge.start.id, 0)]
+                v1 = [(edge.start.rc.id, len(edge))]
+                for i in range(1, 10):
+                    cpos = i * self.step
+                    v.append((edge.id + "-" + str(cpos), cpos))
+                    v1.append((edge.rc.id + "-" + str(len(edge) - cpos), len(edge) - cpos))
+                for i in range(1, 10)[::-1]:
+                    cpos = len(edge) - i * self.step
                     v.append((edge.id + "-" + str(cpos), cpos))
                     v1.append((edge.rc.id + "-" + str(len(edge) - cpos), len(edge) - cpos))
                 v.append((edge.end.id, len(edge)))
@@ -146,8 +161,15 @@ class DotLinePrinter:
         for edge in self.graph.E.values():
             for v in vIndex[edge.id][1:-1]:
                 handler.write(basic.quoted(v[0]) + " [style = \"filled\", fillcolor = \"" + "black" + "\"];\n")
+        color_map = dict() # type: Dict[str, str]
+        colors = Palette(len(self.storage.lines))
+        for i, line in enumerate(self.storage.lines):
+            color_map[line.id] = colors.getColor(i)
 
         edges = dict() # type: Dict[Tuple[str, str], Tuple[str, str]]
+        for line in self.storage.lines:
+            pass
+
 
 
 

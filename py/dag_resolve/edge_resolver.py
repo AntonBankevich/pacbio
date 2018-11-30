@@ -130,7 +130,7 @@ class EdgeResolver:
                 print "Additional alignment:", al
                 line.addAlignment(
                     AlignmentPiece(Segment(line, al.seg_from.left + shift, al.seg_from.right + shift), al.seg_to,
-                                   best.cigar))
+                                   al.cigar))
         return best.seg_to.contig
 
     # def attemptReattach(self, line):
