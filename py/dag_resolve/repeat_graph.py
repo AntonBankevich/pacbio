@@ -51,6 +51,9 @@ class Edge(Contig):
         self.info = info
         self.reads = ReadCollection(ContigCollection([self]))
 
+    def unique(self):
+        return self.info.unique
+
 class Graph:
     def __init__(self):
         # type: () -> Graph

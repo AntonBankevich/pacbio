@@ -5,6 +5,7 @@ from typing import Tuple, Optional, Dict
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common.seq_records import NamedSequence
+from dag_resolve import params
 from dag_resolve.line_align import Scorer
 from dag_resolve.line_tools import Line, LinePosition
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
@@ -110,6 +111,8 @@ class EdgeResolver:
         best = None
         print alignments.reads["tail"]
         for al in alignments.reads["tail"].alignments:
+            if al.seg_to.start > params.max_jump:
+                continue
             if (len(al) > 300 or (line.chain[-1].seg_to.contig == edge and line.chain[-1].seg_to.right> len(edge) - 100)) \
                     and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
                 best = al
@@ -122,6 +125,12 @@ class EdgeResolver:
             return None
         line.addAlignment(AlignmentPiece(Segment(line, best.seg_from.left + shift, best.seg_from.right + shift), best.seg_to, best.cigar))
         print "Connected line", line, "to edge", best.seg_to.contig, "using alignment", best
+        for al in alignments.reads["tail"].alignments:
+            if al.seg_to.contig == best.seg_to.contig and best.precedes(al):
+                print "Additional alignment:", al
+                line.addAlignment(
+                    AlignmentPiece(Segment(line, al.seg_from.left + shift, al.seg_from.right + shift), al.seg_to,
+                                   best.cigar))
         return best.seg_to.contig
 
     # def attemptReattach(self, line):

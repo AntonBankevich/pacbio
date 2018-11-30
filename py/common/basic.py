@@ -130,3 +130,6 @@ def Reverse(val):
     elif isinstance(val, int):
         return -val
     assert False, "Tried to reverse an object that is neither number nor a string"
+
+def quoted(val):
+    return "\"" + str(val) + "\""

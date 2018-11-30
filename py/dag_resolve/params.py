@@ -7,6 +7,7 @@ num_iters = 2
 min_reads_in_knot = 2
 min_expected_Pacbio_PI = 0.78
 min_allowed_Pacbio_PI = 0.7
+max_jump = 6000
 
 class Scores:
     ins_score = 8
@@ -16,3 +17,5 @@ class Scores:
     switch_core = 1
     center_score = 20
     inf = 10000000
+
+
