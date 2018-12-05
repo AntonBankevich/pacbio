@@ -123,6 +123,7 @@ class DotLinePrinter:
 
     def splitEdges(self):
         good = self.goodEdges()
+        print "Good edges:", map(str, list(good))
         res = dict() # type: Dict[str, List[Tuple[str, int]]]
         for edge in UniqueList(self.graph.E.values()):
             if edge.id not in good:
@@ -215,7 +216,7 @@ class DotLinePrinter:
                             queue.append((v, False))
         res = set()
         for e in self.graph.E.values():
-            if e.unique() or group[e.start.id] != e.end.id:
+            if e.unique() or group[e.start.id] != group[e.end.id]:
                 res.add(e.id)
         return res
 
