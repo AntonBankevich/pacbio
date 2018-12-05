@@ -16,7 +16,7 @@ from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
 from common.sequences import ContigCollection, ReadCollection, UniqueList
 from common import basic
-from dag_resolve.visualization import DotPrinter, FilterColoring, HistoryPrinter
+from dag_resolve.visualization import DotPrinter, FilterColoring, HistoryPrinter, DotLinePrinter
 
 
 def analyse(graph, storage):
@@ -73,17 +73,18 @@ def ParseEdges(e_str):
 
 def createPrinter(graph, lineStorage, dir):
     # type: (Graph, LineStorage, str) -> HistoryPrinter
-    printer = DotPrinter(graph)
-    printer.edge_colorings.append(FilterColoring(
-        lambda e: e.info.unique and lineStorage.getLine(e.id) is not None and lineStorage.getLine(e.id).knot is None, "black"))
-    printer.edge_colorings.append(FilterColoring(
-        lambda e: e.info.unique and lineStorage.getLine(e.id) is not None and lineStorage.getLine(e.id).knot is not None, "brown"))
-    printer.edge_colorings.append(FilterColoring(
-        lambda e: not e.info.unique and e.id in lineStorage.resolved_edges, "green"))
-    printer.edge_colorings.append(FilterColoring(
-        lambda e: not e.info.unique and e.rc.id in lineStorage.resolved_edges, "cyan"))
-    printer.edge_colorings.append(FilterColoring(
-        lambda e: not e.info.unique and e.id not in lineStorage.resolved_edges and e.rc.id not in lineStorage.resolved_edges, "blue"))
+    # printer = DotPrinter(graph)
+    # printer.edge_colorings.append(FilterColoring(
+    #     lambda e: e.info.unique and lineStorage.getLine(e.id) is not None and lineStorage.getLine(e.id).knot is None, "black"))
+    # printer.edge_colorings.append(FilterColoring(
+    #     lambda e: e.info.unique and lineStorage.getLine(e.id) is not None and lineStorage.getLine(e.id).knot is not None, "brown"))
+    # printer.edge_colorings.append(FilterColoring(
+    #     lambda e: not e.info.unique and e.id in lineStorage.resolved_edges, "green"))
+    # printer.edge_colorings.append(FilterColoring(
+    #     lambda e: not e.info.unique and e.rc.id in lineStorage.resolved_edges, "cyan"))
+    # printer.edge_colorings.append(FilterColoring(
+    #     lambda e: not e.info.unique and e.id not in lineStorage.resolved_edges and e.rc.id not in lineStorage.resolved_edges, "blue"))
+    printer = DotLinePrinter(graph, lineStorage)
     return HistoryPrinter(printer, dir)
 
 def main(argv):
@@ -121,6 +122,19 @@ def main(argv):
     dot = DotParser(open(dot_file, "r")).parse(edges)
     graph = Graph().loadFromDot(edge_sequences, dot)
     graph.printToFile(sys.stdout)
+
+
+    # #######################
+    # al = Aligner(dir_distributor)
+    # lineStorage = LineStorage(graph, al)
+    # picture_dir = os.path.join(dir, "pictures")
+    # printer = createPrinter(graph, lineStorage, picture_dir)
+    # printer.printCurrentGraph()
+    # sys.exit(0)
+    #
+    # #######################
+
+
     sys.stdout.write("Aligning reads\n")
     al = Aligner(dir_distributor)
     polisher = Polisher(al, dir_distributor)

@@ -7,7 +7,7 @@ from dag_resolve import params
 
 sys.path.append("py")
 from common import sam_parser, SeqIO, basic
-from typing import Generator, Iterator, Dict, Tuple, Optional, Union, Callable, Iterable, Any, BinaryIO
+from typing import Generator, Iterator, Dict, Tuple, Optional, Union, Callable, Iterable, Any, BinaryIO, List
 
 
 class ContigCollection():
@@ -182,6 +182,9 @@ class Segment:
 
     def changeContig(self, contig):
         return Segment(contig, self.left, self.right)
+
+    def expand(self, range):
+        return Segment(self.contig, max(self.left - range, 0), min(self.right - range, len(self.contig)))
 
 
 class AlignedRead(NamedSequence):
@@ -685,8 +688,15 @@ class MatchingSequence:
         matchings = [(self.matches[pos_self][1], other.matches[pos_other][1]) for pos_self, pos_other in self.common(other)]
         return MatchingSequence(self.seq_to, other.seq_to, matchings)
 
+    def concat(self, others):
+        # type: (List[MatchingSequence]) -> MatchingSequence
+        new_matches = list(itertools.chain(*[other.matches for other in others]))
+        return MatchingSequence(self.seq_from, self.seq_to, self.matches + new_matches)
+
     def combine(self, others):
-        # type: (list[MatchingSequence]) -> MatchingSequence
+        # type: (List[MatchingSequence]) -> MatchingSequence
+        if len(others) == 0:
+            return self
         others = filter(lambda other: len(self.inter(other)) > 20, others)
         # print "Combining"
         # print self.matches

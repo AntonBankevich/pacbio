@@ -8,7 +8,7 @@ from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.knots import Knotter
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, Vertex
-from dag_resolve.visualization import DotPrinter, FilterColoring, HistoryPrinter
+from dag_resolve.visualization import DotPrinter, FilterColoring, HistoryPrinter, DotLinePrinter
 
 
 class GraphResolver:
@@ -62,9 +62,9 @@ class GraphResolver:
                         self.printer.printCurrentGraph([], [edge], "Resolved edge " + str(edge.id))
                     else:
                         print "Failed to resolve edge", edge.id
+                        self.printer.printCurrentGraph([], [edge], "Failed to resolve edge " + str(edge.id))
                         if new_edge is not None:
                             print "Graph modification detected. Trying to resolve again with edge:", new_edge.id, "of length", len(new_edge)
-                            self.printer.printCurrentGraph([], [edge])
                             self.graph.printToFile(sys.stdout)
                     edge = new_edge
 
@@ -90,6 +90,7 @@ class GraphResolver:
                     cnt += 1
             if cnt == 0:
                 break
+
         for v in self.graph.V.values():# Aligning reads to remaining lines
             if v.id in visited_vertices:
                 continue

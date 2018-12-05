@@ -1,5 +1,8 @@
 from typing import Optional, Tuple
 
+if __name__ == "__main__":
+    import sys
+    sys.path.append("py")
 from common.sequences import AlignmentPiece, MatchingSequence
 from dag_resolve import params
 
@@ -154,5 +157,7 @@ class RectStorage:
             return self.vals[a - self.left][b]
         return self.default
 
-
+if __name__ == "__main__":
+    tmp = MatchingSequence(sys.argv[1], sys.argv[2], [(0, 0), (len(sys.argv[1]) - 1, len(sys.argv[2]) - 1)])
+    print Scorer().accurateScore(tmp)
 

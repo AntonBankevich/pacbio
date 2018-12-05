@@ -133,3 +133,8 @@ def Reverse(val):
 
 def quoted(val):
     return "\"" + str(val) + "\""
+
+def fillRight(s, n, c = " "):
+    while len(s) < n:
+        s = s + c
+    return s
