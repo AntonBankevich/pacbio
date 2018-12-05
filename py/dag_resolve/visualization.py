@@ -127,7 +127,7 @@ class DotLinePrinter:
         for edge in UniqueList(self.graph.E.values()):
             if edge.id not in good:
                 res[edge.id] = [("V:" + str(edge.start.id), 0), ("V:" + str(edge.end.id), len(edge))]
-                res[edge.rc.id] = [("V:" + str(edge.start.rc.id), len(edge)), ("V:" + str(edge.end.rc.id), 0)]
+                res[edge.rc.id] = [("V:" + str(edge.rc.start.id), 0), ("V:" + str(edge.rc.end.id), len(edge))]
             elif not edge.unique() or len(edge) < self.step * 30:
                 n = max(1, len(edge) / self.step)
                 step = len(edge) / n
