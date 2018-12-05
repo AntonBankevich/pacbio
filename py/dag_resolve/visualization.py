@@ -274,10 +274,10 @@ class DotLinePrinter:
                         cur_matching += 1
                     if cur_matching < len(matchings.matches) and pos <= matchings.matches[cur_matching][1] < pos + self.step / 5:
                         line_sequence.append((v, matchings.matches[cur_matching][0], edge))
-                        assert len(line_sequence) < 2 or line_sequence[-2][1] < line_sequence[-1][1], ",".join(map(str, als)) + "\n" + str(line_sequence) + "\n" + v
+                        assert len(line_sequence) < 2 or line_sequence[-2][1] <= line_sequence[-1][1], ",".join(map(str, als)) + "\n" + str(line_sequence) + "\n" + v
                     if cur_matching == len(matchings.matches) and len(matchings.matches) >= 1 and matchings.matches[-1][0] >= pos - self.step / 5:
                         line_sequence.append((v, matchings.matches[-1][0] + 1, edge))
-                        assert len(line_sequence) < 2 or line_sequence[-2][1] < line_sequence[-1][1]
+                        assert len(line_sequence) < 2 or line_sequence[-2][1] <= line_sequence[-1][1]
                         break
             if line_sequence[0][1] > self.step / 2:
                 line_sequence.insert(0, ("L" + str(line.id) + "-" + str(0), 0, line))
