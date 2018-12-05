@@ -166,16 +166,13 @@ class DotLinePrinter:
 
     def goodEdges(self):
         visited = set()
-        queue = [] #type: List[Vertex, bool]
+        queue = [] # type: List[Tuple[Vertex, bool]]
         order = []
         for v in self.graph.V.values():
             if v.id in visited:
                 continue
-            visited.add(v.id)
             queue.append((v, True))
-            for e in v.out:
-                if not e.unique():
-                    queue.append((e.end, False))
+            queue.append((v, False))
             while len(queue) != 0:
                 v, finished = queue.pop()
                 if finished:
@@ -186,34 +183,23 @@ class DotLinePrinter:
                     visited.add(v.id)
                     queue.append((v, True))
                     for e in v.out:
-                        if not e.unique:
-                            queue.append((v, False))
+                        if not e.unique():
+                            queue.append((e.end, False))
         visited = set()
-        queue = [] #type: List[Vertex, bool]
+        queue = [] #type: List[Vertex]
         group = dict()
         for v in order:
             gid = v.id
-            if v.id in visited:
-                continue
-            visited.add(v.id)
-            queue.append((v, True))
-            group[v.id] = gid
-            for e in v.out:
-                if not e.unique():
-                    queue.append((e.end, False))
+            queue.append(v)
             while len(queue) != 0:
-                v, finished = queue.pop()
-                if finished:
-                    order.append(v)
-                else:
-                    if v.id in visited:
-                        continue
-                    visited.add(v.id)
-                    group[v.id] = gid
-                    queue.append((v, True))
-                    for e in v.out:
-                        if not e.unique:
-                            queue.append((v, False))
+                v = queue.pop()
+                if v.id in visited:
+                    continue
+                visited.add(v.id)
+                group[v.id] = gid
+                for e in v.out:
+                    if not e.unique():
+                        queue.append(e.end)
         res = set()
         for e in self.graph.E.values():
             if e.unique() or group[e.start.id] != group[e.end.id]:
