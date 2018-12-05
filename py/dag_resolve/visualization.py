@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 
 class Palette:
-    def __init__(self, num, cmap = "basic"):
+    def __init__(self, num, cmap = "jet"):
         self.num = num
         self.cmap = cmap
-        self.colorList = ["blue", "red", "green", "purple", "yellow", "violet", "cian", "orange", "pink", "brown", "caramel", "navy", "honey"]
+        self.colorList = ["blue", "red", "green", "purple", "yellow", "violet", "orange", "pink", "brown", "navy", "honey"]
         if self.cmap == "basic" and num > len(self.colorList):
             self.cmap = "jet"
         if self.cmap != "basic":
@@ -122,9 +122,13 @@ class DotLinePrinter:
         self.step = 40
 
     def splitEdges(self):
+        good = self.goodEdges()
         res = dict() # type: Dict[str, List[Tuple[str, int]]]
         for edge in UniqueList(self.graph.E.values()):
-            if not edge.unique() or len(edge) < self.step * 30:
+            if edge.id not in good:
+                res[edge.id] = [("V:" + str(edge.start.id), 0), ("V:" + str(edge.end.id), len(edge))]
+                res[edge.rc.id] = [("V:" + str(edge.start.rc.id), len(edge)), ("V:" + str(edge.end.rc.id), 0)]
+            elif not edge.unique() or len(edge) < self.step * 30:
                 n = max(1, len(edge) / self.step)
                 step = len(edge) / n
                 lens = [step] * n
@@ -157,6 +161,62 @@ class DotLinePrinter:
                 v1.append(("V:" + str(edge.end.rc.id), 0))
                 res[edge.id] = v
                 res[edge.rc.id] = v1[::-1]
+        return res
+
+    def goodEdges(self):
+        visited = set()
+        queue = [] #type: List[Vertex, bool]
+        order = []
+        for v in self.graph.V.values():
+            if v.id in visited:
+                continue
+            visited.add(v.id)
+            queue.append((v, True))
+            for e in v.out:
+                if not e.unique():
+                    queue.append((e.end, False))
+            while len(queue) != 0:
+                v, finished = queue.pop()
+                if finished:
+                    order.append(v)
+                else:
+                    if v.id in visited:
+                        continue
+                    visited.add(v.id)
+                    queue.append((v, True))
+                    for e in v.out:
+                        if not e.unique:
+                            queue.append((v, False))
+        visited = set()
+        queue = [] #type: List[Vertex, bool]
+        group = dict()
+        for v in order:
+            gid = v.id
+            if v.id in visited:
+                continue
+            visited.add(v.id)
+            queue.append((v, True))
+            group[v.id] = gid
+            for e in v.out:
+                if not e.unique():
+                    queue.append((e.end, False))
+            while len(queue) != 0:
+                v, finished = queue.pop()
+                if finished:
+                    order.append(v)
+                else:
+                    if v.id in visited:
+                        continue
+                    visited.add(v.id)
+                    group[v.id] = gid
+                    queue.append((v, True))
+                    for e in v.out:
+                        if not e.unique:
+                            queue.append((v, False))
+        res = set()
+        for e in self.graph.E.values():
+            if e.unique() or group[e.start.id] != e.end.id:
+                res.add(e.id)
         return res
 
     def printToFile(self, handler, additionalEdgeColorings = None, additionalVertexColorings = None):
@@ -303,11 +363,11 @@ class DotLinePrinter:
                         cpos += lens[i]
                         v_name = "L" + str(line.id) + "-" + str(cpos)
                         line_vertices.append((v_name, cpos))
-                        assert len(line_vertices) < 2 or line_vertices[-2][1] < line_vertices[-1][1]
+                        assert len(line_vertices) < 2 or line_vertices[-2][1] <= line_vertices[-1][1]
                         handler.write(basic.quoted(v_name) + " [style = \"filled\", fillcolor = \"" +
                                       color_map[line.id] + "\"];\n")
                 line_vertices.append(v2)
-                assert len(line_vertices) < 2 or line_vertices[-2][1] < line_vertices[-1][1], str(v1) + " " +  str(v2)
+                assert len(line_vertices) < 2 or line_vertices[-2][1] <= line_vertices[-1][1], str(v1) + " " +  str(v2)
             for v1, v2 in zip(line_vertices[:-1], line_vertices[1:]):
                 if v2[1] - v1[1] > 2 * self.step:
                     continue
