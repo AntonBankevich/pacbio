@@ -837,10 +837,10 @@ class AlignmentPiece:
         if not self.seg_to.inter(seg):
             return False
         if self.seg_from.left >= 500 and self.seg_to.left >= seg.left + 500:
-            return False
+            return True
         if self.seg_from.right <= len(self.seg_from.contig) - 500 and self.seg_to.right <= seg.right - 500:
-            return False
-        return True
+            return True
+        return False
 
     def contradictingRTC(self, seg = None):#contradiction between read and consensus sequence. Stricter consensus condition
         # type: (Segment) -> bool
@@ -849,10 +849,10 @@ class AlignmentPiece:
         if not self.seg_to.inter(seg):
             return False
         if self.seg_from.left >= 500 and self.seg_to.left >= seg.left + 50:
-            return False
+            return True
         if self.seg_from.right <= len(self.seg_from.contig) - 500 and self.seg_to.right <= seg.right - 50:
-            return False
-        return True
+            return True
+        return False
 
     def contigAsSegment(self, seg):
         # type: (Segment) -> None
