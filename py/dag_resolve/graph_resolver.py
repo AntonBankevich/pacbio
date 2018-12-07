@@ -28,7 +28,7 @@ class GraphResolver:
         resolved = self.edgeResolver.resolveVertex(v, lines)
         for edge, line in zip(resolved, lines):
             if edge is not None:
-                self.lineStorage.edgeLines[edge.id].append(line)
+                self.lineStorage.extendLine(line, edge)
         if None not in resolved:
             print "Successfully resolved vertex", v
             self.printer.printCurrentGraph([v], [], "Successfully resolved vertex " + str(v))

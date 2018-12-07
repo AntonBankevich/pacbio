@@ -358,7 +358,8 @@ class LineStorage:
     def extendLine(self, line, edge):
         if edge.id not in self.edgeLines:
             self.edgeLines[edge.id] = []
-        self.edgeLines[edge.id].append(line)
+        if not edge.unique():
+            self.edgeLines[edge.id].append(line)
 
 
     def isResolvableLeft(self, v):

@@ -184,7 +184,7 @@ class Segment:
         return Segment(contig, self.left, self.right)
 
     def expand(self, range):
-        return Segment(self.contig, max(self.left - range, 0), min(self.right - range, len(self.contig)))
+        return Segment(self.contig, max(self.left - range, 0), min(self.right + range, len(self.contig)))
 
 
 class AlignedRead(NamedSequence):
