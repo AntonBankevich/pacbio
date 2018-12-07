@@ -58,7 +58,7 @@ class Polisher:
             for read in alignment:
                 print read
                 for al in read.alignmentsTo(seq.asSegment()):
-                    if al.contradicting(seq.asSegment()):
+                    if al.contradictingRTC(seq.asSegment()):
                         print "contra_al:", al
                     elif al.seg_to.left > reliable_start:
                         print "late_al:", al

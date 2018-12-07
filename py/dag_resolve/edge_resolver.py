@@ -102,7 +102,7 @@ class EdgeResolver:
         print "Jumping with line", line, "from edge", edge
         shift = line.chain[-1].seg_from.right
         seq = line.seq[shift:]
-        if len(seq) < 200:
+        if len(seq) < 300:
             print "Tail too short"
             return None
         alignments = ReadCollection(ContigCollection(edge.end.out))
@@ -113,8 +113,14 @@ class EdgeResolver:
         for al in alignments.reads["tail"].alignments:
             if al.seg_to.left > params.max_jump:
                 continue
-            if (len(al) > 300 or (line.chain[-1].seg_to.contig == edge and line.chain[-1].seg_to.right> len(edge) - 100)) \
-                    and (best is None or al.seg_from.left < best.seg_from.left) and al.seg_to.contig in edge.end.out:
+            if len(al) < 300 or al.seg_to.contig not in edge.end.out:
+                continue
+            if al.seg_to.contig.unique():
+                if al.seg_from.right < len(al.seg_from.contig) - 100 and al.seg_to.right < len(al.seg_to.contig) - 100:
+                    continue
+                if al.seg_to.left > 1000:
+                    continue
+            if best is None or al.seg_from.left < best.seg_from.left:
                 best = al
         if best is None:
             print "No jump"
@@ -188,7 +194,8 @@ class Prolonger:
         base_consensus = line.seq[-step_back:]
         # print "inter", line, len(line)
         # line.reads.inter(line.suffix(-step_back)).print_alignments(sys.stdout)
-        reads = line.reads.inter(line.suffix(-step_back)).noncontradicting(line.asSegment())
+        reads = line.reads.inter(line.suffix(-overlap)).noncontradicting(line.asSegment())
+
         # print "Filtered reads:"
         # reads.print_alignments(sys.stdout)
         newConsensus = self.polisher.polishQuiver(reads, base_consensus, step_back - overlap).cut()
@@ -200,7 +207,7 @@ class Prolonger:
             print newConsensus.seq[:overlap]
             print line.suffix(-overlap).Seq()
             for i in range(overlap):
-                if newConsensus.seq[i] != line.suffix(-overlap).Seq()[i]:
+                if newConsensus.seq[i] != line[-overlap + i]:
                     print "First difference at position", i
                     break
         old_len = len(line)

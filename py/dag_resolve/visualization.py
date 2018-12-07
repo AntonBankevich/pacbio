@@ -54,11 +54,15 @@ class HistoryPrinter:
             vertices = []
         if edges is None:
             edges = []
-        fn = os.path.join(self.dir, str(self.cur_picture) + "_" + "_".join(message.split()) + ".dot")
+        if message == "Final":
+            fn = os.path.join(self.dir, "Final.dot")
+        else:
+            fn = os.path.join(self.dir, str(self.cur_picture) + "_" + "_".join(message.split()) + ".dot")
         f = open(fn, "w")
         self.printer.printToFile(f, [FilterColoring(lambda e: e in edges, "purple")], [FilterColoring(lambda v: v in vertices, "purple")])
         f.close()
         self.cur_picture += 1
+
 
 
 class DotPrinter:

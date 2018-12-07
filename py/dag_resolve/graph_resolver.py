@@ -103,7 +103,7 @@ class GraphResolver:
                 line.invalidated_reads.extend(relevant_reads)
                 line.fixLineAlignments()
         Knotter(self.lineStorage, self.edgeResolver.aligner).knotGraph()
-        self.printer.printCurrentGraph([], [])
+        self.printer.printCurrentGraph([], [], "Final")
 
     # def printResults(self, handler):
     #     # type: (file) -> None
