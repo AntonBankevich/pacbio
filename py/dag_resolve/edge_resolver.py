@@ -78,18 +78,19 @@ class EdgeResolver:
         print "Uncertain:"
         uncertain.print_alignments(sys.stdout)
         passedLines = []
+        for line in lines:
+            if self.attemptJump(edge, line) is not None:
+                passedLines.append(line)
         # self.prolongAll(edge, lines)
         while True:
             active_lines = [self.shortestLine(lines, passedLines)]
             classified = classifier.classifyReads(active_lines, uncertain)
             uncertain = uncertain.minusBoth(classified) #this should not be important !! Check!!
             total_extention = 0
-            jumped = 0
             for line in active_lines:
                 line_extention = self.prolonger.prolongConsensus(edge, line)
                 if self.attemptJump(edge, line) is not None:
                     passedLines.append(line)
-                    jumped += 1
                 total_extention += line_extention
             if len(passedLines) == len(lines):
                 classifier.classifyReads(lines, uncertain)
@@ -112,6 +113,11 @@ class EdgeResolver:
         print alignments.reads["tail"]
         for al in alignments.reads["tail"].alignments:
             if al.seg_to.left > params.max_jump:
+                continue
+            if al.seg_to.left < 100 and len(al) > 100 and \
+                    line.chain[-1].seg_to.contig == edge and \
+                    line.chain[-1].seg_to.right > len(edge) - 100:
+                best = al
                 continue
             if len(al) < 300 or al.seg_to.contig not in edge.end.out:
                 continue
