@@ -192,7 +192,7 @@ class DotLinePrinter:
         visited = set()
         queue = [] #type: List[Vertex]
         group = dict()
-        for v in order:
+        for v in order[::-1]:
             gid = v.id
             queue.append(v)
             while len(queue) != 0:
@@ -201,9 +201,9 @@ class DotLinePrinter:
                     continue
                 visited.add(v.id)
                 group[v.id] = gid
-                for e in v.out:
+                for e in v.inc:
                     if not e.unique():
-                        queue.append(e.end)
+                        queue.append(e.start)
         res = set()
         for e in self.graph.E.values():
             if e.unique() or group[e.start.id] != group[e.end.id]:
