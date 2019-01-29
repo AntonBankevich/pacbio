@@ -817,6 +817,27 @@ class AlignmentPiece:
             elif c in "I":
                 cur_query += n
 
+    def asMatchingStrings(self):
+        pos_pairs = list(self.matchingPositions())
+        l1 = []
+        l2 = []
+        for p1, p2 in zip(pos_pairs[:-1], pos_pairs[1:]):
+            l1.append(self.seg_from.contig[p1[0]])
+            l2.append(self.seg_to.contig[p1[1]])
+            lens = [p2[0] - p1[0] - 1, p2[1] - p1[1] - 1]
+            for i in range(min(lens[0], lens[1])):
+                l1.append(self.seg_from.contig[p1[0] + i + 1])
+                l2.append(self.seg_to.contig[p1[1] + i + 1])
+            for i in range(min(lens[0], lens[1]), lens[0]):
+                l1.append(self.seg_from.contig[p1[0] + i + 1])
+                l2.append("-")
+            for i in range(min(lens[0], lens[1]), lens[1]):
+                l1.append("-")
+                l2.append(self.seg_to.contig[p1[1] + i + 1])
+        l1.append(self.seg_from.contig[pos_pairs[-1][0]])
+        l2.append(self.seg_to.contig[pos_pairs[-1][1]])
+        return "".join(l1), "".join(l2)
+
     def percentIdentity(self):
         res = len(list(self.matchingPositions(True)))
         return float(res) / max(len(self.seg_from), len(self.seg_to))

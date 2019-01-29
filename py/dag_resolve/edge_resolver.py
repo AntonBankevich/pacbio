@@ -87,15 +87,17 @@ class EdgeResolver:
             classified = classifier.classifyReads(active_lines, uncertain)
             uncertain = uncertain.minusBoth(classified) #this should not be important !! Check!!
             total_extention = 0
+            jumped = 0
             for line in active_lines:
                 line_extention = self.prolonger.prolongConsensus(edge, line)
                 if self.attemptJump(edge, line) is not None:
+                    jumped += 1
                     passedLines.append(line)
                 total_extention += line_extention
             if len(passedLines) == len(lines):
                 classifier.classifyReads(lines, uncertain)
                 return True, None
-            if len(classified) == 0 and total_extention < 100 and jumped == 0:
+            if len(classified) == 0 and total_extention == 0 and jumped == 0:
                 return False, None
 
     def attemptJump(self, edge, line):
@@ -275,6 +277,7 @@ class ReadClassifier:
             #             continue
             if len(candidates) == 0:
                 n_irrelevant += 1
+                print "Irrelevant read:", read
                 continue
             print "Classifying read", read, "Initial:", reads[read.id]
             print "Candidates:", map(lambda al: str(al), candidates)

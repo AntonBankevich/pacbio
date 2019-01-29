@@ -1,6 +1,7 @@
 from typing import Generator, Dict, Set, Optional, Iterable
 
 from alignment.align_tools import Aligner
+from common import basic
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
 from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece, AlignedRead
 
@@ -255,6 +256,11 @@ class Line(Contig):
                     # print al
                     al.seg_to = al.seg_to.shift(-pos)
 
+    def Knot(self, knot):
+        # type: (Knot) -> None
+        self.knot = knot
+        self.rc.knot = knot.RC()
+
 
 class LinePosition:
     def __init__(self, line, pos, invalidateOnCut = False):
@@ -398,9 +404,15 @@ class LineStorage:
 
 
 class Knot:
-    def __init__(self, line1, line2, seq, reads):
+    def __init__(self, line1, line2, gap, reads):
         # type: (Line, Line, str, ReadCollection) -> Knot
         self.line1 = line1
         self.line2 = line2
-        self.seq = seq
+        self.gap = gap
         self.reads = reads
+
+    def RC(self):
+        return Knot(self.line2.rc, self.line1.rc, self.gap, self.reads.RC())
+
+    def __str__(self):
+        return "Knot:" + str(self.line1.id) + "->" + str(self.line2.id) + "(" + str(self.gap) + ")"

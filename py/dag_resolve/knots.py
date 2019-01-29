@@ -1,3 +1,5 @@
+from typing import Optional, Dict, List
+
 from alignment.align_tools import Aligner
 from dag_resolve import params
 from dag_resolve.line_tools import LineStorage, Line, Knot
@@ -13,7 +15,7 @@ class Knotter:
         self.aligner = aligner
 
     def tryKnot(self, line1, line2):
-        # type: (Line, Line) -> bool
+        # type: (Line, Line) -> Optional[Knot]
         print "Trying to knot lines:", line1, line2
         # same_vertex = line1.chain[-1].seg_to.contig.end.rc == line2.chain[-1].seg_to.contig.end
         # extreme_case = line1.rc.id == line2.id and len(line1.chain) == 1 and len(line2.chain) == 1
@@ -57,25 +59,52 @@ class Knotter:
         for read in common_reads:
             print line1.reads[read.id], line1.reads[read.id] == line2.reads[read.id], self.graph.reads[read.id]
         if len(common_reads) >= params.min_reads_in_knot and (aligned >= params.min_reads_in_knot or no_inter >= params.min_reads_in_knot):
-            line1.knot = Knot(line1, line2, "", common_reads)
-            line2.rc.knot = Knot(line2.rc, line1.rc, "", common_reads.RC())
-            print "Knotted lines", line1, "and", line2
-            return True
+            # line1.knot = Knot(line1, line2, "", common_reads)
+            # line2.rc.knot = Knot(line2.rc, line1.rc, "", common_reads.RC())
+            print "Found knot between lines", line1, "and", line2
+            return Knot(line1, line2, 0, common_reads) #FIX WITH RIGHT GAP SIZE!
         else:
-            return False
+            return None
 
     def knotGraph(self):
         for line in self.storage.lines:
             print "Line center:", line, len(line), line.centerPos.pos, line.rc.centerPos.pos, len(line.reads.inter(line.centerPos.suffix())), len(line.reads.inter(line.centerPos.prefix()))
         print "Knotting lines"
-        relevant_lines = filter(lambda line: len(line.baseEdge.end.out) > 0 or len(line.baseEdge.start.inc) > 0, self.storage.lines)
+        relevant_lines = filter(lambda line: len(line.baseEdge.end.out) > 0 or len(line.baseEdge.start.inc) > 0, self.storage.lines) # type: List[Line]
+        knots = dict() # type: Dict[str, List[Knot]]
         for line1 in relevant_lines:
+            knots[line1.id] = []
             for line2 in relevant_lines:
                 if line1 != line2.rc:
-                    self.tryKnot(line1, line2)
-                # if line1.knot is None and line2.knot is None and line1 != line2.rc:
-                #     if self.tryKnot(line1, line2):
-                #         break
+                    knot = self.tryKnot(line1, line2)
+                    if knot is not None:
+                        knots[line1.id].append(knot)
+        for line in relevant_lines:
+            if len(knots[line.id]) == 0:
+                continue
+            other_line = knots[line.id][0].line2
+            if len(knots[line.id]) == 1 and len(knots[other_line.rc.id]) == 1 and line == knots[other_line.rc.id][0].line2.rc:
+                print "Knotted lines", line, "and", other_line
+                line.Knot(knots[line.id][0])
+            else:
+                if len(knots[line.id]) > 1:
+                    print "Multiple outgoing knots for line", line
+                    for knot in knots[line.id]:
+                        print knot
+                elif len(knots[other_line.rc.id]) > 1:
+                    print "Multiple alternative knots for line", line
+                    for knot in knots[other_line.rc.id]:
+                        print knot.RC()
+                elif len(knots[other_line.rc.id]) == 0:
+                    print "Assimmetrical knots for line", line, "No back knot"
+                    print knots[line.id][0]
+                else:
+                    print "Assimmetrical knots for line", line
+                    print knots[line.id][0]
+                    print knots[other_line.rc.id][0]
+
+
+
 
     def extremeConnect(self, read, edge):
         # type: (AlignedRead, Edge) -> bool
