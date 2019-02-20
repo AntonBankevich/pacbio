@@ -20,10 +20,9 @@ rc['N'] = 'N'
 
 def RC(s):
     # type: (str) -> str
-    res = []
-    for a in s[::-1]:
-        # sys.stderr.write(a)
-        res.append(rc[a])
+    res = list(s)[::-1]
+    for i, c in enumerate(res):
+        res[i] = rc[c]
     return "".join(res)
 
 def ensure_dir_existance(dir):
