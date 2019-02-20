@@ -8,7 +8,7 @@ from flye_tools.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
 from common.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, Segment
-from typing import Optional, Iterable, Tuple, Generator
+from typing import Optional, Iterable, Tuple, Generator, BinaryIO
 from common import basic, sam_parser, SeqIO
 
 
@@ -57,12 +57,12 @@ class DirDistributor:
             yield f_name, str(self.hash(reads)), str(len(reads))
 
     def printHash(self, handler, hashs):
-        # type: (file, list[Tuple[str, str, str]]) -> None
+        # type: (BinaryIO, list[Tuple[str, str, str]]) -> None
         for rec in hashs:
             handler.write(" ".join(rec) + "\n")
 
     def compareHash(self, handler, hashs):
-        # type: (file, list[Tuple[str, str, str]]) -> bool
+        # type: (BinaryIO, list[Tuple[str, str, str]]) -> bool
         lines = handler.readlines()
         if len(lines) != len(hashs):
             return False

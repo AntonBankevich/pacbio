@@ -15,6 +15,7 @@ rc['a'] = 'T'
 rc['c'] = 'G'
 rc['g'] = 'C'
 rc['t'] = 'A'
+rc['N'] = 'N'
 
 
 def RC(s):

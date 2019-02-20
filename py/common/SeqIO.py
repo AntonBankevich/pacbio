@@ -84,7 +84,7 @@ def parse_fasta(handler):
             info = rec_id[pos + 1:]
             rec_id = rec_id[:pos]
         assert(rec_id[0] == '>')
-        rec_seq = reader.ReadUntill(lambda s: s.startswith(">"))
+        rec_seq = reader.ReadUntill(lambda s: s.startswith(">")).upper()
         yield SeqRecord(rec_seq, rec_id[1:], None, info)
 
 

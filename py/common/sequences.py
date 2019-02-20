@@ -50,10 +50,13 @@ class ContigCollection():
         # type: (str) -> Contig
         return self.contigs[contig_id]
 
-    def loadFromFasta(self, handler):
-        # type: (BinaryIO) -> ContigCollection
+    def loadFromFasta(self, handler, num_names = True):
+        # type: (BinaryIO, bool) -> ContigCollection
         for rec in SeqIO.parse_fasta(handler):
-            self.add(Contig(rec.seq, str(basic.parseNegativeNumber(rec.id))))
+            if num_names:
+                self.add(Contig(rec.seq, str(basic.parseNegativeNumber(rec.id))))
+            else:
+                self.add(Contig(rec.seq, rec.id))
         return self
 
     def print_fasta(self, handler):
@@ -135,6 +138,10 @@ class Segment:
         l = len(self.contig)
         return Segment(self.contig.rc, l - self.right, l - self.left)
 
+    def asNamedSequence(self):
+        # type: () -> NamedSequence
+        return NamedSequence(self.Seq(), self.contig.id + "[" + str(self.left) + "," + str(self.right) + "]")
+
     def precedes(self, other, delta = 0):
         # type: (Segment, int) -> bool
         return self.contig == other.contig and self.right <= other.left + delta
@@ -186,10 +193,15 @@ class Segment:
     def expand(self, range):
         return Segment(self.contig, max(self.left - range, 0), min(self.right + range, len(self.contig)))
 
+    def copy(self):
+        return Segment(self.contig, self.left, self.right)
+
 
 class AlignedRead(NamedSequence):
     def __init__(self, rec, rc = None):
         # type: (NamedSequence, Optional[AlignedRead]) -> None
+        if rec.id.startswith("contig_"):
+            rec.id = rec.id[len("contig_"):]
         NamedSequence.__init__(self, rec.seq, rec.id)
         self.alignments = [] # type: list[AlignmentPiece]
         if rc is None:
@@ -202,6 +214,7 @@ class AlignedRead(NamedSequence):
 
     def alignmentsTo(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
+        self.sort()
         for al in self.alignments:
             if al.seg_to.inter(seg):
                 yield al
@@ -231,14 +244,14 @@ class AlignedRead(NamedSequence):
         seg_from.contig.alignments.append(piece)
         seg_from.contig.rc.alignments.append(piece.RC())
         # self.rc.alignments.append(piece.RC())
-        if piece.percentIdentity() < 0.4:
-            print piece
-            print rec.pos, rec.rc, rec.query_name, rec.tname, rec.alen
-            print rec.cigar
-            print piece.seg_from.Seq()
-            print piece.seg_to.Seq()
-            print "\n".join(map(str, piece.matchingPositions()))
-            assert False
+        # if piece.percentIdentity() < 0.3:
+        #     print piece
+        #     print rec.pos, rec.rc, rec.query_name, rec.tname, rec.alen
+        #     print rec.cigar
+        #     print piece.seg_from.Seq()
+        #     print piece.seg_to.Seq()
+        #     print "\n".join(map(str, piece.matchingPositions()))
+        #     assert False
         return piece
 
     def addAlignment(self, al):
@@ -335,6 +348,22 @@ class AlignedRead(NamedSequence):
         self.alignments = filter(lambda al: not al.seg_to.inter(seg), self.alignments)
         self.rc.alignments = filter(lambda al: not al.seg_to.inter(seg.RC()), self.rc.alignments)
 
+    def suffix(self, pos):
+        # type: (int) -> Segment
+        if pos < 0:
+            pos = self.__len__() + pos
+        if pos < 0:
+            pos = 0
+        if pos > len(self):
+            pos = len(self)
+        return Segment(self, pos, self.__len__())
+
+    def prefix(self, len):
+        # type: (int) -> Segment
+        len = min(len, self.__len__())
+        return Segment(self, 0, len)
+
+
 
 class ReadCollection:
     # type: (ContigCollection, Optional[Iterable[AlignedRead]]) -> ReadCollection
@@ -378,6 +407,8 @@ class ReadCollection:
         if rec.is_unmapped:
             return False
         rname = rec.query_name.split()[0]
+        if rname.startswith("contig_"):
+            rname = rname[len("contig_"):]
         if rname in self.reads:
             self.reads[rname].AddSamAlignment(rec, self.contigs[rec.tname])
             return True
@@ -394,37 +425,27 @@ class ReadCollection:
 
     def loadFromSam(self, sam, filter = lambda rec: True):
         # type: (sam_parser.Samfile, Callable[[AlignedRead], bool]) -> ReadCollection
-        last = [] # type: list[sam_parser.SAMEntryInfo]
-        for new_rec in itertools.chain(sam, [None]):
-            if new_rec is not None and (len(last) == 0 or new_rec.query_name == last[-1].query_name):
-                last.append(new_rec)
-            else:
-                if len(last) == 0:
-                    return self
-                seq = None
-                for rec in last:
-                    if "H" not in rec.cigar and rec.seq != "*":
-                        seq = rec.seq
-                        break
-                addRC = False
-                addStraight = False
-                assert seq is not None, last[0].query_name + " " + str(len(last))
-                new_read = AlignedRead(common.seq_records.SeqRecord(seq, last[0].query_name))
-                for rec in last: #type: sam_parser.SAMEntryInfo
-                    if rec.is_unmapped:
-                        continue
-                    assert int(rec.tname) in self.contigs.contigs
-                    contig = self.contigs[rec.tname]
-                    alignment = new_read.AddSamAlignment(rec, contig)
-                    if alignment.seg_to.contig in self.contigs:
-                        addStraight = True
-                    if alignment.seg_to.contig.rc in self.contigs:
-                        addRC = True
-                if addStraight and filter(new_read):
-                    self.reads[new_read.id] = new_read
-                if addRC and filter(new_read.rc):
-                    self.reads[new_read.rc.id] = new_read.rc
-                last = [new_rec]
+        recs = list(sam)
+        for new_rec in recs:
+            if "H" not in new_rec.cigar and new_rec.seq != "*":
+                if new_rec.rc:
+                    seq = basic.RC(new_rec.seq).upper()
+                else:
+                    seq = new_rec.seq.upper()
+                read = AlignedRead(NamedSequence(seq, new_rec.query_name))
+                self.reads[read.id] = read
+        for new_rec in recs:
+            read = self.reads[new_rec.query_name]
+            addRC = False
+            if new_rec.is_unmapped:
+                continue
+            assert new_rec.tname in self.contigs.contigs, str(new_rec.tname) + " " + str(list(self.contigs.contigs.keys()))
+            contig = self.contigs[new_rec.tname]
+            alignment = read.AddSamAlignment(new_rec, contig)
+            if alignment.seg_to.contig.rc in self.contigs:
+                addRC = True
+            if addRC and filter(read.rc):
+                self.reads[read.rc.id] = read.rc
         return self
 
     def add(self, read):
@@ -432,6 +453,12 @@ class ReadCollection:
         assert read not in self.reads or read == self.reads[read.id], str(read) + " " + str(self.reads[read.id])
         self.reads[read.id] = read
         return read
+
+    def addAllRC(self):
+        # type: () -> ReadCollection
+        for read in self.reads.values():
+            self.add(read.rc)
+        return self
 
     def filter(self, condition):
         # type: (callable(AlignedRead)) -> ReadCollection
@@ -497,7 +524,7 @@ class ReadCollection:
         return len(self.reads)
 
     def print_fasta(self, hander):
-        # type: (file) -> None
+        # type: (BinaryIO) -> None
         for read in self:
             SeqIO.write(read, hander, "fasta")
 
@@ -736,11 +763,17 @@ class AlignmentPiece:
         assert cigar != "X"
         assert cigar.find("H") == -1 and cigar.find("S") == -1
         self.cigar = cigar
-        assert self.matchingPercentIdentity() > 0.5, str(self)
+        # if self.matchingPercentIdentity() < 0.05:
+        #     print seg_from.Seq()
+        #     print seg_to.Seq()
+        # assert self.matchingPercentIdentity() > 0.5, str(self)
 
     def __str__(self):
         # type: () -> str
-        pid = self.percentIdentity()
+        if len(self) < 20000:
+            pid = self.percentIdentity()
+        else:
+            pid = 1
         if pid > 0.99:
             spid = "%0.3f" % pid
         else:
