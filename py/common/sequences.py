@@ -91,6 +91,9 @@ class Contig(NamedSequence):
         self.rc = rc
         NamedSequence.__init__(self, seq, id)
 
+    def segment(self, left, right):
+        return Segment(self, left, right)
+
     def suffix(self, pos):
         # type: (int) -> Segment
         if pos < 0:
