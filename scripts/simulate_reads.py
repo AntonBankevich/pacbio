@@ -6,7 +6,7 @@ from common import basic, SeqIO
 from common.sequences import ContigCollection
 
 def main(ref_file, contig_name, rlen, cov, dir):
-    contig_names = contig_name.split(";")
+    contig_names = contig_name.split(",")
     basic.ensure_dir_existance(dir)
     all_contigs = ContigCollection().loadFromFasta(open(ref_file, "r"), False)
     for contig_name in contig_names:
