@@ -23,7 +23,7 @@ def main(ref_file, contig_name, rlen, cov, dir):
         reads_file = open(reads_file_name, "w")
         for i in range(0, len(ref), max(1, rlen / cov)):
             read = ref.segment(i, min(i + rlen, len(ref))).asNamedSequence()
-            SeqIO.write(reads_file, read, "fasta")
+            SeqIO.write(read, reads_file, "fasta")
         reads_file.close()
         print "Done", contig_name
         print contig_file_name
