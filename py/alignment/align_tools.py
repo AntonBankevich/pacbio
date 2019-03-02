@@ -7,7 +7,7 @@ from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
-from common.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, Segment
+from common.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, Segment, loadFromSam
 from typing import Optional, Iterable, Tuple, Generator, BinaryIO
 from common import basic, sam_parser, SeqIO
 
@@ -309,10 +309,9 @@ class Aligner:
         self.cur_alignment = 0
         self.threads = threads
 
-    def alignReadCollection(self, reads_collection, contigs = None):
+    def alignReadCollection(self, reads_collection, contigs):
         # type: (ReadCollection, Iterable[Contig]) -> None
-        if contigs is None:
-            contigs = reads_collection.contigs
+        contig_collection = ContigCollection(contigs)
         contig_ids = set()
         for contig in contigs:
             if contig.rc.id not in contig_ids:
@@ -323,7 +322,7 @@ class Aligner:
                 read_ids.add(read.id)
         contigs = filter(lambda contig: contig.id in contig_ids, contigs)
         reads = filter(lambda read: read.id in read_ids, reads_collection)
-        reads_collection.fillFromSam(self.align(reads, contigs))
+        reads_collection.fillFromSam(self.align(reads, contigs), contig_collection)
 
     def alignReadsToSegments(self, reads, segments):
         # type: (ReadCollection, Iterable[Segment]) -> None
@@ -332,16 +331,16 @@ class Aligner:
         for i, seg in enumerate(segments):
             seg_dict[str(i + 1)] = seg
         contigs = map(lambda (i, seg): Contig(seg.Seq(), str(i + 1)), enumerate(segments))
-        read_collection = ReadCollection(ContigCollection(contigs)).extendClean(reads)
-        self.alignReadCollection(read_collection)
+        read_collection = ReadCollection().extendClean(reads)
+        self.alignReadCollection(read_collection, ContigCollection(contigs))
         read_collection.contigsAsSegments(seg_dict)
         reads.mergeAlignments(read_collection)
 
-    def realignCollection(self, reads_collection):
-        # type: (ReadCollection) -> None
+    def realignCollection(self, reads_collection, contigs):
+        # type: (ReadCollection, Iterable[Contig]) -> None
         for read in reads_collection:
             read.clean()
-        self.alignReadCollection(reads_collection)
+        self.alignReadCollection(reads_collection, contigs)
 
     # def fixExtendedLine(self, line):
     #     # type: (Line) -> None
@@ -361,19 +360,14 @@ class Aligner:
     #                     al.seg_to = new_al.seg_to
     #                     al.cigar = new_al.cigar
 
-    def expandCollection(self, reads_collection, new_reads):
-        # type: (ReadCollection, list[AlignedRead]) -> None
-        for read in new_reads:
-            reads_collection.addNewRead(read)
-        reads_collection.fillFromSam(self.align(new_reads, reads_collection.contigs))
-
     def separateAlignments(self, reads, contigs):
         # type: (Iterable[NamedSequence], Iterable[Contig]) -> ReadCollection
-        res = ReadCollection(ContigCollection(list(contigs)))
+        contigs_collection = ContigCollection(list(contigs))
+        res = ReadCollection(contigs_collection)
         for read in reads:
             res.addNewRead(NamedSequence(read.seq, read.id)) # remove when all ids are str
         for contig in contigs:
-            res.fillFromSam(self.align(res, [contig]))
+            res.fillFromSam(self.align(res, [contig]), contigs_collection)
         return res
 
     def align(self, reads, reference):
@@ -432,8 +426,9 @@ class Aligner:
         for rec in self.align(graph.reads, graph.newEdges):
             if not rec.is_unmapped:
                 read = graph.reads[rec.query_name]
-                graph.E[int(rec.tname)].reads.add(read)
-                graph.E[int(rec.tname)].reads.addNewAlignment(rec)
+                edge = graph.E[rec.tname]
+                edge.reads.add(read)
+                edge.reads.addNewAlignment(rec, edge)
         graph.newEdges = []
 
 
@@ -443,7 +438,7 @@ if __name__ == "__main__":
     target = sys.argv[3]
     aln = Aligner(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"))
-    ReadCollection(contigs).loadFromSam(aln.align(ReadCollection().loadFromFasta(open(query, "r")), contigs)).print_alignments(sys.stdout)
+    loadFromSam(ReadCollection(), aln.align(ReadCollection().loadFromFasta(open(query, "r")), contigs), contigs).print_alignments(sys.stdout)
 
 
 

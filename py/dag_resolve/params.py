@@ -8,6 +8,7 @@ min_reads_in_knot = 2
 min_expected_Pacbio_PI = 0.78
 min_allowed_Pacbio_PI = 0.7
 max_jump = 6000
+assert_pi = True
 
 class Scores:
     ins_score = 8

@@ -70,12 +70,12 @@ def main(argv):
     print "Visited", len(visited)
     print map(str, list(visited))
     relevant = []
-    edge_alignments = ReadCollection(ref).loadFromFasta(open(edge_sequences, "r")).addAllRC()
+    edge_alignments = ReadCollection().loadFromFasta(open(edge_sequences, "r")).addAllRC()
     for edge in graph.E.values():
         if edge.start in visited or edge.start.rc in visited:
             relevant.append(edge_alignments[edge.id])
     print "Loading sam"
-    edge_alignments.fillFromSam(Samfile(open(alignment_file, "r")))
+    edge_alignments.fillFromSam(Samfile(open(alignment_file, "r")), ref)
     for rel in relevant:
         print rel.__str__()
     print "Collecting segments"

@@ -69,7 +69,7 @@ class EdgeResolver:
             else:
                 positions.append(LinePosition(line, 0))
         classifier = ReadClassifier(self.graph, self.aligner, lines, positions)
-        uncertain = ReadCollection(ContigCollection(lines), map(lambda read: self.reads[read.id], edge.reads))
+        uncertain = ReadCollection(map(lambda read: self.reads[read.id], edge.reads))
         print "All reads:"
         edge.reads.print_alignments(sys.stdout)
         print "All on line:"
@@ -108,9 +108,9 @@ class EdgeResolver:
         if len(seq) < 300:
             print "Tail too short"
             return None
-        alignments = ReadCollection(ContigCollection(edge.end.out))
+        alignments = ReadCollection()
         alignments.addNewRead(NamedSequence(seq, "tail"))
-        self.aligner.alignReadCollection(alignments)
+        self.aligner.alignReadCollection(alignments, [edge.end.out])
         best = None
         print alignments.reads["tail"]
         for al in alignments.reads["tail"].alignments:
@@ -132,9 +132,9 @@ class EdgeResolver:
                 best = al
         if best is None:
             print "No jump"
-            alignments = ReadCollection(ContigCollection(self.graph.E.values()))
+            alignments = ReadCollection()
             alignments.addNewRead(NamedSequence(seq, "tail"))
-            self.aligner.alignReadCollection(alignments)
+            self.aligner.alignReadCollection(alignments, self.graph.E.values())
             alignments.print_alignments(sys.stdout)
             return None
         line.addAlignment(AlignmentPiece(Segment(line, best.seg_from.left + shift, best.seg_from.right + shift), best.seg_to, best.cigar))
@@ -220,9 +220,9 @@ class Prolonger:
                     break
         old_len = len(line)
         line.extendRight(newConsensus, -overlap)
-        alignments = ReadCollection(ContigCollection([edge])) # alignments to previous edges may become corrupted!!!
+        alignments = ReadCollection() # alignments to previous edges may become corrupted!!!
         read = alignments.addNewRead(NamedSequence(newConsensus.seq, "tail"))
-        self.aligner.alignReadCollection(alignments)
+        self.aligner.alignReadCollection(alignments, [edge])
         read.sort()
         for al in read.alignments:
             if al.seg_to.contig == edge:
@@ -251,7 +251,7 @@ class ReadClassifier:
         print "Full list of lines:", map(str, self.lines)
         print "Active lines:", map(str, active)
         line_aligns = self.pairwiseAlign(self.lines)
-        alignments = ReadCollection(ContigCollection(self.lines))
+        alignments = ReadCollection()
         for read in reads.reads.values():
             alignments.addNewRead(read)
         for line in self.lines:
@@ -314,7 +314,7 @@ class ReadClassifier:
         for line in self.lines:
             print len(classified[line.id]), "reads were classified to line", line
             print map(str, classified[line.id])
-        res = ReadCollection(reads.contigs).extend(list(itertools.chain(*classified.values())))
+        res = ReadCollection().extend(list(itertools.chain(*classified.values())))
         print "Classified", len(res), "reads. Irrelevant:", n_irrelevant, ". Uncertain:", n_uncertain, ". Nonactive line:", n_class - len(res)
         return res
 

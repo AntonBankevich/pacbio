@@ -2,7 +2,7 @@ import sys
 sys.path.append("py")
 
 from common.sam_parser import Samfile
-from common.sequences import ContigCollection, ReadCollection
+from common.sequences import ContigCollection, ReadCollection, loadFromSam
 from dag_resolve.line_align import Scorer
 
 
@@ -10,8 +10,7 @@ def main(contig_file, sam_file):
     # type: (str, str) -> None
     contigs = ContigCollection()
     contigs.loadFromFasta(open(contig_file, "r"))
-    reads = ReadCollection(contigs)
-    reads.loadFromSam(Samfile(open(sam_file, "r")))
+    reads = loadFromSam(ReadCollection(), Samfile(open(sam_file, "r")), contigs)
     scores = []
     full_count = dict()
     for read in reads:

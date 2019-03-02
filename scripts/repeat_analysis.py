@@ -20,7 +20,7 @@ def main(contig_file, reads_file, sam_file, dir, contig_id):
     read_names = set()
     for rec in Samfile(open(sam_file, "r")):
         read_names.add(rec.query_name)
-    reads = ReadCollection(contigs)
+    reads = ReadCollection()
     cnt = 0
     for rec in SeqIO.parse_fasta(open(reads_file, "r")):
         if rec.id in read_names:
@@ -33,7 +33,7 @@ def main(contig_file, reads_file, sam_file, dir, contig_id):
     print "RC added", len(reads)
 
     aligner = Aligner(DirDistributor(os.path.join(dir, "alignments")))
-    aligner.alignReadCollection(reads)
+    aligner.alignReadCollection(reads, contigs)
     print "Reads aligned", len(reads)
     reads = reads.inter(contig.asSegment())
     print "Reads filtered", len(reads)

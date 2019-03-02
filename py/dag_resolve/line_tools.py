@@ -55,7 +55,7 @@ class Line(Contig):
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
         Contig.__init__(self, edge.seq, edge.id, None, self.rc)
         self.chain = [AlignmentPiece(self.asSegment(), edge.asSegment(), "=")] # type: list[AlignmentPiece]
-        self.reads = ReadCollection(ContigCollection([self]))
+        self.reads = ReadCollection()
         self.invalidated_reads = [] # type: list[AlignedRead]
         self.listeners = []
         self.centerPos = LinePosition(self, len(edge) / 2)
@@ -148,10 +148,10 @@ class Line(Contig):
     def fixLineAlignments(self):
         # type: () -> None
         print "Fixing alignments."
-        to_fix = ReadCollection(ContigCollection([Contig(self.centerPos.suffix().Seq(), "half")]))
+        to_fix = ReadCollection()
         to_fix.extendClean(self.invalidated_reads)
         still_invalidated_reads = []
-        self.aligner.alignReadCollection(to_fix)
+        self.aligner.alignReadCollection(to_fix, [Contig(self.centerPos.suffix().Seq(), "half")])
         seg_dict = {"half": self.centerPos.suffix()}
         to_fix.contigsAsSegments(seg_dict)
         to_fix_center = []
@@ -185,9 +185,9 @@ class Line(Contig):
         self.invalidated_reads = still_invalidated_reads
         if len(to_fix_center) == 0:
             return
-        to_fix = ReadCollection(ContigCollection([self]))
+        to_fix = ReadCollection()
         to_fix.extendClean(to_fix_center)
-        self.aligner.alignReadCollection(to_fix)
+        self.aligner.alignReadCollection(to_fix, [self])
         for read in to_fix_center:
             aligned_read = to_fix[read.id]
             has_contradicting = False
@@ -342,7 +342,7 @@ class LineStorage:
                 self.edgeLines[edge2.id].append(line.rc)
                 self.lines.append(line)
                 self.lines.append(line.rc)
-        self.reads = ReadCollection(ContigCollection(self.lines))
+        self.reads = ReadCollection()
         for read in self.g.reads:
             self.reads.addNewRead(read)
         # for line in self.lines:

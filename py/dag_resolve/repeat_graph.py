@@ -49,7 +49,7 @@ class Edge(Contig):
         self.rc = rc # type: Edge
         Contig.__init__(self, consensus, id, info, self.rc)
         self.info = info
-        self.reads = ReadCollection(ContigCollection([self]))
+        self.reads = ReadCollection()
 
     def unique(self):
         return self.info.unique
@@ -65,7 +65,7 @@ class Graph:
         self.min_new_vid = 1
         self.min_new_eid = 6000
         self.newEdges = []
-        self.reads = ReadCollection(self.edgeCollection())
+        self.reads = ReadCollection()
 
     def addVertex(self, v_id = None, selfrc = False, label = None):
         # type: (Optional[int], bool, str) -> Vertex

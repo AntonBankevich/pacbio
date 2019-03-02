@@ -36,8 +36,8 @@ class Polisher:
             reliable_start = len(polishing_base)
         seq = Contig(self.polish(reads, polishing_base), "contig")
         res = [0] * (len(seq) + 1)
-        alignment = ReadCollection(ContigCollection([seq])).extendClean(reads)
-        self.aligner.alignReadCollection(alignment)
+        alignment = ReadCollection().extendClean(reads)
+        self.aligner.alignReadCollection(alignment, [seq])
         contra = 0
         ok = 0
         late = 0
@@ -69,7 +69,7 @@ class Polisher:
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 3000):
         # type: (ReadCollection, str, int, int) -> Optional[Consensus]
         cc = ContigCollection([Contig(base_start, "base_start")])
-        reads_to_base = ReadCollection(cc).extendClean(reads).fillFromSam(self.aligner.align(reads, cc))
+        reads_to_base = ReadCollection().extendClean(reads).fillFromSam(self.aligner.align(reads, cc), cc)
         # for read in reads:
         #     print read
         #     if read.id in reads_to_base.reads:

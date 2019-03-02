@@ -19,7 +19,7 @@ class Knotter:
         print "Trying to knot lines:", line1, line2
         # same_vertex = line1.chain[-1].seg_to.contig.end.rc == line2.chain[-1].seg_to.contig.end
         # extreme_case = line1.rc.id == line2.id and len(line1.chain) == 1 and len(line2.chain) == 1
-        common_reads = ReadCollection(ContigCollection([line1, line2]))
+        common_reads = ReadCollection()
         no_inter = 0
         aligned = 0
         unaligned = 0
@@ -44,8 +44,8 @@ class Knotter:
                 seg1 = line1.suffix(left2 - right1)
                 seg2 = line2.prefix(right1 - left2)
                 segment_read = AlignedRead(seg1.subcontig())
-                alignment = ReadCollection(ContigCollection([seg2.subcontig()]), [segment_read])
-                self.aligner.alignReadCollection(alignment)
+                alignment = ReadCollection()
+                self.aligner.alignReadCollection(alignment, [seg2.subcontig()])
                 found = False
                 for al in segment_read.alignments:
                     if len(al.seg_from) > 0.8 * len(segment_read) and al.percentIdentity() > 0.8:

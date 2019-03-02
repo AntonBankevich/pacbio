@@ -4,10 +4,15 @@ from common import basic
 
 
 class NamedSequence:
-    def __init__(self, seq, id):
-        # type: (str, str) -> NamedSequence
+    def __init__(self, seq, id, zero_pos = 0):
+        # type: (str, str, int) -> NamedSequence
         self.id = id # type: str
         self.seq = seq.upper()
+        self.zero_pos = zero_pos
+
+    def subSequence(self, left, right):
+        # type: (int, int) -> NamedSequence
+        return NamedSequence(self.seq[left + self.zero_pos:right + self.zero_pos], self.id + "(" + str(left) +"," + str(right) + ")")
 
     def __len__(self):
         # type: () -> int
@@ -18,14 +23,14 @@ class NamedSequence:
         return NamedSequence(basic.RC(self.seq), basic.Reverse(self.id))
 
     def __getitem__(self, item):
-        return self.seq[item]
+        return self.seq[item + self.zero_pos]
 
 
 class SeqRecord(NamedSequence):
-    def __init__(self, seq, id, qual = None, info = None):
-        # type: (str, str, Optional[str], Optional[str]) -> SeqRecord
+    def __init__(self, seq, id, qual = None, info = None, zero_pos = 0):
+        # type: (str, str, Optional[str], Optional[str], int) -> SeqRecord
         assert qual is None or len(qual) == len(seq)
-        NamedSequence.__init__(self, seq, id)
+        NamedSequence.__init__(self, seq, id, zero_pos)
         self.qual = qual
         self.info = info
 

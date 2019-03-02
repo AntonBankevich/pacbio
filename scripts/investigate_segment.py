@@ -13,7 +13,7 @@ def main(ref_file, segment, dir):
     if segment[0] < 0:
         segment = (-segment[0], -segment[1])
         chr1 = chr1.rc
-    reads = ReadCollection(ref)
+    reads = ReadCollection()
     reads_list = []
     for i in range(segment[0], segment[1], 500):
         read = reads.addNewRead(Segment(chr1, i, i + 500).asNamedSequence())
@@ -22,7 +22,7 @@ def main(ref_file, segment, dir):
     chr1.rc.seq = basic.RC(chr1.seq)
     basic.ensure_dir_existance(dir)
     aligner = Aligner(DirDistributor(dir))
-    aligner.alignReadCollection(reads)
+    aligner.alignReadCollection(reads, ref)
     out = sys.stdout
     for read in reads_list:
         # print read
