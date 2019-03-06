@@ -3,6 +3,7 @@ from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, AlignedRead, AlignmentPiece, UniqueList, ReadCollection
+from disjointig_resolve.smart_storage import AlignmentStorage
 
 
 class Disjointig(NamedSequence):
@@ -10,51 +11,47 @@ class Disjointig(NamedSequence):
         # type: (str, str, Optional[Disjointig]) -> None
         NamedSequence.__init__(self, seq, id)
         self.seq = seq
-        self.dot_plot = [] # type: List[AlignmentPiece]
-        self.read_alignments = [] #type: List[AlignmentPiece]
         if rc is None:
+            self.dot_plot = AlignmentStorage() # type: AlignmentStorage
+            self.read_alignments = AlignmentStorage() # type: AlignmentStorage
             self.rc = Disjointig(basic.RC(seq), basic.Reverse(id), self) # type: Disjointig
         else:
-            self.rc = rc
+            self.rc = rc # type:Disjointig
+            self.dot_plot = self.rc.dot_plot.rc # type: AlignmentStorage
+            self.read_alignments = self.rc.read_alignments.rc  # type: AlignmentStorage
 
     def addAlignments(self, alignments):
-        self.read_alignments.extend(alignments)
-        self.read_alignments = sorted(self.read_alignments, key = lambda al: al.segTo.left)
+        # type: (List[AlignmentPiece]) -> None
+        self.read_alignments.addAll(alignments)
         self.rc.alignments = [al.RC() for al in self.read_alignments[::-1]]
 
-    def getReadAlignments(self, segment, only_selected = False):
-        # type: (Segment, bool) -> list[AlignmentPiece]
-        # IMPLEMENT
-        return []
+    def getReadAlignments(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
+        for dt_al in self.dot_plot.allContaining(seg):
+            reduced = dt_al.reduce(target=seg.expand(50))
+            dt = reduced.seg_from.contig # type: Disjointig
+            for read_al in dt.read_alignments.allContaining(dt_al.seg_from):
+                yield read_al.compose(reduced).reduce(target=seg)
 
-    def getDotPlot(self, segment):
+    def getDotPlot(self, seg):
         # type: (Segment) -> list[AlignmentPiece]
-        # IMPLEMENT
-        return []
+        return self.dot_plot.allContaining(seg)
 
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeTokenLine(self.id)
         handler.writeTokenLine(self.seq)
-        handler.writeIntLine(len(self.dot_plot))
-        for al in self.dot_plot:
-            al.save(handler)
-        handler.writeIntLine(len(self.read_alignments))
-        for al in self.read_alignments:
-            al.save(handler)
+        self.dot_plot.save(handler)
+        self.read_alignments.save(handler)
 
 
     def load(self, handler, disjointigs, reads):
         # type: (TokenReader, DisjointigCollection, ReadCollection) -> None
         self.id = handler.readToken()
         self.rc.id = basic.RC(self.id)
-        n = handler.readInt()
-        for al in range(n):
-            self.dot_plot.append(AlignmentPiece.load(handler, disjointigs, disjointigs))
-        n = handler.readInt()
-        for i in range(n):
-            al = AlignmentPiece.load(handler, reads, disjointigs)
-            self.read_alignments.append(al)
+        self.dot_plot.load(handler, disjointigs, self)
+        self.read_alignments.load(handler, reads, disjointigs)
+        for al in self.read_alignments:
             read = al.seg_from.contig # type: AlignedRead
             read.addAlignment(al)
 

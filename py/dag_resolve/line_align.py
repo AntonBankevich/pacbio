@@ -99,7 +99,7 @@ class Scorer:
         # print "Matches:"
         # print matches1.matches
         # print matches2.matches
-        composite = matches1.compose(matches2)
+        composite = matches1.composeDifference(matches2)
         # print "Composite:", composite.matches
         matches1 = matches1.reduceTarget(composite.matches[0][0], composite.matches[-1][0] + 1)
         matches2 = matches2.reduceTarget(composite.matches[0][1], composite.matches[-1][1] + 1)

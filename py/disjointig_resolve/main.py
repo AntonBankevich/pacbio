@@ -1,37 +1,16 @@
 import os
 import sys
 
-from typing import Tuple
-
-from common.save_load import TokenReader, TokenWriter, SaveHandler
-from common.sequences import ContigCollection, UniqueList, AlignmentPiece, ReadCollection
-from disjointig_resolve.accurate_line import NewLineStorage
 
 sys.path.append("py")
 
+from disjointig_resolve.line_extender import LineExtender
+from common.save_load import TokenReader, SaveHandler
+from common.sequences import ContigCollection, ReadCollection
+from disjointig_resolve.accurate_line import NewLineStorage
+from disjointig_resolve.io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.params import Params
-
-def loadAll(handler):
-    # type: (TokenReader) -> Tuple[Params, ContigCollection, ReadCollection, DisjointigCollection, NewLineStorage]
-    params = Params()
-    params.load(handler)
-    contigs = ContigCollection()
-    contigs.load(handler)
-    reads = ReadCollection()
-    reads.loadFromFasta(open(params.reads_file, "r"))
-    disjointigs = DisjointigCollection()
-    disjointigs.load(handler, reads)
-    lines = NewLineStorage(disjointigs)
-    lines.load(handler, reads, contigs)
-    return params, contigs, reads, disjointigs, lines
-
-def saveAll(handler, params, contigs, reads, disjointigs, lines):
-    # type: (TokenWriter, Params, ContigCollection, ReadCollection, DisjointigCollection, NewLineStorage) -> None
-    params.save(handler)
-    contigs.save(handler)
-    disjointigs.save(handler)
-    lines.save(handler)
 
 
 def main(args):
@@ -61,35 +40,26 @@ def main(args):
         lines.fillFromDisjointigs()
 
     save_handler = SaveHandler(params.save_dir)
-    saveAll(save_handler.getWriter(), params, contigs, reads, disjointigs, lines)
     print "Resolving"
     extender = LineExtender(disjointigs)
     knotter = LineKnotter(lines)
+    cnt = 0
     while True:
         stop = True
         for line in lines:
             extended = extender.tryExtend(line)
             if extended:
+                cnt += 1
                 stop = False
                 knotter.tryKnot(line)
+            if cnt > 50:
+                cnt = 0
+                saveAll(save_handler.getWriter(), params, contigs, reads, disjointigs, lines)
         if stop:
             break
 
     lines.printToFile(sys.stdout)
     lines.printToFasta(open(os.path.join(params.dir, "lines.fasta"), "w"))
-
-
-
-
-
-#     IMPLEMENT
-
-
-
-
-
-
-
 
 
 

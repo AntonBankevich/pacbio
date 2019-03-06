@@ -177,6 +177,16 @@ class Segment:
         self.left = left
         self.right = right
 
+    def cap(self, other):
+        # type: (Segment) -> Segment
+        assert self.inter(other)
+        return Segment(self.contig, max(self.left, other.left), min(self.right, other.right))
+
+    def cup(self, other):
+        # type: (Segment) -> Segment
+        assert self.inter(other)
+        return Segment(self.contig, min(self.left, other.left), max(self.right, other.right))
+
     def RC(self):
         # type: () -> Segment
         l = len(self.contig)
@@ -833,11 +843,15 @@ class MatchingSequence:
                 cur_other += 1
         return MatchingSequence(self.seq_from, self.seq_to, matches)
 
-    def compose(self, other):
+    def composeDifference(self, other):
         # type: (MatchingSequence) -> MatchingSequence
         matchings = [(self.matches[pos_self][1], other.matches[pos_other][1]) for pos_self, pos_other in
                      self.common(other)]
         return MatchingSequence(self.seq_to, other.seq_to, matchings)
+
+    def compose(self, other):
+        # type: (MatchingSequence) -> MatchingSequence
+        return self.reverse().composeDifference(other)
 
     def concat(self, others):
         # type: (List[MatchingSequence]) -> MatchingSequence
@@ -1072,6 +1086,10 @@ class AlignmentPiece:
     def load(handler, collection_from, collection_to):
         # type: (TokenReader, Any, Any) -> AlignmentPiece
         return AlignmentPiece(Segment.load(handler, collection_from), Segment.load(handler, collection_to), handler.readToken())
+
+    def compose(self, other):
+        # type: (AlignmentPiece) -> AlignmentPiece
+        return self.matchingSequence(False).compose(other.matchingSequence(False)).asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
 
 
 def UniqueList(sequences):
