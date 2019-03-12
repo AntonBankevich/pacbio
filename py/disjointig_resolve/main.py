@@ -1,6 +1,8 @@
 import os
 import sys
 
+from alignment.align_tools import Aligner, DirDistributor
+from disjointig_resolve.dot_plot import LineDotPlot
 
 sys.path.append("py")
 
@@ -19,8 +21,10 @@ def main(args):
     print "Preparing initial state"
     if params.load_from is not None:
         print "Loading initial state from saves"
-        params, contigs, reads, disjointigs, lines = loadAll(TokenReader(open(params.load_from, "r")))
+        params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(params.load_from, "r")))
     else:
+        aligner = Aligner(DirDistributor(params.alignmentDir()))
+
         print "Creating disjointig collection"
         disjointigs = DisjointigCollection()
         disjointigs.loadFromFasta(open(params.disjointigs_file, "r"))
@@ -39,6 +43,9 @@ def main(args):
         lines.fillFromContigs(contigs)
         lines.fillFromDisjointigs()
 
+        dot_plot = LineDotPlot(lines)
+        dot_plot.construct(aligner)
+
     save_handler = SaveHandler(params.save_dir)
     print "Resolving"
     extender = LineExtender(disjointigs)
@@ -54,7 +61,7 @@ def main(args):
                 knotter.tryKnot(line)
             if cnt > 50:
                 cnt = 0
-                saveAll(save_handler.getWriter(), params, contigs, reads, disjointigs, lines)
+                saveAll(save_handler.getWriter(), params, aligner, contigs, reads, disjointigs, lines, dot_plot)
         if stop:
             break
 

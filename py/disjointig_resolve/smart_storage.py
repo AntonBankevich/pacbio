@@ -1,13 +1,29 @@
 from typing import Optional, Iterator, List, Any
 
+from common.alignment_storage import AlignmentPiece
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, AlignmentPiece
+from common.sequences import Segment
 
 
-class SmartStorage:
+class LineListener:
+    def __init__(self):
+        pass
+
+    def fireExtendRight(self, line, seq):
+        pass
+
+    def fireCutRight(self, line, pos):
+        pass
+
+    def fireCorrect(self, alignments):
+        pass
+
+
+class SmartStorage(LineListener):
     def __init__(self, rc=None):
         # type: (Optional[SmartStorage]) -> None
+        LineListener.__init__(self)
         self.items = None  # List
         if rc is None:
             rc = SmartStorage(self)
@@ -26,17 +42,13 @@ class SmartStorage:
             return self.rc.isSorted()
 
     def add(self, seg):
-        if self.isCanonical():
-            self.items.append(seg)
-            self.sorted = False
-        else:
-            self.rc.add(seg.RC())
+        assert False
+        pass
 
     def addAll(self, items):
         # type: (List) -> None
         for item in items:
             self.add(item)
-
 
     def sort(self):
         # type: () -> None
@@ -56,23 +68,6 @@ class SmartStorage:
         else:
             handler.writeIntLine(0)
 
-    def __iter__(self):
-        # type: () -> Iterator
-        self.sort()
-        if self.isCanonical():
-            for item in self.items:
-                yield item
-        else:
-            for item in self.rc.items[::-1]:
-                yield item.RC()
-
-    def __getitem__(self, item):
-        # type: (int) -> Any
-        if self.isCanonical():
-            return self.items[item]
-        else:
-            return self.rc.__getitem__(-1 - item).RC()
-
     def __len__(self):
         if self.isCanonical():
             return len(self.items)
@@ -83,7 +78,7 @@ class SmartStorage:
 class SegmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[SegmentStorage]) -> None
-        SmartStorage.__init__(rc)
+        SmartStorage.__init__(self, rc)
         self.items = None  # List[Segment]
         if rc is None:
             rc = SegmentStorage(self)
@@ -91,6 +86,30 @@ class SegmentStorage(SmartStorage):
         self.rc = rc
         self.sorted = False
         self.key = lambda seg: seg.left
+
+    def __getitem__(self, item):
+        # type: (int) -> Segment
+        if self.isCanonical():
+            return self.items[item]
+        else:
+            return self.rc.__getitem__(-1 - item).RC()
+
+    def __iter__(self):
+        # type: () -> Iterator[Segment]
+        self.sort()
+        if self.isCanonical():
+            for item in self.items:
+                yield item
+        else:
+            for item in self.rc.items[::-1]:
+                yield item.RC()
+
+    def add(self, seg):
+        if self.isCanonical():
+            self.items.append(seg)
+            self.sorted = False
+        else:
+            self.rc.add(seg.RC())
 
     def isIn(self, seg):
         # type: (Segment) -> bool
@@ -104,7 +123,7 @@ class SegmentStorage(SmartStorage):
 
     # Merge all segments that have intersection of at least inter_size and remove all subsegments
     # After this operation segment ordering is the same when we sort by left bound as if we sort by right bounds
-    def mergeSegments(self, inter_size):
+    def mergeSegments(self, inter_size = 0):
         # type: (int) -> None
         if self.isCanonical():
             self.sort()
@@ -131,6 +150,18 @@ class SegmentStorage(SmartStorage):
         else:
             return [seg1.RC() for seg1 in self.rc.cap(seg.RC())]
 
+    def fireExtendRight(self, line, seq):
+        # IMPLEMENT
+        pass
+
+    def fireCutRight(self, line, pos):
+        # IMPLEMENT
+        pass
+
+    def fireCorrect(self, alignments):
+        # IMPLEMENT
+        pass
+
     def load(self, handler, contig):
         # type: (TokenReader, NamedSequence) -> None
         n = handler.readInt()
@@ -141,8 +172,8 @@ class SegmentStorage(SmartStorage):
 class AlignmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[AlignmentStorage]) -> None
-        SmartStorage.__init__(rc)
-        self.items = None  # List[AlignmentPiece]
+        SmartStorage.__init__(self, rc)
+        self.items = None  # type: List[AlignmentPiece]
         if rc is None:
             rc = AlignmentStorage(self)
             self.items = []
@@ -150,11 +181,41 @@ class AlignmentStorage(SmartStorage):
         self.sorted = False
         self.key = lambda al: al.seg_to.left
 
-    def load(self, handler, collection_from, collection_to):
-        # type: (TokenReader, Any, Any) -> None
-        n = handler.readInt()
-        for i in range(n):
-            self.add(AlignmentPiece.load(handler, collection_from, collection_to))
+    def __getitem__(self, item):
+        # type: (int) -> AlignmentPiece
+        if self.isCanonical():
+            return self.items[item]
+        else:
+            return self.rc.__getitem__(-1 - item).rc
+
+    def __iter__(self):
+        # type: () -> Iterator[AlignmentPiece]
+        self.sort()
+        if self.isCanonical():
+            for item in self.items:
+                yield item
+        else:
+            for item in self.rc.items[::-1]:
+                yield item.rc
+
+    def add(self, al):
+        if self.isCanonical():
+            self.items.append(al)
+            self.sorted = False
+        else:
+            self.rc.add(al.rc)
+
+    def fireExtendRight(self, line, seq):
+        # IMPLEMENT
+        pass
+
+    def fireCutRight(self, line, pos):
+        # IMPLEMENT
+        pass
+
+    def fireCorrect(self, alignments):
+        # IMPLEMENT
+        pass
 
     def allInter(self, seg):
         # type: (Segment) -> List[AlignmentPiece]
@@ -171,3 +232,9 @@ class AlignmentStorage(SmartStorage):
             if al.seg_to.contains(seg):
                 result.append(al)
         return result
+
+    def load(self, handler, collection_from, collection_to):
+        # type: (TokenReader, Any, Any) -> None
+        n = handler.readInt()
+        for i in range(n):
+            self.add(AlignmentPiece.load(handler, collection_from, collection_to))

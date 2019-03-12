@@ -1,33 +1,38 @@
-from typing import Optional, Iterable, List, Iterator, BinaryIO
+from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any
 from common import basic
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, AlignmentPiece, UniqueList, ReadCollection, ContigCollection, AlignedRead, Contig
+from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig
+from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.disjointigs import DisjointigCollection, UniqueMarker
-from disjointig_resolve.smart_storage import AlignmentStorage, SegmentStorage
+from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
 
 
 class NewLine(NamedSequence):
-    def __init__(self, seq, id, rc = None, zero_pos = 0):
-        # type: (str, str, Optional[NewLine], int) -> None
+    def __init__(self, seq, id, rc = None, listeners = None, zero_pos = 0):
+        # type: (str, str, Optional[NewLine], Any, int) -> None
         NamedSequence.__init__(self, seq, id, zero_pos)
         if rc is None:
             self.initial = AlignmentStorage()
             self.correct_segments = SegmentStorage()
             self.completely_resolved = SegmentStorage()
+            self.disjointig_alignments = AlignmentStorage()
             self.read_alignments = AlignmentStorage()
-            self.rc = NewLine(basic.RC(seq), basic.Reverse(self.id), len(seq) - zero_pos) #type: NewLine
+            self.listeners = [self.initial, self.correct_segments, self.disjointig_alignments, self.read_alignments] # type: List[LineListener]
+            self.rc = NewLine(basic.RC(seq), basic.Reverse(self.id), listeners, len(seq) - zero_pos) #type: NewLine
         else:
             self.initial = rc.initial.rc # type: AlignmentStorage
             self.correct_segments = rc.correct_segments.rc # type: SegmentStorage
             self.completely_resolved = rc.completely_resolved.rc # type: SegmentStorage
+            self.disjointig_alignments = rc.disjointig_alignments.rc # type: AlignmentStorage
             self.read_alignments = rc.read_alignments.rc # type: AlignmentStorage
+            self.listeners = listeners # type: List[LineListener]
             self.rc = rc #type: NewLine
 
     def addReads(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
         self.read_alignments.extend(alignments)
-        self.rc.read_alignments.extend([al.RC() for al in alignments])
+        self.rc.read_alignments.extend([al.rc for al in alignments])
         self.read_alignments = sorted(self.read_alignments, key = lambda al: al.seg_to.left)
         self.rc.read_alignments = sorted(self.rc.read_alignments, key = lambda al: al.seg_to.left)
 
@@ -63,9 +68,15 @@ class NewLine(NamedSequence):
 
     def extendRight(self, seq):
         # type: (str) -> None
+        self.notifyExtendRight(seq)
         self.seq = self.seq + seq
         self.rc.seq = basic.RC(seq) + self.rc.seq
         self.rc.zero_pos += len(seq)
+
+    def notifyExtendRight(self, seq):
+        # type: (str) -> None
+        for listener in self.listeners:
+            listener.fireExtendRight(self, seq)
 
     # def extendLeft(self, seq):
     #     # type: (str) -> None
@@ -78,9 +89,15 @@ class NewLine(NamedSequence):
         cut_length = len(self) - pos - self.zero_pos
         if cut_length == 0:
             return
+        self.notifyCutRight(pos)
         self.seq = self.seq[:-cut_length]
         self.rc.seq = self.rc.seq[cut_length:]
         self.rc.zero_pos -= cut_length
+
+    def notifyCutRight(self, pos):
+        # type: (int) -> None
+        for listener in self.listeners:
+            listener.fireCutRight(self, pos)
 
     # def cutLeft(self, pos):
     #     assert pos < 0 and 0 <= pos + self.zero_pos <= len(self)
@@ -91,22 +108,35 @@ class NewLine(NamedSequence):
     #     self.rc.seq = self.rc.seq[:-cut_length]
     #     self.zero_pos -= cut_length
 
-    def correctSequence(self, alignment):
-        # type: (AlignmentPiece) -> None
-        #IMPLEMENT fix read alignments, correct segments, initial alignments, sequence and zero_pos
+    def correctSequence(self, alignments):
+        # type: (List[AlignmentPiece]) -> None
+        #IMPLEMENT fix read alignments, correct segments, initial alignments, sequence and zero_pos and everything else. Do not forget to fix rc
+        self.notifyCorrect(alignments)
         pass
 
-    def extendRightWithAlignment(self, alignment):
-        # type: (AlignmentPiece) -> None
-        assert alignment.seg_from.contig == self
-        self.cutRight(alignment.seg_from.right)
-        self.correctSequence(alignment)
-        self.extendRight(alignment.seg_to.contig.suffix(alignment.seg_to.right))
+    def notifyCorrect(self, alignments):
+        # type: (List[AlignmentPiece]) -> None
+        for listener in self.listeners:
+            listener.fireCorrect(alignments)
+
+
+    # def extendRightWithAlignment(self, alignment):
+    #     # type: (AlignmentPiece) -> None
+    #     assert alignment.seg_from.contig == self
+    #     self.cutRight(alignment.seg_from.right)
+    #     self.correctSequence([alignment])
+    #     self.extendRight(alignment.seg_to.contig.suffix(alignment.seg_to.right))
 
     def addReadAlignment(self, al):
         # type: (AlignmentPiece) -> AlignmentPiece
         self.read_alignments.add(al)
         return al
+
+    def addListener(self, listener):
+        self.listeners.append(listener)
+
+    def removeListener(self, listener):
+        self.listeners.remove(listener)
 
     def save(self, handler):
         # type: (TokenWriter) -> None
@@ -115,6 +145,7 @@ class NewLine(NamedSequence):
         self.initial.save(handler)
         self.correct_segments.save(handler)
         self.completely_resolved.save(handler)
+        self.disjointig_alignments.save(handler)
         self.read_alignments.save(handler)
 
     def load(self, handler, disjointigs, reads, contigs):
@@ -124,6 +155,7 @@ class NewLine(NamedSequence):
         self.initial.load(handler, disjointigs, self)
         self.correct_segments.load(handler, self)
         self.completely_resolved.load(handler, self)
+        self.disjointig_alignments.load(handler, disjointigs, self)
         self.read_alignments.load(handler, reads, self)
         for al in self.read_alignments:
             read = al.seg_from.contig #type: AlignedRead
@@ -141,7 +173,7 @@ class NewLineStorage:
     def __init__(self, disjointigs):
         # type: (DisjointigCollection) -> None
         self.disjointigs = disjointigs
-        self.lines = dict()
+        self.lines = dict() # type: Dict[str, NewLine]
         self.cnt = 1
 
     def __iter__(self):
@@ -206,18 +238,25 @@ class NewLineStorage:
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeTokenLine(str(self.cnt))
-        handler.writeTokens(map(lambda line: line.id, UniqueList(self.lines.values())))
-        for line in UniqueList(self.lines.values()):
+        line_ids = map(lambda line: line.id, UniqueList(self.lines.values()))
+        handler.writeTokens(line_ids)
+        for line_id in line_ids:
+            line = self.lines[line_id]
+            handler.writeTokenLine(line.seq)
+        for line_id in line_ids:
+            line = self.lines[line_id]
             line.save(handler)
+
 
     def load(self, handler, reads, contigs):
         # type: (TokenReader, ReadCollection, ContigCollection) -> None
         self.cnt = int(handler.readToken())
         keys = handler.readTokens()
         for key in keys:
-            line = self.add("", key)
+            self.add(handler.readToken(), key)
+        for key in keys:
+            line = self.lines[key]
             line.load(handler, self.disjointigs, reads, contigs)
-            assert key == line.id
 
     def printToFile(self, handler):
         # type: (BinaryIO) -> None

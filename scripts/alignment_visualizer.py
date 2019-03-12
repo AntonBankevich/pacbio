@@ -3,8 +3,8 @@ sys.path.append("py")
 
 from common import sam_parser, basic
 from common.seq_records import NamedSequence
-from common.sequences import ContigCollection, AlignedRead, AlignmentPiece
-
+from common.sequences import ContigCollection
+from common.alignment_storage import AlignmentPiece, AlignedRead
 
 
 def printAlignments(sam_handler, reference_handler, handler):

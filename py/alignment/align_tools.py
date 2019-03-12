@@ -2,12 +2,15 @@ import itertools
 import os
 import sys
 
+from common.save_load import TokenWriter, TokenReader
+
 sys.path.append("py")
 from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
 from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
-from common.sequences import AlignedRead, Contig, ContigCollection, ReadCollection, Segment, loadFromSam
+from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam
+from common.alignment_storage import AlignedRead
 from typing import Optional, Iterable, Tuple, Generator, BinaryIO
 from common import basic, sam_parser, SeqIO
 
@@ -91,6 +94,18 @@ class DirDistributor:
             f_name = os.path.join(dir, f_name)
             self.WriteSequences(reads, f_name)
         return dir, content_files, False
+
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        handler.writeToken(self.dir)
+        handler.writeIntLine(self.cur_dir)
+
+    @staticmethod
+    def load(handler):
+        # type: (TokenReader) -> DirDistributor
+        res = DirDistributor(handler.readToken())
+        res.cur_dir = handler.readInt()
+        return res
 
 class AlignedSequences:
     def __init__(self, seq_from, seq_to):
@@ -306,7 +321,6 @@ class Aligner:
     def __init__(self, dir_distributor, threads = 16):
         # type: (DirDistributor, int) -> Aligner
         self.dir_distributor = dir_distributor
-        self.cur_alignment = 0
         self.threads = threads
 
     def alignReadCollection(self, reads_collection, contigs):
@@ -430,6 +444,16 @@ class Aligner:
                 edge.reads.add(read)
                 edge.reads.addNewAlignment(rec, edge)
         graph.newEdges = []
+
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        handler.writeIntLine(self.threads)
+        self.dir_distributor.save(handler)
+
+    @staticmethod
+    def load(handler):
+        # type: (TokenReader) -> Aligner
+        return Aligner(DirDistributor.load(handler), handler.readInt())
 
 
 if __name__ == "__main__":

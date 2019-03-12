@@ -1,3 +1,5 @@
+import os
+
 from typing import List
 
 from common.save_load import TokenWriter, TokenReader
@@ -15,6 +17,9 @@ class Params:
     def parse(self, args):
         # type: (List[str]) -> Params
         return self
+
+    def alignmentDir(self):
+        return os.path.join(self.dir, "alignment")
 
     def save(self, handler):
         # type: (TokenWriter) -> None

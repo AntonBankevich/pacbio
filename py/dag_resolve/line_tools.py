@@ -3,7 +3,8 @@ from typing import Generator, Dict, Set, Optional, Iterable
 from alignment.align_tools import Aligner
 from common import basic
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
-from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, AlignmentPiece, AlignedRead
+from common.sequences import Consensus, ReadCollection, Contig, ContigCollection
+from common.alignment_storage import AlignmentPiece, AlignedRead
 
 
 # class PseudoLineSegment:
@@ -63,6 +64,7 @@ class Line(Contig):
         self.aligner = aligner
 
     def setConsensus(self, consensus):
+        # type: (Consensus) -> None
         self.consensus = consensus
         self.seq = consensus.seq
         self.rc.consensus = consensus.RC()
@@ -122,7 +124,7 @@ class Line(Contig):
                 self.chain[-1] = AlignmentPiece(matchingSequence.SegFrom(self),
                                                 matchingSequence.SegTo(self.chain[-1].seg_to.contig),
                                                 matchingSequence.cigar())
-        self.rc.chain = [al.RC() for al in self.chain[::-1]]
+        self.rc.chain = [al.rc for al in self.chain[::-1]]
 
     def addAlignment(self, piece):
         self.cutAlignments(piece.seg_from.left)
@@ -130,7 +132,7 @@ class Line(Contig):
             self.chain[-1] = self.chain[-1].merge(piece)
         else:
             self.chain.append(piece)
-        self.rc.chain = [al.RC() for al in self.chain[::-1]]
+        self.rc.chain = [al.rc for al in self.chain[::-1]]
 
     def isSimpleLoop(self):
         return self.knot is not None and len(self.chain) == 1 and len(self.rc.chain) == 1 and self.knot.line2.rc.id == self.id
@@ -219,7 +221,7 @@ class Line(Contig):
             for al in read.alignments:
                 if al.seg_to.contig == self:
                     al.seg_to = al.seg_to.shift(l)
-        self.chain = [al.RC() for al in self.rc.chain[::-1]]
+        self.chain = [al.rc for al in self.rc.chain[::-1]]
 
     def notifyCutRightBefore(self, pos):
         for listener in self.listeners:
