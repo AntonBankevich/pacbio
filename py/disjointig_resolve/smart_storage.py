@@ -3,7 +3,7 @@ from typing import Optional, Iterator, List, Any
 from common.alignment_storage import AlignmentPiece, Correction
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment
+from common.sequences import Segment, Contig
 
 
 class LineListener:
@@ -12,11 +12,11 @@ class LineListener:
         self.rc = rc
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, NamedSequence, str) -> None
+        # type: (Any, Contig, str) -> None
         pass
 
     def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, NamedSequence, int) -> None
+        # type: (Any, Contig, int) -> None
         pass
 
     # alignments from new sequence to new sequence
@@ -174,13 +174,14 @@ class SegmentStorage(SmartStorage):
         self.sorted = self.rc.sorted
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, NamedSequence, str) -> None
+        # type: (Any, Contig, str) -> None
         self.makeCanonical()
 
 
     def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, NamedSequence, int) -> None
+        # type: (Any, Contig, int) -> None
         self.makeCanonical()
+        self.sort()
         self.items = [seg for seg in self.items if seg.left < pos] # type: List[Segment]
         if len(self.items) > 0 and self.items[-1].right > pos:
             assert self.items[-1].contig == line
@@ -190,6 +191,7 @@ class SegmentStorage(SmartStorage):
     def fireBeforeCorrect(self, correction):
         # type: (Correction) -> None
         self.makeCanonical()
+        self.sort()
         self.items = correction.mapSegmentsUp(self.items)
 
     def fireAfterExtendRight(self, line, seq):
@@ -239,6 +241,13 @@ class AlignmentStorage(SmartStorage):
             for item in self.rc.items[::-1]:
                 yield item.rc
 
+    def makeCanonical(self):
+        if self.isCanonical():
+            return
+        self.items = [al.rc for al in self.items[::-1]]
+        self.rc.items = None
+        self.sorted = self.rc.sorted
+
     def add(self, al):
         if self.isCanonical():
             self.items.append(al)
@@ -246,17 +255,42 @@ class AlignmentStorage(SmartStorage):
         else:
             self.rc.add(al.rc)
 
-    def fireBeforeExtendRight(self, line, seq):
-        # IMPLEMENT
-        pass
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (Any, Contig, str) -> None
+        self.makeCanonical()
+        self.items = [al.targetAsSegment(Segment(new_seq, 0, len(line))) for al in self.items]
 
-    def fireBeforeCutRight(self, line, pos):
-        # IMPLEMENT
-        pass
+    def fireAfterExtendRight(self, line, seq):
+        # type: (Any, str) -> None
+        self.makeCanonical()
+        self.items = [al.targetAsSegment(Segment(line, 0, len(line))) for al in self.items]
 
-    def fireBeforeCorrect(self, alignments):
-        # IMPLEMENT
-        pass
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (Any, Contig, int) -> None
+        self.makeCanonical()
+        new_items = []
+        for al in self.items: # type: AlignmentPiece
+            if al.seg_to.right <= pos:
+                new_items.append(al.changeTarget(new_seq))
+            elif al.seg_to.left <= pos:
+                new_items.append(al.reduce(target=Segment(line, line.left(), pos)).changeTarget(new_seq))
+        self.items = new_items # type: List[Segment]
+
+    def fireAfterCutRight(self, line, pos):
+        # type: (Any, int) -> None
+        self.makeCanonical()
+        self.items = [al.changeTarget(line) for al in self.items]
+
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, correction):
+        # type: (Correction) -> None
+        self.makeCanonical()
+        self.items = correction.composeQueryDifferences(self.items) # type: List[AlignmentPiece]
+
+    def fireAfterCorrect(self, line):
+        # type: (Any) -> None
+        self.makeCanonical()
+        self.items = [al.targetAsSegment(Segment(line, line.left(), line.right())) for al in self.items] # type: List[AlignmentPiece]
 
     def allInter(self, seg):
         # type: (Segment) -> List[AlignmentPiece]

@@ -65,7 +65,7 @@ class NewLine(NamedSequence):
 
     def extendRight(self, seq):
         # type: (str) -> None
-        new_seq = NamedSequence(self.seq + seq, "TMP_" + self.id)
+        new_seq = Contig(self.seq + seq, "TMP_" + self.id)
         self.notifyBeforeExtendRight(new_seq, seq)
         self.seq = self.seq + seq
         self.rc.seq = basic.RC(seq) + self.rc.seq
@@ -88,7 +88,7 @@ class NewLine(NamedSequence):
         cut_length = len(self) - pos - self.zero_pos
         if cut_length == 0:
             return
-        new_seq = NamedSequence(self.seq[:pos], "TMP_" + self.id)
+        new_seq = Contig(self.seq[:pos], "TMP_" + self.id)
         self.notifyBeforeCutRight(new_seq, pos)
         self.seq = self.seq[:-cut_length]
         self.rc.seq = self.rc.seq[cut_length:]
@@ -112,7 +112,9 @@ class NewLine(NamedSequence):
         correction = Correction.constructCorrection(alignments)
         self.notifyBeforeCorrect(correction)
         self.seq = correction.seq_from.seq
+        self.rc.seq = basic.RC(self.seq)
         self.zero_pos = correction.mapPositionsUp([0])[0]
+        self.rc.zero_pos = len(self) - self.zero_pos
         self.notifyAfterCorrect()
 
     def notifyBeforeCorrect(self, alignments):

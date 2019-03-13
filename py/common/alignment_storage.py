@@ -1,6 +1,6 @@
 import itertools
 
-from typing import Generator, Tuple, Optional, Any, List, Dict
+from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator
 
 from common import sam_parser
 from common.save_load import TokenWriter, TokenReader
@@ -171,13 +171,15 @@ class AlignmentPiece:
         return False
 
     def targetAsSegment(self, seg):
-        # type: (Segment) -> None
+        # type: (Segment) -> AlignmentPiece
         # print "ContigAsSegment", self, seg
-        self.seg_to = self.seg_to.contigAsSegment(seg)
+        seg_to = self.seg_to.contigAsSegment(seg)
+        return AlignmentPiece(self.seg_from, seg_to, self.cigar)
 
     def queryAsSegment(self, seg):
-        # type: (Segment) -> None
-        self.seg_from = self.seg_from.contigAsSegment(seg)
+        # type: (Segment) -> AlignmentPiece
+        seg_from = self.seg_from.contigAsSegment(seg)
+        return AlignmentPiece(seg_from, self.seg_to, self.cigar)
 
     def reduce(self, segment=None, query=None, target=None):
         # type: (Optional[Segment], Optional[Segment], Optional[Segment]) -> AlignmentPiece
@@ -210,6 +212,18 @@ class AlignmentPiece:
         # type: (AlignmentPiece) -> AlignmentPiece
         return self.matchingSequence(False).compose(other.matchingSequence(False)).asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
 
+    # composes alignments A->B and A->C into alignment B->C
+    def composeTargetDifference(self, other):
+        # type: (AlignmentPiece) -> AlignmentPiece
+        return self.matchingSequence(False).composeDifference(other.matchingSequence(False)).\
+            asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
+
+    # composes alignments A->B and C->B into alignment A->C
+    def composeQueryDifference(self, other):
+        # type: (AlignmentPiece) -> AlignmentPiece
+        return self.matchingSequence(False).compose(other.matchingSequence(False).reverse()).\
+            asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
+
 
 class MatchingSequence:
     def __init__(self, seq_from, seq_to, matchingPositions):
@@ -241,8 +255,9 @@ class MatchingSequence:
         return MatchingSequence(self.seq_from, self.seq_to,
                                 filter(lambda match: left <= match[0] < right, self.matches))
 
-    def asAlignmentPiece(self, contig_from, contig_to):
-        # type: (NamedSequence, NamedSequence) -> AlignmentPiece
+    def asAlignmentPiece(self, contig_from, contig_to, accurate = False):
+        # type: (NamedSequence, NamedSequence, bool) -> AlignmentPiece
+        # IMPLEMENT correction of sparse alignment!!!
         return AlignmentPiece(self.SegFrom(contig_from), self.SegTo(contig_to), self.cigar())
 
     def cigar(self):
@@ -488,6 +503,7 @@ class AlignedRead(NamedSequence):
         # type: (Dict[int, Segment]) -> None
         # print "ContigsAsSegments", self, [str(i) + " " + str(seg_dict[i]) for i in seg_dict]
         self.rc.alignments = []
+        alignments = []
         for al in self.alignments:
             if al.seg_to.contig.id in seg_dict:
                 seg = seg_dict[al.seg_to.contig.id]
@@ -495,8 +511,9 @@ class AlignedRead(NamedSequence):
                 seg = seg_dict[al.seg_to.contig.rc.id].RC()
             else:
                 assert False
-            al.targetAsSegment(seg)
+            alignments.append(al.targetAsSegment(seg))
             self.rc.alignments.append(al.rc)
+        self.alignments = alignments
 
     def mergeAlignments(self, other):
         # type: (AlignedRead) -> AlignedRead
@@ -547,39 +564,102 @@ class Correction:
         right = self.mapPositionsDown([seg.right for seg in segments])
         return [Segment(self.seq_to, l, r) for l, r in zip(left, right)]
 
-    def mapPositionsUp(self, positions):
-        # type: (List[int]) -> List[int]
-        res = []
+    def mapPositionsUp(self, positions, none_one_miss = False):
+        # type: (List[int], bool) -> List[Optional[int]]
+        tmp = [(pos, i) for i, pos in enumerate(positions)]
+        tmp = sorted(tmp)
+        res = [0] * len(positions)
         cur_pos = 0
         for al in self.alignments:
-            while cur_pos < len(positions) and positions[cur_pos] <= al.seg_to.left:
-                res.append(al.seg_from.left - (al.seg_to.left - positions[cur_pos]))
+            while cur_pos < len(tmp) and tmp[cur_pos][0] <= al.seg_to.left:
+                res[tmp[cur_pos][1]] = al.seg_from.left - (al.seg_to.left - tmp[cur_pos][0])
                 cur_pos += 1
             for p1, p2 in al.matchingPositions(equalOnly=False):
-                while cur_pos < len(positions) and positions[cur_pos] <= p2:
-                    res.append(p1)
+                while cur_pos < len(positions) and tmp[cur_pos][0] <= p2:
+                    if tmp[cur_pos][0] == p2 or not none_one_miss:
+                        res[tmp[cur_pos][1]] = p1
+                    else:
+                        res[tmp[cur_pos][1]] = None
                     cur_pos += 1
         while cur_pos < len(positions):
-            res.append(len(self.seq_from) - (len(self.seq_to) - positions[cur_pos]))
+            res[tmp[cur_pos][1]] = len(self.seq_from) - (len(self.seq_to) - tmp[cur_pos][0])
             cur_pos += 1
-        return  res
+        return res
 
-    def mapPositionsDown(self, positions):
-        # type: (List[int]) -> List[int]
-        res = []
+    def mapPositionsDown(self, positions, none_one_miss = False):
+        # type: (List[int], bool) -> List[Optional[int]]
+        tmp = [(pos, i) for i, pos in enumerate(positions)]
+        tmp = sorted(tmp)
+        res = [0] * len(positions)
         cur_pos = 0
         for al in self.alignments:
-            while cur_pos < len(positions) and positions[cur_pos] <= al.seg_from.left:
-                res.append(al.seg_to.left - (al.seg_from.left - positions[cur_pos]))
+            while cur_pos < len(tmp) and tmp[cur_pos][0] <= al.seg_from.left:
+                res[tmp[cur_pos][1]] = al.seg_to.left - (al.seg_from.left - tmp[cur_pos][0])
                 cur_pos += 1
             for p1, p2 in al.matchingPositions(equalOnly=False):
-                while cur_pos < len(positions) and positions[cur_pos] <= p1:
-                    res.append(p2)
+                while cur_pos < len(positions) and tmp[cur_pos][0] <= p1:
+                    if tmp[cur_pos][0] == p1 or not none_one_miss:
+                        res[tmp[cur_pos][1]] = p2
+                    else:
+                        res[tmp[cur_pos][1]] = None
                     cur_pos += 1
         while cur_pos < len(positions):
-            res.append(len(self.seq_to) - (len(self.seq_from) - positions[cur_pos]))
+            res[tmp[cur_pos][1]] = len(self.seq_to) - (len(self.seq_from) - tmp[cur_pos][0])
             cur_pos += 1
-        return  res
+        return res
+
+    def continuousMapping(self, map_function, iter):
+        # type: (Callable[[List[int]], List[int]], Iterator[int]) -> Generator[int]
+        chunk = []
+        for item in iter:
+            chunk.append(item)
+            if len(chunk) > 100000:
+                for res in map_function(chunk):
+                    yield res
+                chunk = []
+        for res in map_function(chunk):
+            yield res
+
+    # This method may change the order of alignments. But they will be sorted by start.
+    def composeQueryDifferences(self, als):
+        # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
+        als = sorted(als, key = lambda al: al.seg_to.left)
+        # Sorting alignments into those that intersect corrections (complex) and those that do not (easy)
+        easy = []
+        complex = []
+        cur = 0
+        for al in self.alignments:
+            while cur < len(als) and als[cur].seg_to.left < al.seg_to.left:
+                if als[cur].seg_to.right >= al.seg_to.left:
+                    complex.append(als[cur])
+                else:
+                    easy.append(als[cur])
+                cur += 1
+            while cur < len(als) and als[cur].seg_to.left < al.seg_to.right:
+                complex.append(als[cur])
+                cur += 1
+        easy.extend(als[cur:])
+
+        res = []
+        # Mapping alignments that do not intersect corrections
+        new_easy_segs = self.mapSegmentsUp([al.seg_to for al in easy])
+        for seg, al in zip(new_easy_segs, easy):
+            res.append(AlignmentPiece(al.seg_from, seg, al.cigar))
+        # Mapping alignments that intersect corrections
+        func = lambda items: self.mapPositionsUp(items, True)
+        matchings = [al.matchingSequence(True) for al in complex]
+        positions = map(lambda matching: map(lambda pair: pair[1], matching), matchings)
+        generator = self.continuousMapping(func, itertools.chain.from_iterable(positions))
+        for al, matching in zip(complex, matchings):
+            new_pairs = []
+            for pos_from, pos_to in matching.matches:
+                new_pos = generator.next()
+                if new_pos is not None:
+                    new_pairs.append((pos_from, new_pos))
+            new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
+            res.append(new_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from, accurate=True))
+        return sorted(res, key = lambda al: al.seg_to.left)
+
 
     @staticmethod
     def constructCorrection(alignments):
@@ -598,7 +678,7 @@ class Correction:
             pos = al.seg_to.right
         sb.append(initial.segment(alignments[-1].seg_to.right,initial.right()).Seq())
         new_pos += initial.right() - alignments[-1].seg_to.right
-        new_seq = NamedSequence("".join(sb), "TMP_" + initial.id)
+        new_seq = Contig("".join(sb), "TMP_" + initial.id)
         new_als = []
         pos = initial.left()
         new_pos = 0
