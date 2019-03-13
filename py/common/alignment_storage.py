@@ -526,4 +526,87 @@ class AlignedRead(NamedSequence):
         len = min(len, self.__len__())
         return Segment(self, 0, len)
 
+# this class stores global alignment between very long sequences.
+# It only stores different parts explicitly. All the rest is expected to be the same in seq_from and seq_to
+class Correction:
+    def __init__(self, seq_from, seq_to, alignments):
+        # type: (NamedSequence, NamedSequence, List[AlignmentPiece]) -> None
+        self.seq_from = seq_from
+        self.seq_to = seq_to
+        self.alignments = alignments
+        
+    def mapSegmentsUp(self, segments):
+        # type: (List[Segment]) -> List[Segment]
+        left = self.mapPositionsUp([seg.left for seg in segments])
+        right = self.mapPositionsUp([seg.right for seg in segments])
+        return [Segment(self.seq_from, l, r) for l, r in zip(left, right)]
+
+    def mapSegmentsDown(self, segments):
+        # type: (List[Segment]) -> List[Segment]
+        left = self.mapPositionsDown([seg.left for seg in segments])
+        right = self.mapPositionsDown([seg.right for seg in segments])
+        return [Segment(self.seq_to, l, r) for l, r in zip(left, right)]
+
+    def mapPositionsUp(self, positions):
+        # type: (List[int]) -> List[int]
+        res = []
+        cur_pos = 0
+        for al in self.alignments:
+            while cur_pos < len(positions) and positions[cur_pos] <= al.seg_to.left:
+                res.append(al.seg_from.left - (al.seg_to.left - positions[cur_pos]))
+                cur_pos += 1
+            for p1, p2 in al.matchingPositions(equalOnly=False):
+                while cur_pos < len(positions) and positions[cur_pos] <= p2:
+                    res.append(p1)
+                    cur_pos += 1
+        while cur_pos < len(positions):
+            res.append(len(self.seq_from) - (len(self.seq_to) - positions[cur_pos]))
+            cur_pos += 1
+        return  res
+
+    def mapPositionsDown(self, positions):
+        # type: (List[int]) -> List[int]
+        res = []
+        cur_pos = 0
+        for al in self.alignments:
+            while cur_pos < len(positions) and positions[cur_pos] <= al.seg_from.left:
+                res.append(al.seg_to.left - (al.seg_from.left - positions[cur_pos]))
+                cur_pos += 1
+            for p1, p2 in al.matchingPositions(equalOnly=False):
+                while cur_pos < len(positions) and positions[cur_pos] <= p1:
+                    res.append(p2)
+                    cur_pos += 1
+        while cur_pos < len(positions):
+            res.append(len(self.seq_to) - (len(self.seq_from) - positions[cur_pos]))
+            cur_pos += 1
+        return  res
+
+    @staticmethod
+    def constructCorrection(alignments):
+        # type: (List[AlignmentPiece]) -> Correction
+        initial = alignments[0].seg_to.contig
+        alignments = sorted(alignments, key = lambda al: al.seg_to.left)
+        sb = []
+        pos = initial.left()
+        new_pos = 0
+        for al in alignments:
+            sb.append(initial.subSequence(pos, al.seg_to.left).seq)
+            new_pos += al.seg_to.left - pos
+            pos = al.seg_to.left
+            sb.append(al.seg_from.Seq())
+            new_pos += al.seg_from.__len__()
+            pos = al.seg_to.right
+        sb.append(initial.segment(alignments[-1].seg_to.right,initial.right()).Seq())
+        new_pos += initial.right() - alignments[-1].seg_to.right
+        new_seq = NamedSequence("".join(sb), "TMP_" + initial.id)
+        new_als = []
+        pos = initial.left()
+        new_pos = 0
+        for al in alignments:
+            new_pos += al.seg_to.left - pos
+            new_seg_from = Segment(new_seq, new_pos, new_pos + al.seg_from.__len__())
+            new_als.append(AlignmentPiece(new_seg_from, al.seg_to, al.cigar))
+            pos = al.seg_to.right
+            new_pos += al.seg_from.__len__()
+        return Correction(new_seq, initial, new_als)
 

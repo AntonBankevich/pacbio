@@ -44,15 +44,15 @@ class LineDotPlot(LineListener):
         # IMPLEMENT
         pass
 
-    def fireExtendRight(self, line, seq):
+    def fireBeforeExtendRight(self, line, seq):
         # IMPLEMENT
         pass
 
-    def fireCutRight(self, line, pos):
+    def fireBeforeCutRight(self, line, pos):
         # IMPLEMENT
         pass
 
-    def fireCorrect(self, alignments):
+    def fireBeforeCorrect(self, alignments):
         # IMPLEMENT
         pass
 

@@ -1,34 +1,50 @@
 from typing import Optional, Iterator, List, Any
 
-from common.alignment_storage import AlignmentPiece
+from common.alignment_storage import AlignmentPiece, Correction
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment
 
 
 class LineListener:
-    def __init__(self):
+    def __init__(self, rc):
+        # type: (LineListener) -> None
+        self.rc = rc
+
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (Any, NamedSequence, str) -> None
         pass
 
-    def fireExtendRight(self, line, seq):
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (Any, NamedSequence, int) -> None
         pass
 
-    def fireCutRight(self, line, pos):
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, alignments):
+        # type: (Correction) -> None
         pass
 
-    def fireCorrect(self, alignments):
+    def fireAfterExtendRight(self, line, seq):
+        # type: (Any, str) -> None
+        pass
+
+    def fireAfterCutRight(self, line, pos):
+        # type: (Any, int) -> None
+        pass
+
+    def fireAfterCorrect(self, line):
+        # type: (Any) -> None
         pass
 
 
 class SmartStorage(LineListener):
     def __init__(self, rc=None):
         # type: (Optional[SmartStorage]) -> None
-        LineListener.__init__(self)
         self.items = None  # List
         if rc is None:
             rc = SmartStorage(self)
             self.items = []
-        self.rc = rc
+        LineListener.__init__(self, rc)
         self.sorted = False
         self.key = lambda item: item
 
@@ -75,16 +91,16 @@ class SmartStorage(LineListener):
             return len(self.rc)
 
 
+# Collection of segments where no segment contains another.
+# The reason is that sortings are the same for strait and rc
 class SegmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[SegmentStorage]) -> None
-        SmartStorage.__init__(self, rc)
         self.items = None  # List[Segment]
         if rc is None:
             rc = SegmentStorage(self)
             self.items = []  # List[Segment]
-        self.rc = rc
-        self.sorted = False
+        SmartStorage.__init__(self, rc)
         self.key = lambda seg: seg.left
 
     def __getitem__(self, item):
@@ -150,17 +166,44 @@ class SegmentStorage(SmartStorage):
         else:
             return [seg1.RC() for seg1 in self.rc.cap(seg.RC())]
 
-    def fireExtendRight(self, line, seq):
-        # IMPLEMENT
+    def makeCanonical(self):
+        if self.isCanonical():
+            return
+        self.items = [seg.RC() for seg in self.items[::-1]]
+        self.rc.items = None
+        self.sorted = self.rc.sorted
+
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (Any, NamedSequence, str) -> None
+        self.makeCanonical()
+
+
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (Any, NamedSequence, int) -> None
+        self.makeCanonical()
+        self.items = [seg for seg in self.items if seg.left < pos] # type: List[Segment]
+        if len(self.items) > 0 and self.items[-1].right > pos:
+            assert self.items[-1].contig == line
+            self.items[-1] = self.items[-1].cap(line.segment(line.left(), pos))
+
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, correction):
+        # type: (Correction) -> None
+        self.makeCanonical()
+        self.items = correction.mapSegmentsUp(self.items)
+
+    def fireAfterExtendRight(self, line, seq):
+        # type: (Any, str) -> None
         pass
 
-    def fireCutRight(self, line, pos):
-        # IMPLEMENT
+    def fireAfterCutRight(self, line, pos):
+        # type: (Any, int) -> None
         pass
 
-    def fireCorrect(self, alignments):
-        # IMPLEMENT
-        pass
+    def fireAfterCorrect(self, line):
+        # type: (Any) -> None
+        self.makeCanonical()
+        self.items = [seg.contigAsSegment(line.segment(line.left(), line.right())) for seg in self.items]
 
     def load(self, handler, contig):
         # type: (TokenReader, NamedSequence) -> None
@@ -172,13 +215,11 @@ class SegmentStorage(SmartStorage):
 class AlignmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[AlignmentStorage]) -> None
-        SmartStorage.__init__(self, rc)
         self.items = None  # type: List[AlignmentPiece]
         if rc is None:
             rc = AlignmentStorage(self)
             self.items = []
-        self.rc = rc
-        self.sorted = False
+        SmartStorage.__init__(self, rc)
         self.key = lambda al: al.seg_to.left
 
     def __getitem__(self, item):
@@ -205,15 +246,15 @@ class AlignmentStorage(SmartStorage):
         else:
             self.rc.add(al.rc)
 
-    def fireExtendRight(self, line, seq):
+    def fireBeforeExtendRight(self, line, seq):
         # IMPLEMENT
         pass
 
-    def fireCutRight(self, line, pos):
+    def fireBeforeCutRight(self, line, pos):
         # IMPLEMENT
         pass
 
-    def fireCorrect(self, alignments):
+    def fireBeforeCorrect(self, alignments):
         # IMPLEMENT
         pass
 

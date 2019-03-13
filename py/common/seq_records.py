@@ -10,6 +10,12 @@ class NamedSequence:
         self.seq = seq.upper()
         self.zero_pos = zero_pos
 
+    def left(self):
+        return -self.zero_pos
+
+    def right(self):
+        return len(self) - self.zero_pos
+
     def subSequence(self, left, right):
         # type: (int, int) -> NamedSequence
         return NamedSequence(self.seq[left + self.zero_pos:right + self.zero_pos], self.id + "(" + str(left) +"," + str(right) + ")")
