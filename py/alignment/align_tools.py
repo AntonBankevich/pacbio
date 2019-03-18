@@ -7,12 +7,11 @@ from common.save_load import TokenWriter, TokenReader
 sys.path.append("py")
 from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
-from dag_resolve import params
 from dag_resolve.repeat_graph import Graph
 from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam
 from common.alignment_storage import AlignedRead
 from typing import Optional, Iterable, Tuple, Generator, BinaryIO
-from common import basic, sam_parser, SeqIO
+from common import basic, sam_parser, SeqIO, params
 
 
 class DirDistributor:

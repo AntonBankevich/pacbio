@@ -4,10 +4,9 @@ import common.seq_records
 from common.alignment_storage import AlignedRead
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from dag_resolve import params
 
 sys.path.append("py")
-from common import sam_parser, SeqIO, basic
+from common import sam_parser, SeqIO, basic, params
 from typing import Generator, Iterator, Dict, Optional, Union, Callable, Iterable, Any, BinaryIO
 
 

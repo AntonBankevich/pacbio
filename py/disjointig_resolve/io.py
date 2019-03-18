@@ -6,7 +6,7 @@ from common.sequences import ContigCollection, ReadCollection
 from disjointig_resolve.accurate_line import NewLineStorage
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
-from disjointig_resolve.params import Params
+from disjointig_resolve.cl_params import Params
 
 
 def loadAll(handler):

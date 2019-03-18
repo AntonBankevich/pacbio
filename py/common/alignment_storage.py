@@ -2,11 +2,11 @@ import itertools
 
 from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator
 
-from common import sam_parser
+from common import sam_parser, params
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, Contig, ContigCollection
-from dag_resolve import params
+from common.line_align import Scorer
 
 
 class AlignmentPiece:
@@ -224,6 +224,10 @@ class AlignmentPiece:
         return self.matchingSequence(False).compose(other.matchingSequence(False).reverse()).\
             asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
 
+    def reverse(self):
+        # type: () -> AlignmentPiece
+        return self.matchingSequence(False).reverse().asAlignmentPiece(self.seg_to.contig, self.seg_from.contig)
+
 
 class MatchingSequence:
     def __init__(self, seq_from, seq_to, matchingPositions):
@@ -255,9 +259,8 @@ class MatchingSequence:
         return MatchingSequence(self.seq_from, self.seq_to,
                                 filter(lambda match: left <= match[0] < right, self.matches))
 
-    def asAlignmentPiece(self, contig_from, contig_to, accurate = False):
-        # type: (NamedSequence, NamedSequence, bool) -> AlignmentPiece
-        # IMPLEMENT correction of sparse alignment!!!
+    def asAlignmentPiece(self, contig_from, contig_to):
+        # type: (NamedSequence, NamedSequence) -> AlignmentPiece
         return AlignmentPiece(self.SegFrom(contig_from), self.SegTo(contig_to), self.cigar())
 
     def cigar(self):
@@ -551,6 +554,7 @@ class Correction:
         self.seq_from = seq_from
         self.seq_to = seq_to
         self.alignments = alignments
+        self.scorer = Scorer()
         
     def mapSegmentsUp(self, segments):
         # type: (List[Segment]) -> List[Segment]
@@ -657,7 +661,8 @@ class Correction:
                 if new_pos is not None:
                     new_pairs.append((pos_from, new_pos))
             new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
-            res.append(new_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from, accurate=True))
+            corrected_matching = self.scorer.polyshAlignment(new_matching)
+            res.append(corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from))
         return sorted(res, key = lambda al: al.seg_to.left)
 
 

@@ -1,10 +1,10 @@
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 
 if __name__ == "__main__":
     import sys
     sys.path.append("py")
 from common.alignment_storage import AlignmentPiece, MatchingSequence
-from dag_resolve import params
+from common import params
 
 
 class Scorer:
@@ -124,7 +124,7 @@ class Scorer:
             matches.append((cur_i, cur_j))
         return MatchingSequence(alignment.seq_from, alignment.seq_to, matches[::-1])
 
-    def score3(self, piece1, piece2):
+    def oldCompare(self, piece1, piece2):
         # type: (AlignmentPiece, AlignmentPiece) -> Tuple[Optional[int], Optional[int], Optional[int]]
         pid1 = piece1.percentIdentity()
         pid2 = piece2.percentIdentity()
@@ -138,6 +138,9 @@ class Scorer:
             return None, self.score(piece2.matchingSequence()), None
         if pid2 < params.min_allowed_Pacbio_PI or (contra2 and piece1.seg_from.right > piece2.seg_from.right + 500):
             return self.score(piece1.matchingSequence()), None, None
+        return self.scoreCommon(piece1, piece2)
+
+    def scoreCommon(self, piece1, piece2):
         matches1 = piece1.matchingSequence()
         matches2 = piece2.matchingSequence()
         composite = matches1.composeDifference(matches2)
@@ -151,8 +154,9 @@ class Scorer:
         if not (abs(accurate1 - accurate2) <= accurate12 <= accurate1 + accurate2):
             print "Triangle inequality failed: " + \
                   str(accurate1) + " " + str(accurate2) + " " + \
-                  str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" +str(accurate1 + accurate2)
+                  str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" + str(accurate1 + accurate2)
         return self.accurateScore(matches1), self.accurateScore(matches2), self.accurateScore(composite)
+
 
 class Storage:
     def __init__(self, left, right, default = None):
@@ -178,7 +182,56 @@ class RectStorage(Storage):
         Storage.__init__(left, right, default)
         self.vals = self.vals # type: List[Storage]
 
+class Tournament:
+    def __init__(self):
+        self.scorer = Scorer()
+
+    def fight(self, c1, c2):
+        # type: (AlignmentPiece, AlignmentPiece) -> Optional[AlignmentPiece]
+        assert c1.seg_from.contig == c2.seg_from.contig
+        s1, s2, s12 = self.scorer.oldCompare(c1, c2)
+        if s12 is None:
+            if s1 is None and s2 is not None:
+                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c2
+                return c2
+            elif s1 is not None and s2 is None:
+                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c1
+                return c1
+            elif s1 is None and s2 is None:
+                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner"
+                return None
+            assert False, "Strange comparison results"
+        else:
+            if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or abs(s1 - s2) < s12 * 0.65:
+                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "No winner"
+                return None
+            if s1 > s2:
+                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c2
+                return c2
+            else:
+                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c1
+                return c1
+
+    def tournament(self, candidates):
+        # type: (list[AlignmentPiece]) -> Optional[AlignmentPiece]
+        best = None
+        for candidate in candidates:
+            if best is None:
+                best = candidate
+            else:
+                best = self.fight(candidate, best)
+        if best is None:
+            return None
+        if len(candidates) > 2:
+            for candidate in candidates:
+                if candidate == best:
+                    continue
+                fight_results = self.fight(candidate, best)
+                if fight_results is None or fight_results != best:
+                    return None
+        return best
+
+
 if __name__ == "__main__":
     tmp = MatchingSequence(sys.argv[1], sys.argv[2], [(0, 0), (len(sys.argv[1]) - 1, len(sys.argv[2]) - 1)])
     print Scorer().accurateScore(tmp)
-

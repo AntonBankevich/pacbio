@@ -3,7 +3,7 @@ sys.path.append("py")
 
 from common.sam_parser import Samfile
 from common.sequences import ContigCollection, ReadCollection, loadFromSam
-from dag_resolve.line_align import Scorer
+from common.line_align import Scorer
 
 
 def main(contig_file, sam_file):

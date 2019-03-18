@@ -3,8 +3,7 @@ import os
 from typing import Optional
 
 from alignment.align_tools import Aligner, DirDistributor
-from common import basic, SeqIO
-from dag_resolve import params
+from common import basic, SeqIO, params
 from common.sequences import Consensus, ReadCollection, Contig, ContigCollection
 from common.alignment_storage import AlignmentPiece
 from flye_tools.polysh_job import JobPolishing

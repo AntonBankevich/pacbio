@@ -1,4 +1,4 @@
-from typing import Optional, Iterator, List, Any
+from typing import Optional, Iterator, List, Any, Iterable, Tuple
 
 from common.alignment_storage import AlignmentPiece, Correction
 from common.save_load import TokenWriter, TokenReader
@@ -126,6 +126,21 @@ class SegmentStorage(SmartStorage):
             self.sorted = False
         else:
             self.rc.add(seg.RC())
+
+    def remove(self, seg):
+        # type: (Segment) -> None
+        if self.isCanonical():
+            l = len(self)
+            isin = seg in self.items
+            self.items.remove(seg)
+            assert not isin or len(self) == l - 1
+        else:
+            self.rc.remove(seg.RC())
+
+    def addAll(self, segs):
+        # type: (Iterable[Segment]) -> None
+        for seg in segs:
+            self.add(seg)
 
     def isIn(self, seg):
         # type: (Segment) -> bool
@@ -255,6 +270,12 @@ class AlignmentStorage(SmartStorage):
         else:
             self.rc.add(al.rc)
 
+    def replaceReverse(self, old_als, new_als):
+        # type: (List[AlignmentPiece], List[AlignmentPiece]) -> int
+        self.sort()
+
+
+
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
         self.makeCanonical()
@@ -313,3 +334,9 @@ class AlignmentStorage(SmartStorage):
         n = handler.readInt()
         for i in range(n):
             self.add(AlignmentPiece.load(handler, collection_from, collection_to))
+
+    def clean(self):
+        if self.isCanonical():
+            self.items = []
+        else:
+            self.rc.items = []

@@ -12,7 +12,7 @@ from common.sequences import ContigCollection, ReadCollection
 from disjointig_resolve.accurate_line import NewLineStorage
 from disjointig_resolve.io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
-from disjointig_resolve.params import Params
+from disjointig_resolve.cl_params import Params
 
 
 def main(args):
@@ -49,7 +49,7 @@ def main(args):
     save_handler = SaveHandler(params.save_dir)
     print "Resolving"
     extender = LineExtender(disjointigs)
-    knotter = LineKnotter(lines)
+    knotter = LineKnotter(lines)#IMPLEMENT
     cnt = 0
     while True:
         stop = True
@@ -59,7 +59,7 @@ def main(args):
                 cnt += 1
                 stop = False
                 knotter.tryKnot(line)
-            if cnt > 50:
+            if cnt > 20:
                 cnt = 0
                 saveAll(save_handler.getWriter(), params, aligner, contigs, reads, disjointigs, lines, dot_plot)
         if stop:

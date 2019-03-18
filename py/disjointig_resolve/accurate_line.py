@@ -73,7 +73,7 @@ class NewLine(NamedSequence):
         self.notifyAfterExtendRight(seq)
 
     def notifyBeforeExtendRight(self, new_seq, seq):
-        # type: (NamedSequence, str) -> None
+        # type: (Contig, str) -> None
         for listener in self.listeners:
             listener.fireBeforeExtendRight(self, new_seq, seq)
 
@@ -96,7 +96,7 @@ class NewLine(NamedSequence):
         self.notifyAfterCutRight(pos)
 
     def notifyBeforeCutRight(self, new_seq, pos):
-        # type: (NamedSequence, int) -> None
+        # type: (Contig, int) -> None
         for listener in self.listeners:
             listener.fireBeforeCutRight(self, new_seq, pos)
 
@@ -142,9 +142,11 @@ class NewLine(NamedSequence):
 
     def addListener(self, listener):
         self.listeners.append(listener)
+        self.rc.addListener(listener.rc)
 
     def removeListener(self, listener):
         self.listeners.remove(listener)
+        self.rc.listeners.remove(listener.rc)
 
     def save(self, handler):
         # type: (TokenWriter) -> None
@@ -275,3 +277,40 @@ class NewLineStorage:
         # type: (BinaryIO) -> None
         # IMPLEMENT
         pass
+
+class LinePosition(LineListener):
+    def __init__(self, line, pos, rc=None):
+        # type: (NewLine, int, Optional[LinePosition]) -> None
+        self.line = line
+        self.pos = pos
+        line.addListener(self)
+        if rc is None:
+            rc = LinePosition(line.rc, len(line) - 1 - (pos + line.zero_pos) - line.rc.zero_pos)
+        LineListener.__init__(self, rc)
+
+    def fixRC(self):
+        self.rc.pos = len(self.line) - 1 - (self.pos + self.line.zero_pos) - self.line.rc.zero_pos
+
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (Any, Contig, str) -> None
+        pass
+
+    def fireAfterExtendRight(self, line, seq):
+        # type: (NewLine, str) -> None
+        self.fixRC()
+
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (Any, Contig, int) -> None
+        if pos >= line.right():
+            self.pos = line.right() - 1
+            self.fixRC()
+
+    def fireAfterCutRight(self, line, pos):
+        # type: (Any, int) -> None
+        self.fixRC()
+
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, alignments):
+        # type: (Correction) -> None
+        self.pos = alignments.mapPositionsUp([self.pos])[0] # type: int
+

@@ -6,7 +6,7 @@ from common import basic
 from common.basic import quoted
 from common.sequences import UniqueList, Segment
 from common.alignment_storage import MatchingSequence
-from dag_resolve.line_align import Scorer
+from common.line_align import Scorer
 from dag_resolve.line_tools import LineStorage, Line
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
 import matplotlib as mplt

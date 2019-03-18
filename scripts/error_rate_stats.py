@@ -4,7 +4,7 @@ import random
 
 
 sys.path.append("py")
-from dag_resolve.line_align import Scorer
+from common.line_align import Scorer
 from alignment.align_tools import DirDistributor, Aligner
 from common import basic
 from common.sequences import ContigCollection, Contig, ReadCollection

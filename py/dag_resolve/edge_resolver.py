@@ -5,11 +5,11 @@ from typing import Tuple, Optional, Dict
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common.seq_records import NamedSequence
-from dag_resolve import params
-from dag_resolve.line_align import Scorer
+from common import params
+from common.line_align import Scorer, Tournament
 from dag_resolve.line_tools import Line, LinePosition
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
-from common.sequences import ReadCollection, ContigCollection, Segment, Contig
+from common.sequences import ReadCollection, Segment, Contig
 from common.alignment_storage import AlignmentPiece
 
 
@@ -245,6 +245,7 @@ class ReadClassifier:
         self.positions = dict()# type: Dict[int, LinePosition]
         for pos in positions:
             self.positions[pos.line.id] = pos
+        self.tournament = Tournament()
 
     def classifyReads(self, active, reads):
         # type: (list[Line], ReadCollection) -> ReadCollection
@@ -290,7 +291,7 @@ class ReadClassifier:
                 n_class += 1
                 print "No active candidates"
                 continue
-            res = self.tournament(candidates, line_aligns)
+            res = self.tournament.tournament(candidates)
             if res is None:
                 n_uncertain += 1
                 print "Could not determine the champion"
@@ -360,49 +361,4 @@ class ReadClassifier:
                 print "Added line alignment:", new_piece
                 res_map[(line_from.id, line_to.id)].append(new_piece)
         return res_map
-
-    def fight(self, c1, c2, line_aligns):
-        # type: (AlignmentPiece, AlignmentPiece, Dict[Tuple[int, int], list[AlignmentPiece]]) -> Optional[AlignmentPiece]
-        assert c1.seg_from.contig == c2.seg_from.contig
-        s1, s2, s12 = self.scorer.score3(c1, c2)
-        if s12 is None:
-            if s1 is None and s2 is not None:
-                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c2
-                return c2
-            elif s1 is not None and s2 is None:
-                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c1
-                return c1
-            elif s1 is None and s2 is None:
-                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner"
-                return None
-            assert False, "Strange comparison results"
-        else:
-            if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or abs(s1 - s2) < s12 * 0.65:
-                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "No winner"
-                return None
-            if s1 > s2:
-                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c2
-                return c2
-            else:
-                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c1
-                return c1
-
-    def tournament(self, candidates, line_aligns):
-        # type: (list[AlignmentPiece], Dict[Tuple[int, int], list[AlignmentPiece]]) -> Optional[AlignmentPiece]
-        best = None
-        for candidate in candidates:
-            if best is None:
-                best = candidate
-            else:
-                best = self.fight(candidate, best, line_aligns)
-        if best is None:
-            return None
-        if len(candidates) > 2:
-            for candidate in candidates:
-                if candidate == best:
-                    continue
-                fight_results = self.fight(candidate, best, line_aligns)
-                if fight_results is None or fight_results != best:
-                    return None
-        return best
 

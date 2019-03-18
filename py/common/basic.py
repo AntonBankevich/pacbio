@@ -131,6 +131,25 @@ def Reverse(val):
         return -val
     assert False, "Tried to reverse an object that is neither number nor a string"
 
+def Normalize(val):
+    if isinstance(val, str):
+        assert not val.startswith("--")
+        if val.startswith("-"):
+            return val[1:]
+        else:
+            return val
+    elif isinstance(val, int):
+        return abs(val)
+    assert False, "Tried to normalize an object that is neither number nor a string"
+
+def isCanonocal(val):
+    if isinstance(val, str):
+        assert not val.startswith("--")
+        return not val.startswith("-")
+    elif isinstance(val, int):
+        return val > 0
+    assert False, "Tried to check canonical an object that is neither number nor a string"
+
 def quoted(val):
     return "\"" + str(val) + "\""
 

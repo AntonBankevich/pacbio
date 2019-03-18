@@ -9,14 +9,13 @@ sys.path.append("py")
 
 from alignment.polishing import Polisher
 from alignment.align_tools import DirDistributor, Aligner
-from dag_resolve import params
 from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.graph_resolver import GraphResolver
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
 from common.sequences import ContigCollection, ReadCollection, UniqueList
-from common import basic
-from dag_resolve.visualization import DotPrinter, FilterColoring, HistoryPrinter, DotLinePrinter
+from common import basic, params
+from dag_resolve.visualization import HistoryPrinter, DotLinePrinter
 
 
 def analyse(graph, storage):
