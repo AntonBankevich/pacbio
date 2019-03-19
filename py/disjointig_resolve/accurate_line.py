@@ -1,5 +1,5 @@
 from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any
-from common import basic
+from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig
@@ -31,10 +31,11 @@ class NewLine(NamedSequence):
 
     def addReads(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
-        self.read_alignments.extend(alignments)
-        self.rc.read_alignments.extend([al.rc for al in alignments])
-        self.read_alignments = sorted(self.read_alignments, key = lambda al: al.seg_to.left)
-        self.rc.read_alignments = sorted(self.rc.read_alignments, key = lambda al: al.seg_to.left)
+        self.read_alignments.addAll(alignments)
+
+    def getReads(self, seg):
+        # type: (Segment) -> Iterable[AlignmentPiece]
+        return self.read_alignments.allInter(seg)
 
     def segment(self, start, end):
         return Segment(self, start, end)
@@ -61,10 +62,9 @@ class NewLine(NamedSequence):
         return self.segment(pos, len(self) - self.zero_pos)
 
 
-
-
     def extendRight(self, seq):
         # type: (str) -> None
+        # IMPLEMENT extension of all read alignments
         new_seq = Contig(self.seq + seq, "TMP_" + self.id)
         self.notifyBeforeExtendRight(new_seq, seq)
         self.seq = self.seq + seq
@@ -107,7 +107,6 @@ class NewLine(NamedSequence):
 
     def correctSequence(self, alignments):
         # type: (List[AlignmentPiece]) -> None
-        #IMPLEMENT fix read alignments, correct segments, initial alignments, sequence and zero_pos and everything else. Do not forget to fix rc
         assert len(alignments) > 0
         correction = Correction.constructCorrection(alignments)
         self.notifyBeforeCorrect(correction)
@@ -275,8 +274,8 @@ class NewLineStorage:
 
     def printToFasta(self, handler):
         # type: (BinaryIO) -> None
-        # IMPLEMENT
-        pass
+        for line in UniqueList(self.lines.values()):
+            SeqIO.write(line, handler, "fasta")
 
 class LinePosition(LineListener):
     def __init__(self, line, pos, rc=None):

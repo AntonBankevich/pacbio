@@ -48,7 +48,7 @@ class UniqueMarker:
     # Mark unique regions on all disjointigs as correct
     def findUnique(self, contig):
         # type: (NamedSequence) -> Generator[Segment]
-        # IMPLEMENT
+        # IMPLEMENT search for unique segments in disjointigs including construction of dot plot
         pass
 
     def findAllUnique(self, sequences):
@@ -110,16 +110,16 @@ class DisjointigCollection:
 
     def getDisjointigAlignments(self, segment):
         # type: (Segment) -> List[AlignmentPiece]
-        # IMPLEMENT
+        # IMPLEMENT get all disjointigs that align to this disjointig segment
         return []
 
     def getReadAlignments(self, segment):
         # type: (Segment) -> List[AlignmentPiece]
-        # IMPLEMENT
+        # IMPLEMENT get all reads that align to this segment of disjointig
         return []
 
     def calculateDotPlot(self):
-        # IMPLEMENT
+        # IMPLEMENT calculate dot plot of disjointigs
         pass
 
     def fillFromReadCollection(self, reads):
@@ -143,6 +143,7 @@ class DisjointigCollection:
         keys = handler.readTokens()
         for key in keys:
             id = handler.readToken()
+            assert id == key
             seq = handler.readToken()
             disjointig = self.add(seq, key)
             assert key == disjointig.id, key + " " + disjointig.id

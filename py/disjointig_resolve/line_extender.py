@@ -8,6 +8,7 @@ from common.sequences import Segment, ReadCollection
 from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
+from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.smart_storage import SegmentStorage
 
 k = 1000
@@ -63,9 +64,10 @@ class LineCorrector:
 
 
 class LineExtender:
-    def __init__(self, disjointigs):
-        # type: (DisjointigCollection) -> None
+    def __init__(self, disjointigs, dot_plot):
+        # type: (DisjointigCollection, LineDotPlot) -> None
         self.disjointigs = disjointigs
+        self.dot_plot = dot_plot
         self.scorer = Scorer()
 
     def tryExtend(self, line):
@@ -96,6 +98,8 @@ class LineExtender:
                         else:
                             to_polysh.append(seg)
                     line.polyshSegments(to_polysh)
+                    line.updateCorrectSegments()
+                self.updateCompletelyResolved(line)# IMPLEMENT
                 total = sum([num for seg, num in result])
                 new_recruits += total
                 if total == 0:
@@ -106,7 +110,7 @@ class LineExtender:
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, int]]
         # Find all lines that align to at leasr k nucls of resolved segment. Since this segment is resolve we get all
-        line_alignments = self.alignedLines(resolved) # type: List[AlignmentPiece]
+        line_alignments = self.dot_plot.getAllAlignments(resolved) # type: List[AlignmentPiece]
         #Find all reads that align to at least k nucls of resolved segment or corresponding segments on other lines
         reads = self.relevantReadAlignments(resolved, line_alignments) # type: List[AlignmentPiece]
         #Find all reads that align to at least k nucls of resolved segment or corresponding segments on other lines

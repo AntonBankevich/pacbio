@@ -1,6 +1,6 @@
 import itertools
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 from alignment.align_tools import Aligner
 from common import basic
@@ -11,6 +11,133 @@ from common.save_load import TokenWriter, TokenReader
 from common.sequences import Segment, Contig, UniqueList
 
 
+class AutoAlignmentStorage(LineListener):
+    def __init__(self, line, rc = None):
+        # type: (NewLine, Optional[AutoAlignmentStorage]) -> None
+        self.line = line
+        if rc is None:
+            self.content = AlignmentStorage()
+            rc = AutoAlignmentStorage(line.rc, self)
+            rc.content = self.content.rc
+        LineListener.__init__(self, rc)
+        self.rc = rc # type: AutoAlignmentStorage
+
+    def add(self, alignment):
+        self.content.add(alignment)
+
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (Any, Contig, str) -> None
+        self.content.fireBeforeExtendRight(line, new_seq, seq)
+        self.reverse()
+        self.content.fireBeforeExtendRight(line, new_seq, seq)
+
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (Any, Contig, int) -> None
+        self.content.fireBeforeCutRight(line, new_seq, pos)
+        self.reverse()
+        self.content.fireBeforeCutRight(line, new_seq, pos)
+
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, alignments):
+        # type: (Correction) -> None
+        self.content.fireBeforeCorrect(alignments)
+        self.reverse()
+        self.content.fireBeforeCorrect(alignments)
+
+    def fireAfterExtendRight(self, line, seq):
+        # type: (Any, str) -> None
+        self.content.fireAfterExtendRight(line, seq)
+        self.reverse()
+        self.content.fireAfterExtendRight(line, seq)
+
+    def fireAfterCutRight(self, line, pos):
+        # type: (Any, int) -> None
+        self.content.fireAfterCutRight(line, pos)
+        self.reverse()
+        self.content.fireAfterCutRight(line, pos)
+
+    def fireAfterCorrect(self, line):
+        # type: (Any) -> None
+        self.content.fireAfterCorrect(line)
+        self.reverse()
+        self.content.fireAfterCorrect(line)
+
+    def reverse(self):
+        self.content = self.content.reverse()
+        self.rc.content = self.content.rc
+
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        self.content.save(handler)
+
+    def load(self, handler):
+        # type: (TokenReader) -> None
+        self.content.load(handler, self.line, self.line)
+
+class RCAlignmentStorage(LineListener):
+    def __init__(self, line, rc = None):
+        # type: (NewLine, Optional[RCAlignmentStorage]) -> None
+        self.line = line
+        if rc is None:
+            self.content = AlignmentStorage()
+            rc = RCAlignmentStorage(line.rc, self)
+            rc.content = self.content.rc
+        LineListener.__init__(self, rc)
+        self.rc = rc # type: AutoAlignmentStorage
+
+    def add(self, alignment):
+        self.content.add(alignment)
+        self.content.add(alignment.reverse().rc)
+
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (Any, Contig, str) -> None
+        self.content.fireBeforeExtendRight(line, new_seq, seq)
+        self.reverse()
+        self.content.fireBeforeExtendRight(line, new_seq, seq)
+
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (Any, Contig, int) -> None
+        self.content.fireBeforeCutRight(line, new_seq, pos)
+        self.reverse()
+        self.content.fireBeforeCutRight(line, new_seq, pos)
+
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, alignments):
+        # type: (Correction) -> None
+        self.content.fireBeforeCorrect(alignments)
+        self.reverse()
+        self.content.fireBeforeCorrect(alignments)
+
+    def fireAfterExtendRight(self, line, seq):
+        # type: (Any, str) -> None
+        self.content.fireAfterExtendRight(line, seq)
+        self.reverse()
+        self.content.fireAfterExtendRight(line, seq)
+
+    def fireAfterCutRight(self, line, pos):
+        # type: (Any, int) -> None
+        self.content.fireAfterCutRight(line, pos)
+        self.reverse()
+        self.content.fireAfterCutRight(line, pos)
+
+    def fireAfterCorrect(self, line):
+        # type: (Any) -> None
+        self.content.fireAfterCorrect(line)
+        self.reverse()
+        self.content.fireAfterCorrect(line)
+
+    def reverse(self):
+        self.rc.content = self.content.reverse()
+        self.content = self.rc.content.rc
+
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        self.content.save(handler)
+
+    def load(self, handler):
+        # type: (TokenReader) -> None
+        self.content.load(handler, self.line, self.line)
+
 class LineDotPlot(LineListener):
     def __init__(self, lines):
         # type: (NewLineStorage) -> None
@@ -20,14 +147,12 @@ class LineDotPlot(LineListener):
             line.addListener(self)
         self.auto_alignments = dict() # type: Dict[str, AutoAlignmentStorage] # here we store alignments of line to itself
         self.rc_alignments = dict() # type: Dict[str, RCAlignmentStorage] # here we stora alignments of line to its RC
-        self.alignmentsTo = dict() # type: Dict[str, Dict[str, TwoLineAlignmentStorage]] # here we store all the remaining alignments
+        self.alignmentsToFrom = dict() # type: Dict[str, Dict[str, TwoLineAlignmentStorage]] # here we store all the remaining alignments
         for line in lines:
-            self.alignmentsTo[line.id] = dict()
+            self.alignmentsToFrom[line.id] = dict()
         for line in UniqueList(lines):
-            self.auto_alignments[line.id] = AutoAlignmentStorage(line)
-            self.auto_alignments[line.rc.id] = self.auto_alignments[line.id].rc
-            self.rc_alignments[line.id] = RCAlignmentStorage(line)
-            self.rc_alignments[line.rc.id] = self.rc_alignments[line.id].rc
+            self.addRCAlignmentStorage(line)
+            self.addSelfAlignmentStorage(line)
 
     def addAlignment(self, al):
         # type: (AlignmentPiece) -> None
@@ -45,22 +170,22 @@ class LineDotPlot(LineListener):
         elif to_line == from_line.rc:
             self.rc_alignments[to_id].add(al)
         else:
-            if from_id not in self.alignmentsTo[from_id]:
+            if from_id not in self.alignmentsToFrom[from_id]:
                 self.addTwoLineStorage(from_line, to_line)
-            self.alignmentsTo[to_id][from_id].add(al)
+            self.alignmentsToFrom[to_id][from_id].add(al)
 
     def addTwoLineStorage(self, line1, line2):
         # type: (NewLine, NewLine) -> TwoLineAlignmentStorage
         storage = TwoLineAlignmentStorage(line1, line2)
-        if line2.id not in self.alignmentsTo:
-            self.alignmentsTo[line2.id] = dict()
-        self.alignmentsTo[line2.id][line1.id] = storage
-        self.alignmentsTo[line2.rc.id][line1.rc.id] = storage.rc
-        self.alignmentsTo[line1.id][line2.id] = storage.reverse
-        self.alignmentsTo[line1.rc.id][line2.rc.id] = storage.rc.reverse
+        if line2.id not in self.alignmentsToFrom:
+            self.alignmentsToFrom[line2.id] = dict()
+        self.alignmentsToFrom[line2.id][line1.id] = storage
+        self.alignmentsToFrom[line2.rc.id][line1.rc.id] = storage.rc
+        self.alignmentsToFrom[line1.id][line2.id] = storage.reverse
+        self.alignmentsToFrom[line1.rc.id][line2.rc.id] = storage.rc.reverse
         return storage
 
-    def addRCLineStorage(self, line):
+    def addRCAlignmentStorage(self, line):
         # type: (NewLine) -> RCAlignmentStorage
         storage = RCAlignmentStorage(line)
         self.rc_alignments[line.id] = storage
@@ -76,17 +201,18 @@ class LineDotPlot(LineListener):
 
     def getAllAlignments(self, seg):
         # type: (Segment) -> List[AlignmentPiece]
-        # IMPLEMENT
+        # IMPLEMENT dotplot alignment getter
         pass
 
     def construct(self, aligner):
         # type: (Aligner) -> None
-        # IMPLEMENT
+        # IMPLEMENT dotplot initial construction
         pass
 
+    # IMPLEMENT construct additional alignments when expanding maybe when correcting too. Maybe additional operation find new alignments of a segment
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
-        for d in self.alignmentsTo[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
+        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireBeforeExtendRight(line, new_seq, seq)
         self.auto_alignments[line.id].fireBeforeExtendRight(line, new_seq, seq)
@@ -95,7 +221,7 @@ class LineDotPlot(LineListener):
 
     def fireBeforeCutRight(self, line, new_seq, pos):
         # type: (Any, Contig, int) -> None
-        for d in self.alignmentsTo[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
+        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireBeforeExtendRight(line, new_seq, seq)
         self.auto_alignments[line.id].fireBeforeExtendRight(line, new_seq, seq)
@@ -105,7 +231,7 @@ class LineDotPlot(LineListener):
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
         line = alignments.seq_to # type: NewLine
-        for d in self.alignmentsTo[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
+        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireBeforeCorrect(alignments)
         self.auto_alignments[line.id].fireBeforeCorrect(alignments)
@@ -113,7 +239,7 @@ class LineDotPlot(LineListener):
 
     def fireAfterExtendRight(self, line, seq):
         # type: (Any, str) -> None
-        for d in self.alignmentsTo[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
+        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireAfterExtendRight(line, seq)
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
@@ -121,7 +247,7 @@ class LineDotPlot(LineListener):
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None
-        for d in self.alignmentsTo[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
+        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireAfterCutRight(line, pos)
         self.auto_alignments[line.id].fireAfterCutRight(line, pos)
@@ -129,7 +255,7 @@ class LineDotPlot(LineListener):
 
     def fireAfterCorrect(self, line):
         # type: (Any) -> None
-        for d in self.alignmentsTo[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
+        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireAfterCorrect(line)
         self.auto_alignments[line.id].fireAfterCorrect(line)
@@ -137,7 +263,9 @@ class LineDotPlot(LineListener):
 
     def save(self, handler):
         # type: (TokenWriter) -> None
-        for l1, d1 in self.alignmentsTo.items():
+        keys = [key for key in self.lines.lines.keys() if basic.isCanonocal(key)]
+        handler.writeTokens(keys)
+        for l1, d1 in self.alignmentsToFrom.items():
             if not basic.isCanonocal(l1):
                 continue
             for l2, als in d1.items():
@@ -145,15 +273,16 @@ class LineDotPlot(LineListener):
                     handler.writeTokens([l1, l2])
                     als.save(handler)
         handler.writeTokens(["0", "0"])
-        for lid in sorted(self.lines.lines.keys()):
+        for lid in keys:
             storage = self.rc_alignments[lid]
             storage.save(handler)
-        for lid in sorted(self.lines.lines.keys()):
+        for lid in keys:
             storage = self.auto_alignments[lid]
             storage.save(handler)
 
     def load(self, handler):
         # type: (TokenReader) -> None
+        keys = handler.readTokens()
         while True:
             l1 = handler.readToken()
             l2 = handler.readToken()
@@ -161,12 +290,12 @@ class LineDotPlot(LineListener):
                 break
             storage = self.addTwoLineStorage(self.lines[l1], self.lines[l2])
             storage.load(handler, self.lines)
-        for lid in sorted(self.lines.lines.keys()):
+        for lid in keys:
             storage = self.rc_alignments[lid]
-            storage.load(handler, self.lines)
-        for lid in sorted(self.lines.lines.keys()):
+            storage.load(handler)
+        for lid in keys:
             storage = self.auto_alignments[lid]
-            storage.load(handler, self.lines)
+            storage.load(handler)
 
 
 class TwoLineAlignmentStorage(LineListener):
@@ -205,7 +334,6 @@ class TwoLineAlignmentStorage(LineListener):
         # type: (Any, Contig, str) -> None
         self.content.fireBeforeExtendRight(line, new_seq, seq)
         self.normalizeReverse()
-
 
     def fireBeforeCutRight(self, line, new_seq, pos):
         # type: (Any, Contig, int) -> None

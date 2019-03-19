@@ -62,7 +62,7 @@ class SmartStorage(LineListener):
         pass
 
     def addAll(self, items):
-        # type: (List) -> None
+        # type: (Iterable) -> None
         for item in items:
             self.add(item)
 
@@ -237,6 +237,7 @@ class AlignmentStorage(SmartStorage):
             rc = AlignmentStorage(self)
             self.items = []
         SmartStorage.__init__(self, rc)
+        self.rc = rc # type: AlignmentStorage
         self.key = lambda al: al.seg_to.left
 
     def __getitem__(self, item):
@@ -340,3 +341,9 @@ class AlignmentStorage(SmartStorage):
             self.items = []
         else:
             self.rc.items = []
+
+    def reverse(self):
+        res = AlignmentStorage()
+        for al in self:
+            res.add(al.reverse())
+        return res
