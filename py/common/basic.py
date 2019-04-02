@@ -1,7 +1,5 @@
 import heapq
 import shutil
-import sys
-
 import os
 
 from typing import Callable, Union

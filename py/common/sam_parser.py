@@ -6,8 +6,7 @@
 
 import sys
 import itertools
-import re
-from typing import Generator, Tuple
+from typing import Generator
 
 
 def CIGAR_to_List(cigar):
@@ -264,65 +263,6 @@ class SamChain:
             if sam.gettid(tname) != None:
                 return sam.gettid(tname)
         return None
-
-pattern = re.compile('([0-9]*)([MIDNSHP])')
-
-def ParseCigar(cigar, len, pos=0, full_read = False):
-    # type: (str, int, int) -> Generator[Tuple[int, int]]
-    if cigar == "=":
-        for i in range(len):
-            yield (i, i + pos)
-        return
-    if cigar == "X":
-        return
-    cur = 0
-    curr = pos
-    for n, c in pattern.findall(cigar):
-        if n:
-            n = int(n)
-        else:
-            n = 1
-        if c == 'M':
-            for i in range(n):
-                yield (cur, curr)
-                cur += 1
-                curr += 1
-        elif c in 'DPN':
-            curr += n
-        elif c in "IS":
-            cur += n
-        elif c == 'H' and full_read:
-            cur += n
-
-def CigarToList(cigar):
-    # type: (str) -> Generator[Tuple[str, int]]
-    if cigar == "=":
-        yield ("=", 0)
-        return
-    if cigar == "X":
-        return
-    for n, c in pattern.findall(cigar):
-        if n:
-            n = int(n)
-        else:
-            n = 1
-        yield (c, n)
-
-def RCCigar(cigar):
-    # type: (str) -> str
-    # IMPLEMENT get rid of complex signs and move to AlignmentPiece
-    if cigar == "=":
-        return "="
-    if cigar == "X":
-        return "X"
-    res = []
-    for n, c in list(pattern.findall(cigar))[::-1]:
-        if n:
-            res.append(n + c)
-        else:
-            res.append(c)
-    return "".join(res)
-
 
 ############################# test
 

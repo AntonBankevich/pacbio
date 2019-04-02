@@ -2,7 +2,7 @@ import itertools
 
 from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator
 
-from common import sam_parser, params
+from common import sam_parser, params, easy_cigar
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, Contig, ContigCollection, EasyContig
@@ -26,22 +26,22 @@ class AlignmentPiece:
                 print seg_to.Seq()
             assert pi > 0.5, str(self)
         if rc is None:
-            self.rc = AlignmentPiece(seg_from.RC(), seg_to.RC(), sam_parser.RCCigar(self.cigar), self)
+            self.rc = AlignmentPiece(seg_from.RC(), seg_to.RC(), easy_cigar.RCCigar(self.cigar), self)
         else:
             self.rc = rc
 
     @staticmethod
     def FromSamRecord(seq_from, seq_to, rec):
         # type: (EasyContig, EasyContig, sam_parser.SAMEntryInfo) -> AlignmentPiece
-        cigar_list = list(sam_parser.CigarToList(rec.cigar))
+        cigar_list = list(easy_cigar.CigarToList(rec.cigar))
         ls = 0
         rs = 0
-        if cigar_list[0][0] in "HS":
-            ls = cigar_list[0][1]
-        if cigar_list[-1][0] in "HS":
-            rs = cigar_list[-1][1]
+        if cigar_list[0][1] in "HS":
+            ls = cigar_list[0][0]
+        if cigar_list[-1][1] in "HS":
+            rs = cigar_list[-1][0]
         new_cigar = []
-        for s, num in cigar_list:
+        for num, s in cigar_list:
             if s not in "HS":
                 new_cigar.append(num)
                 new_cigar.append(s)
@@ -51,7 +51,7 @@ class AlignmentPiece:
         if rec.rc:
             seg_from = Segment(seq_from.rc, ls, len(seq_from) - rs).RC()
             seg_to = seg_to.RC()
-            new_cigar = sam_parser.RCCigar(new_cigar)
+            new_cigar = easy_cigar.RCCigar(new_cigar)
         piece = AlignmentPiece(seg_from, seg_to, new_cigar)
         seg_from.contig.alignments.append(piece)
         seg_from.contig.rc.alignments.append(piece.rc)
@@ -140,20 +140,16 @@ class AlignmentPiece:
             return
         cur_query = self.seg_from.left
         cur_tar = self.seg_to.left
-        for n, c in sam_parser.pattern.findall(self.cigar):
-            if n:
-                n = int(n)
-            else:
-                n = 1
+        for n, c in easy_cigar.CigarToList(self.cigar):
             if c == 'M':
                 for i in range(n):
                     if not equalOnly or self.seg_from.contig[cur_query] == self.seg_to.contig[cur_tar]:
                         yield (cur_query, cur_tar)
                     cur_tar += 1
                     cur_query += 1
-            elif c in 'DPN':
+            elif c == "D":
                 cur_tar += n
-            elif c in "I":
+            elif c == "I":
                 cur_query += n
 
     def asMatchingStrings(self):
@@ -190,15 +186,15 @@ class AlignmentPiece:
         return MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq,
                                 list(self.matchingPositions(equalOnly)))
 
-    def contradicting(self, seg=None):
-        # type: (Segment) -> bool
+    def contradicting(self, seg=None, tail_size = 500):
+        # type: (Segment, int) -> bool
         if seg is None:
             seg = self.seg_to.contig.asSegment()
         if not self.seg_to.inter(seg):
             return False
-        if self.seg_from.left >= 500 and self.seg_to.left >= seg.left + 500:
+        if self.seg_from.left >= tail_size and self.seg_to.left >= seg.left + tail_size:
             return True
-        if self.seg_from.right <= len(self.seg_from.contig) - 500 and self.seg_to.right <= seg.right - 500:
+        if self.seg_from.right <= len(self.seg_from.contig) - tail_size and self.seg_to.right <= seg.right - tail_size:
             return True
         return False
 
@@ -272,7 +268,7 @@ class AlignmentPiece:
 
     def reverse(self):
         # type: () -> AlignmentPiece
-        return self.matchingSequence(False).reverse().asAlignmentPiece(self.seg_to.contig, self.seg_from.contig)
+        return AlignmentPiece(self.seg_to, self.seg_from, easy_cigar.ReverseCigar(self.cigar))
 
 
 class MatchingSequence:
