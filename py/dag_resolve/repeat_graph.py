@@ -168,7 +168,6 @@ class Graph:
         # type: (Edge) -> None
         for read in edge.reads:
             read.removeContig(edge)
-            read.removeContig(edge.rc)
         edge.start.removeEdge(edge)
         edge.end.removeEdge(edge)
         edge.rc.start.removeEdge(edge.rc)

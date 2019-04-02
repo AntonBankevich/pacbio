@@ -55,7 +55,7 @@ class Line(Contig):
         self.rc = rc # type: Line
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
         Contig.__init__(self, edge.seq, edge.id, None, self.rc)
-        self.chain = [AlignmentPiece(self.asSegment(), edge.asSegment(), "=")] # type: list[AlignmentPiece]
+        self.chain = [AlignmentPiece.Identical(self.asSegment(), edge.asSegment())] # type: list[AlignmentPiece]
         self.reads = ReadCollection()
         self.invalidated_reads = [] # type: list[AlignedRead]
         self.listeners = []
@@ -121,9 +121,7 @@ class Line(Contig):
                 self.chain.pop()
             else:
                 matchingSequence = self.chain[-1].matchingSequence(False).reduceQuery(0, pos)
-                self.chain[-1] = AlignmentPiece(matchingSequence.SegFrom(self),
-                                                matchingSequence.SegTo(self.chain[-1].seg_to.contig),
-                                                matchingSequence.cigar())
+                self.chain[-1] = matchingSequence.asAlignmentPiece(self, self.chain[-1].seg_to.contig)
         self.rc.chain = [al.rc for al in self.chain[::-1]]
 
     def addAlignment(self, piece):
@@ -174,8 +172,8 @@ class Line(Contig):
             if noncontradicting_al is not None:
                 print "Adding read", read, "to line", self, "with alignment", noncontradicting_al
                 assert read in self.reads
-                print "Adding read-to-line alignment", noncontradicting_al.changeQuery(read)
-                read.addAlignment(noncontradicting_al.changeQuery(read))
+                print "Adding read-to-line alignment", noncontradicting_al.changeQueryContig(read)
+                read.addAlignment(noncontradicting_al.changeQueryContig(read))
             else:
                 if has_contradicting:
                     print "REMOVING READ!!!", aligned_read, "since it only has contradicting alignments to the line"
@@ -202,8 +200,8 @@ class Line(Contig):
             if noncontradicting_al is not None:
                 print "Adding read", read, "to line", self, "with alignment", noncontradicting_al
                 assert read in self.reads
-                print "Adding read-to-line alignment", noncontradicting_al.changeQuery(read)
-                read.addAlignment(noncontradicting_al.changeQuery(read))
+                print "Adding read-to-line alignment", noncontradicting_al.changeQueryContig(read)
+                read.addAlignment(noncontradicting_al.changeQueryContig(read))
             else:
                 if has_contradicting:
                     print "REMOVING READ!!!", aligned_read, "since it only has contradicting alignments to the line"

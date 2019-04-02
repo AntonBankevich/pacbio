@@ -248,7 +248,7 @@ class AlignmentStorage(SmartStorage):
             return self.rc.__getitem__(-1 - item).rc
 
     def __iter__(self):
-        # type: () -> Iterator[AlignmentPiece]
+        # type: () -> Generator[AlignmentPiece]
         self.sort()
         if self.isCanonical():
             for item in self.items:
@@ -271,12 +271,6 @@ class AlignmentStorage(SmartStorage):
         else:
             self.rc.add(al.rc)
 
-    def replaceReverse(self, old_als, new_als):
-        # type: (List[AlignmentPiece], List[AlignmentPiece]) -> int
-        self.sort()
-
-
-
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
         self.makeCanonical()
@@ -293,15 +287,15 @@ class AlignmentStorage(SmartStorage):
         new_items = []
         for al in self.items: # type: AlignmentPiece
             if al.seg_to.right <= pos:
-                new_items.append(al.changeTarget(new_seq))
+                new_items.append(al.changeTargetContig(new_seq))
             elif al.seg_to.left <= pos:
-                new_items.append(al.reduce(target=Segment(line, line.left(), pos)).changeTarget(new_seq))
+                new_items.append(al.reduce(target=Segment(line, line.left(), pos)).changeTargetContig(new_seq))
         self.items = new_items # type: List[Segment]
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None
         self.makeCanonical()
-        self.items = [al.changeTarget(line) for al in self.items]
+        self.items = [al.changeTargetContig(line) for al in self.items]
 
     # alignments from new sequence to new sequence
     def fireBeforeCorrect(self, correction):

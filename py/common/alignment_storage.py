@@ -16,6 +16,8 @@ class AlignmentPiece:
         self.seg_to = seg_to #type: Segment
         assert cigar != "X"
         assert cigar.find("H") == -1 and cigar.find("S") == -1
+        if cigar == "=":
+            cigar = str(len(seg_from)) + "M"
         self.cigar = cigar
         if params.assert_pi:
             pi = self.matchingPercentIdentity()
@@ -53,16 +55,14 @@ class AlignmentPiece:
         piece = AlignmentPiece(seg_from, seg_to, new_cigar)
         seg_from.contig.alignments.append(piece)
         seg_from.contig.rc.alignments.append(piece.rc)
-        # self.rc.alignments.append(piece.RC())
-        # if piece.percentIdentity() < 0.3:
-        #     print piece
-        #     print rec.pos, rec.rc, rec.query_name, rec.tname, rec.alen
-        #     print rec.cigar
-        #     print piece.seg_from.Seq()
-        #     print piece.seg_to.Seq()
-        #     print "\n".join(map(str, piece.matchingPositions()))
-        #     assert False
         return piece
+
+    @staticmethod
+    def Identical(seg_from, other = None):
+        # type: (Segment, Optional[Segment]) -> AlignmentPiece
+        if other is None:
+            other = seg_from
+        return AlignmentPiece(seg_from, other, str(len(seg_from)) + "M")
 
 
     def __str__(self):
@@ -80,11 +80,19 @@ class AlignmentPiece:
             suffix = "!!!"
         return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ":" + spid + suffix + ")"
 
-    def changeQuery(self, read):
+    def changeQueryContig(self, read):
         return AlignmentPiece(self.seg_from.changeContig(read), self.seg_to, self.cigar)
 
-    def changeTarget(self, contig):
+    def changeTargetContig(self, contig):
         return AlignmentPiece(self.seg_from, self.seg_to.changeContig(contig), self.cigar)
+
+    def changeQuerySegment(self, seg):
+        # type: (Segment) -> AlignmentPiece
+        return AlignmentPiece(seg, self.seg_to, self.cigar)
+
+    def changeTargetSegment(self, seg):
+        # type: (Segment) -> AlignmentPiece
+        return AlignmentPiece(self.seg_from, seg, self.cigar)
 
     def precedes(self, other, delta=0):
         # type: (AlignmentPiece, int) -> bool
@@ -245,6 +253,7 @@ class AlignmentPiece:
         # type: (TokenReader, Any, Any) -> AlignmentPiece
         return AlignmentPiece(Segment.load(handler, collection_from), Segment.load(handler, collection_to), handler.readToken())
 
+    # composes alignments A->B and B->C into alignment A->C
     def compose(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
         return self.matchingSequence(False).compose(other.matchingSequence(False)).asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
@@ -253,13 +262,13 @@ class AlignmentPiece:
     def composeTargetDifference(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
         return self.matchingSequence(False).composeDifference(other.matchingSequence(False)).\
-            asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
+            asAlignmentPiece(self.seg_to.contig, other.seg_to.contig)
 
     # composes alignments A->B and C->B into alignment A->C
     def composeQueryDifference(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
         return self.matchingSequence(False).compose(other.matchingSequence(False).reverse()).\
-            asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
+            asAlignmentPiece(self.seg_from.contig, other.seg_from.contig)
 
     def reverse(self):
         # type: () -> AlignmentPiece
@@ -410,9 +419,7 @@ class AlignedRead(EasyContig):
         handler.writeTokenLine(self.seq)
         handler.writeIntLine(len(self.alignments))
         for al in self.alignments:
-            al.seg_from.save(handler)
-            al.seg_to.save(handler)
-            handler.writeTokenLine(al.cigar)
+            al.save(handler)
 
     @staticmethod
     def load(handler, collection):
@@ -422,10 +429,7 @@ class AlignedRead(EasyContig):
         res = AlignedRead(NamedSequence(seq, id))
         n = handler.readInt()
         for i in range(n):
-            seg_from = Segment.load(handler, res)
-            seg_to = Segment.load(handler, collection)
-            cigar = handler.readToken()
-            res.alignments.append(AlignmentPiece(seg_from, seg_to, cigar))
+            res.alignments.append(AlignmentPiece.load(handler, res, collection))
         return res
 
     def alignmentsTo(self, seg):
@@ -454,6 +458,7 @@ class AlignedRead(EasyContig):
 
     def removeContig(self, contig):
         self.alignments = filter(lambda alignment: alignment.seg_to.contig.id != contig.id, self.alignments)
+        self.rc.alignments = filter(lambda alignment: alignment.seg_to.contig.id != contig.rc.id, self.rc.alignments)
 
     def clean(self):
         self.alignments = []
@@ -490,7 +495,7 @@ class AlignedRead(EasyContig):
         new_alignments = []
         for al in self.alignments:
             if al.seg_to.contig in contigs:
-                new_alignments.append(al.changeTarget(contigs[al.seg_to.contig.id]))
+                new_alignments.append(al.changeTargetContig(contigs[al.seg_to.contig.id]))
         self.alignments = new_alignments
 
     def contains(self, other):
@@ -527,7 +532,7 @@ class AlignedRead(EasyContig):
     def mergeAlignments(self, other):
         # type: (AlignedRead) -> AlignedRead
         for al in other.alignments:
-            new_al = al.changeQuery(self)
+            new_al = al.changeQueryContig(self)
             self.alignments.append(new_al)
             self.rc.alignments.append(new_al.rc)
         return self
@@ -654,7 +659,7 @@ class Correction:
         # Mapping alignments that do not intersect corrections
         new_easy_segs = self.mapSegmentsUp([al.seg_to for al in easy])
         for seg, al in zip(new_easy_segs, easy):
-            res.append(AlignmentPiece(al.seg_from, seg, al.cigar))
+            res.append(al.changeTargetSegment(seg))
         # Mapping alignments that intersect corrections
         func = lambda items: self.mapPositionsUp(items, True)
         matchings = [al.matchingSequence(True) for al in complex]
@@ -696,7 +701,7 @@ class Correction:
         for al in alignments:
             new_pos += al.seg_to.left - pos
             new_seg_from = Segment(new_seq, new_pos, new_pos + al.seg_from.__len__())
-            new_als.append(AlignmentPiece(new_seg_from, al.seg_to, al.cigar))
+            new_als.append(al.changeQuerySegment(new_seg_from))
             pos = al.seg_to.right
             new_pos += al.seg_from.__len__()
         return Correction(new_seq, initial, new_als)

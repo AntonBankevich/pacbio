@@ -1,13 +1,60 @@
-from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any
+import itertools
+
+from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any, Generator
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, EasyContig
 from common.alignment_storage import AlignmentPiece, AlignedRead, Correction
-from disjointig_resolve.disjointigs import DisjointigCollection, UniqueMarker
+from disjointig_resolve.disjointigs import DisjointigCollection, UniqueMarker, Disjointig
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
 
+class ReadAlignmentListener(LineListener):
 
+    def __init__(self, line, rc = None):
+        # type: (NewLine, Optional[ReadAlignmentListener]) -> None
+        self.line = line # type: NewLine
+        if rc is None:
+            rc = ReadAlignmentListener(line.rc, self)
+        LineListener.__init__(self, rc)
+        self.rc = rc # type: ReadAlignmentListener
+
+    def refreshReadAlignments(self):
+        for al in self.line.read_alignments:
+            read = al.seg_from.contig  # type: AlignedRead
+            read.removeContig(self.line)
+        for al in self.line.read_alignments:
+            read = al.seg_from.contig  # type: AlignedRead
+            read.addAlignment(al)
+
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (Any, Contig, str) -> None
+        assert self.line == line, str((line.id, self.line.id))
+        self.refreshReadAlignments()
+
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (Any, Contig, int) -> None
+        assert self.line == line, str((line.id, self.line.id))
+        self.refreshReadAlignments()
+
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, alignments):
+        # type: (Correction) -> None
+        self.refreshReadAlignments()
+
+    def fireAfterExtendRight(self, line, seq):
+        # type: (Any, str) -> None
+        self.refreshReadAlignments()
+
+    def fireAfterCutRight(self, line, pos):
+        # type: (Any, int) -> None
+        self.refreshReadAlignments()
+
+    def fireAfterCorrect(self, line):
+        # type: (Any) -> None
+        self.refreshReadAlignments()
+
+# Reads only store alignments to lines they were selected to.
 class NewLine(EasyContig):
     def __init__(self, seq, id, rc = None):
         # type: (str, str, Optional[NewLine]) -> None
@@ -19,7 +66,8 @@ class NewLine(EasyContig):
             self.completely_resolved = SegmentStorage()
             self.disjointig_alignments = AlignmentStorage()
             self.read_alignments = AlignmentStorage()
-            self.listeners = [self.initial, self.correct_segments, self.disjointig_alignments, self.read_alignments] # type: List[LineListener]
+            self.read_listener = ReadAlignmentListener(self)
+            self.listeners = [self.initial, self.correct_segments, self.disjointig_alignments, self.read_alignments, self.read_listener] # type: List[LineListener]
             rc = NewLine(basic.RC(seq), basic.Reverse(self.id)) #type: NewLine
         else:
             self.initial = rc.initial.rc # type: AlignmentStorage
@@ -27,7 +75,8 @@ class NewLine(EasyContig):
             self.completely_resolved = rc.completely_resolved.rc # type: SegmentStorage
             self.disjointig_alignments = rc.disjointig_alignments.rc # type: AlignmentStorage
             self.read_alignments = rc.read_alignments.rc # type: AlignmentStorage
-            self.listeners = [listener.rc for listener in rc.listeners[::-1]] # type: List[LineListener]
+            self.read_listener = rc.read_listener.rc # type: ReadAlignmentListener
+            self.listeners = [listener.rc for listener in rc.listeners] # type: List[LineListener]
         EasyContig.__init__(self, seq, id, rc)
         self.rc = rc #type: NewLine
 
@@ -35,15 +84,30 @@ class NewLine(EasyContig):
         # type: (Iterable[AlignmentPiece]) -> None
         self.read_alignments.addAll(alignments)
 
-    def getReads(self, seg):
+    def getReadAlignmentsTo(self, seg):
         # type: (Segment) -> Iterable[AlignmentPiece]
-        return self.read_alignments.allInter(seg)
+        return self.read_alignments.getAlignmentsTo(seg)
 
-    def segment(self, start, end):
-        return Segment(self, start, end)
-
-    def asSegment(self):
-        return self.segment(0, len(self))
+    def getPotentialAlignmentsTo(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
+        result = []
+        for alDL in self.disjointig_alignments.getAlignmentsTo(seg):
+            reduced = alDL.reduce(target=seg)
+            dt = alDL.seg_from.contig # type: Disjointig
+            for alRD in dt.getAlignmentsTo(reduced.seg_from):
+                result.append(alRD.compose(alDL))
+        result = sorted(result, key = lambda al: al.seg_from.contig.id)
+        for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig):
+            readRes = []
+            for al in iter:
+                found = False
+                for al1 in readRes:
+                    inter = al.matchingSequence(True).inter(al1.matchingSequence(True))
+                    if len(inter.matches) != 0:
+                        found = True
+                if not found:
+                    yield al
+                    readRes.append(al)
 
     def __len__(self):
         # type: () -> int
@@ -218,7 +282,7 @@ class NewLineStorage:
                 print "No unique segments found in contig", contig
                 continue
             line = self.add(contig.seq)
-            line.initial.add(AlignmentPiece(line.asSegment(), contig.asSegment(), str(len(line)) + "M"))
+            line.initial.add(AlignmentPiece.Identical(line.asSegment(), contig.asSegment()))
             for seg in segments:
                 line.correct_segments.add(seg.contigAsSegment(line.asSegment()))
             for seg in line.correct_segments:
@@ -228,7 +292,7 @@ class NewLineStorage:
         # type: () -> None
         for seg in UniqueMarker(self.disjointigs).findAllUnique(self.disjointigs):
             line = self.add(seg.Seq())
-            line.initial.add(AlignmentPiece(line.asSegment(), seg, str(len(line)) + "M"))
+            line.initial.add(AlignmentPiece.Identical(line.asSegment(), seg))
         #IMPLEMENT Filter all lines already present in the collection
 
     def mergeLines(self, alignment):
@@ -236,7 +300,7 @@ class NewLineStorage:
         line1 = alignment.seg_from.contig #type: NewLine
         line2 = alignment.seg_to.contig #type: NewLine
         line = self.add(line1.seq, name = "(" + line1.id + "," + line2.id + ")")
-        line.extendRightWithAlignment(alignment.changeQuery(line))
+        line.extendRightWithAlignment(alignment.changeQueryContig(line))
         # IMPLEMENT merge lines into a new line based on the given alignment. Polysh the result. Transfer all reads, segments and alignments
         del self.lines[line1.id]
         del self.lines[line2.id]

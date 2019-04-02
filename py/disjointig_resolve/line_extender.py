@@ -2,7 +2,7 @@ import itertools
 
 from typing import Optional, Tuple, List, Dict, Iterable
 
-from common import basic
+from common import basic, params
 from common.line_align import Scorer
 from common.sequences import Segment, ReadCollection
 from common.alignment_storage import AlignmentPiece, AlignedRead
@@ -97,8 +97,8 @@ class LineExtender:
                            to_polysh.append(seg.RC())
                         else:
                             to_polysh.append(seg)
-                    line.polyshSegments(to_polysh)
-                    line.updateCorrectSegments()
+                    line.polyshSegments(to_polysh)# IMPLEMENT
+                    line.updateCorrectSegments()# IMPLEMENT
                 self.updateCompletelyResolved(line)# IMPLEMENT
                 total = sum([num for seg, num in result])
                 new_recruits += total
@@ -110,19 +110,21 @@ class LineExtender:
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, int]]
         # Find all lines that align to at leasr k nucls of resolved segment. Since this segment is resolve we get all
-        line_alignments = self.dot_plot.getAllAlignments(resolved) # type: List[AlignmentPiece]
-        #Find all reads that align to at least k nucls of resolved segment or corresponding segments on other lines
-        reads = self.relevantReadAlignments(resolved, line_alignments) # type: List[AlignmentPiece]
-        #Find all reads that align to at least k nucls of resolved segment or corresponding segments on other lines
-        recruited_reads = set()
-        for al in line_alignments:
-            seg = al.seg_from
-            line = seg.contig # type: NewLine
-            for al in line.getReads(seg):
-                recruited_reads.add(al.seg_from.contig.id)
-        reads = filter(lambda al: al.seg_from.contig.id not in recruited_reads, reads)
-        # For each read we find all its alignmens that can compete with alignments to this line
-        read_alignments = self.generateReadToLineAlignments(reads, line_alignments) # type: List[List[AlignmentPiece]]
+        line_alignments = list(self.dot_plot.getAlignmentsTo(resolved)) # type: List[AlignmentPiece]
+        line = resolved.contig # type: NewLine
+        tmp = list(line.getPotentialAlignmentsTo(resolved.suffix(length = params.k))) # type: List[AlignmentPiece]
+        readsToLine = []
+        for al in tmp:
+            read = al.seg_from.contig # type: AlignedRead
+            selected = False
+            for al1 in read.alignments:
+                for al2 in line_alignments:
+                    if al1.seg_to.inter(al2.seg_from):
+                        selected = True
+            if not selected:
+                readsToLine.append(al)
+        #IMPLEMENT For each read we find all its alignmens that can compete with alignments to this line
+        read_alignments = self.generateReadToLineAlignments(readsToLine, line_alignments) # type: List[List[AlignmentPiece]]
         new_recruits = 0
         for als in read_alignments:
             winner = self.tournament(als) #type: AlignmentPiece

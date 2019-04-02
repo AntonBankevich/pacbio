@@ -17,6 +17,13 @@ class EasyContig(NamedSequence):
             rc = EasyContig(basic.RC(seq), basic.Reverse(id), self)
         self.rc = rc
 
+    def asSegment(self):
+        return Segment(self, 0, len(self))
+
+    def segment(self, left, right):
+        return Segment(self,left, right)
+
+
 class EasyContigStorage:
     def __init__(self, iter, add_rc = True):
         # type: (Iterable[EasyContig], bool) -> None
@@ -288,6 +295,20 @@ class Segment:
         # type: (Segment) -> Segment
         return Segment(seg.contig, self.left + seg.left, self.right + seg.left)
 
+    def suffix(self, pos = None, length = None):
+        assert (pos is not None) != (length is not None)
+        if length is not None:
+            pos = self.right - length
+        assert self.left <= pos < self.right
+        return Segment(self.contig, pos, self.right)
+
+    def prefix(self, pos = None, length = None):
+        assert (pos is not None) != (length is not None)
+        if length is not None:
+            pos = self.left + length
+        assert self.left < pos <= self.right
+        return Segment(self.contig, self.left, pos)
+
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeToken(self.contig.id)
@@ -516,7 +537,7 @@ class ReadCollection:
                 new_read = res.addNewRead(read)
                 for al in read.alignments:
                     if al.seg_to.contig == contig:
-                        new_read.addAlignment(al.changeQuery(new_read))
+                        new_read.addAlignment(al.changeQueryContig(new_read))
         return res
 
     def contigsAsSegments(self, seg_dict):

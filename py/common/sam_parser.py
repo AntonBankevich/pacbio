@@ -310,6 +310,7 @@ def CigarToList(cigar):
 
 def RCCigar(cigar):
     # type: (str) -> str
+    # IMPLEMENT get rid of complex signs and move to AlignmentPiece
     if cigar == "=":
         return "="
     if cigar == "X":

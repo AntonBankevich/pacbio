@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, BinaryIO, Callable, Iterator, Generator, Iterable
+from typing import Dict, List, Optional, BinaryIO, Callable, Iterator, Generator, Iterable, Union
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
@@ -20,9 +20,17 @@ class Disjointig(EasyContig):
         EasyContig.__init__(self, seq, id, rc)
         self.rc = rc # type:Disjointig
 
-    def addAlignments(self, alignments):
-        # type: (List[AlignmentPiece]) -> None
-        self.read_alignments.addAll(alignments)
+    def addAlignments(self, als):
+        # type: (Iterable[AlignmentPiece]) -> None
+        self.read_alignments.addAll(als)
+
+    def addAlignment(self, al):
+        # type: (AlignmentPiece) -> None
+        self.read_alignments.add(al)
+
+    def getAlignmentsTo(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
+        return self.read_alignments.getAlignmentsTo(seg)
 
     def save(self, handler):
         # type: (TokenWriter) -> None
@@ -109,24 +117,11 @@ class DisjointigCollection:
             else:
                 self.add(rec.seq)
 
-    def getDisjointigAlignments(self, segment):
-        # type: (Segment) -> List[AlignmentPiece]
-        # IMPLEMENT get all disjointigs that align to this disjointig segment
-        return []
-
-    def getReadAlignments(self, segment):
-        # type: (Segment) -> List[AlignmentPiece]
-        # IMPLEMENT get all reads that align to this segment of disjointig
-        return []
-
-    def calculateDotPlot(self):
-        # IMPLEMENT calculate dot plot of disjointigs
-        pass
-
-    def fillFromReadCollection(self, reads):
-        # type: (ReadCollection) -> None
-        # IMPLEMENT fill read to disjointig alignments from aligned read collection
-        pass
+    def addAll(self, als):
+        # type: (Union[Generator[AlignmentPiece], Iterable[AlignmentPiece]]) -> None
+        for al in als:
+            dt = al.seg_from.contig # type: Disjointig
+            dt.addAlignment(al)
 
     def save(self, handler):
         # type: (TokenWriter) -> None

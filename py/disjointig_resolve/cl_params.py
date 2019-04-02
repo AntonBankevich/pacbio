@@ -16,6 +16,7 @@ class Params:
 
     def parse(self, args):
         # type: (List[str]) -> Params
+        # IMPLEMENT command line parameters parsing
         return self
 
     def alignmentDir(self):

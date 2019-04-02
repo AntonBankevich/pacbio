@@ -13,6 +13,7 @@ from common.sequences import Segment, Contig, UniqueList, EasyContig
 
 
 # Unlike all other storages AutoAlignmentStorage stores only half of the alignments. The other half are the reversals of the stored half.
+# Also identical alignment can not be stored here but is returned as a part of iteration (see __iter__)
 class AutoAlignmentStorage(LineListener):
 
     def __init__(self, line, rc = None):
@@ -26,14 +27,22 @@ class AutoAlignmentStorage(LineListener):
         self.rc = rc # type: AutoAlignmentStorage
 
     def add(self, alignment):
+        # type: (AlignmentPiece) -> None
         self.content.add(alignment)
+
+    def __iter__(self):
+        # type: () -> Generator[AlignmentPiece]
+        for al in self.content:
+            yield al
+        for al in self.content:
+            yield al.reverse()
+        yield AlignmentPiece.Identical(self.line.asSegment())
 
     def getAlignmentsTo(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
-        for al in self.content.getAlignmentsTo(seg):
-            yield al
-        for al in self.content.reverse().getAlignmentsTo(seg):
-            yield al
+        for al in self:
+            if al.seg_to.contains(seg):
+                yield al
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
@@ -95,6 +104,10 @@ class RCAlignmentStorage(LineListener):
             rc.content = self.content.rc
         LineListener.__init__(self, rc)
         self.rc = rc # type: AutoAlignmentStorage
+
+    def __iter__(self):
+        # type: () -> Generator[AlignmentPiece]
+        return self.content.__iter__()
 
     def getAlignmentsTo(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
@@ -182,6 +195,10 @@ class TwoLineAlignmentStorage(LineListener):
         self.content.add(al)
         reverse = al.reverse()
         self.reverse.content.add(reverse)
+
+    def __iter__(self):
+        # type: () -> Generator[AlignmentPiece]
+        return self.content.__iter__()
 
     def getAlignmentsTo(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]

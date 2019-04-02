@@ -138,14 +138,12 @@ class EdgeResolver:
             self.aligner.alignReadCollection(alignments, self.graph.E.values())
             alignments.print_alignments(sys.stdout)
             return None
-        line.addAlignment(AlignmentPiece(Segment(line, best.seg_from.left + shift, best.seg_from.right + shift), best.seg_to, best.cigar))
+        line.addAlignment(best.changeQuerySegment(Segment(line, best.seg_from.left + shift, best.seg_from.right + shift)))
         print "Connected line", line, "to edge", best.seg_to.contig, "using alignment", best
         for al in alignments.reads["tail"].alignments:
             if al.seg_to.contig == best.seg_to.contig and best.precedes(al):
                 print "Additional alignment:", al
-                line.addAlignment(
-                    AlignmentPiece(Segment(line, al.seg_from.left + shift, al.seg_from.right + shift), al.seg_to,
-                                   al.cigar))
+                line.addAlignment(al.changeQuerySegment(Segment(line, al.seg_from.left + shift, al.seg_from.right + shift)))
         return best.seg_to.contig
 
     # def attemptReattach(self, line):
@@ -228,7 +226,7 @@ class Prolonger:
         for al in read.alignments:
             if al.seg_to.contig == edge:
                 seg_from = Segment(line, al.seg_from.left + old_len - overlap, al.seg_from.right + old_len - overlap)
-                new_al = AlignmentPiece(seg_from, al.seg_to, al.cigar)
+                new_al = al.changeQuerySegment(seg_from)
                 print "Candidate alignment:", al, line.chain[-1], line.chain[-1].precedes(new_al)
                 if line.chain[-1].seg_to.contig != edge or line.chain[-1].precedes(new_al):
                     line.addAlignment(new_al)
@@ -306,7 +304,7 @@ class ReadClassifier:
                 line.addRead(cread)
                 if res.seg_to.left > res.seg_to.contig.centerPos.pos + 500: # if read does not intercect the center we use the selected alignment
                     seg_from = Segment(cread, res.seg_from.left, res.seg_from.right)
-                    cread.addAlignment(AlignmentPiece(seg_from, res.seg_to, res.cigar))
+                    cread.addAlignment(res.changeQuerySegment(seg_from))
                     print "New read alignments:", cread
                 else: # otherwise we need to fix the alignment so that full read alignment is recorded
                     line.invalidateRead(cread)
@@ -357,7 +355,7 @@ class ReadClassifier:
                 # print al.seg_to.Seq()
                 # print al.cigar
                 # print seg_to.Seq()
-                new_piece = AlignmentPiece(seg_from, seg_to, al.cigar)
+                new_piece = al.changeQuerySegment(seg_from)
                 print "Added line alignment:", new_piece
                 res_map[(line_from.id, line_to.id)].append(new_piece)
         return res_map
