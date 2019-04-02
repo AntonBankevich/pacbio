@@ -1,4 +1,5 @@
 import heapq
+import random
 import shutil
 import os
 
@@ -23,15 +24,18 @@ def RC(s):
         res[i] = rc[c]
     return "".join(res)
 
+
 def ensure_dir_existance(dir):
     # type: (str) -> None
     if not os.path.exists(dir):
         os.makedirs(dir)
 
+
 def recreate(dir):
     if os.path.exists(dir):
         shutil.rmtree(dir)
     ensure_dir_existance(dir)
+
 
 def parseNumber(s, pos=0):
     # type: (str, int) -> Union[None, float, int]
@@ -47,6 +51,7 @@ def parseNumber(s, pos=0):
         return float(res)
     else:
         return int(res)
+
 
 def parseNegativeNumber(s, pos=0):
     # type: (str, int) -> Union[None, float, int]
@@ -68,7 +73,8 @@ def parseNegativeNumber(s, pos=0):
     else:
         return int(res)
 
-def best2(arr, better = lambda x, y: x < y):
+
+def best2(arr, better=lambda x, y: x < y):
     # type: (list[int], Callable[[int, int], bool]) -> tuple[int,int]
     assert len(arr) >= 2
     res = [0, 1]
@@ -81,12 +87,14 @@ def best2(arr, better = lambda x, y: x < y):
                 res = res[::-1]
     return (res[0], res[1])
 
+
 def merge(*iterables):
     prev = None
     for cur in heapq.merge(*iterables):
         if cur != prev:
             yield cur
             prev = cur
+
 
 class OStreamWrapper:
     def __init__(self, *streams):
@@ -105,6 +113,7 @@ class OStreamWrapper:
         for stream in self.streams:
             stream.flush()
 
+
 def Link(arr, dist):
     if len(arr) == 0:
         return
@@ -118,6 +127,7 @@ def Link(arr, dist):
         prev = val
     yield prev, arr[-1]
 
+
 def Reverse(val):
     if isinstance(val, str):
         assert not val.startswith("--")
@@ -128,6 +138,7 @@ def Reverse(val):
     elif isinstance(val, int):
         return -val
     assert False, "Tried to reverse an object that is neither number nor a string"
+
 
 def Normalize(val):
     if isinstance(val, str):
@@ -140,6 +151,7 @@ def Normalize(val):
         return abs(val)
     assert False, "Tried to normalize an object that is neither number nor a string"
 
+
 def isCanonocal(val):
     if isinstance(val, str):
         assert not val.startswith("--")
@@ -148,10 +160,20 @@ def isCanonocal(val):
         return val > 0
     assert False, "Tried to check canonical an object that is neither number nor a string"
 
+
 def quoted(val):
     return "\"" + str(val) + "\""
 
-def fillRight(s, n, c = " "):
+
+def fillRight(s, n, c=" "):
     while len(s) < n:
         s = s + c
     return s
+
+
+def randomSequence(n):
+    # type: (int) -> str
+    res = ["A"] * n
+    for i in range(n):
+        res[i] = random.choice(["A", "C", "G", "T"])
+    return "".join(res)

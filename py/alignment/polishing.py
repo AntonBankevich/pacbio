@@ -1,10 +1,11 @@
 import os
 
-from typing import Optional
+from typing import Optional, List, Iterable
 
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO, params
-from common.sequences import Consensus, ReadCollection, Contig, ContigCollection
+from common.seq_records import NamedSequence
+from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, Segment, EasyContig
 from common.alignment_storage import AlignmentPiece
 from flye_tools.polysh_job import JobPolishing
 
@@ -16,7 +17,7 @@ class Polisher:
         self.dir_distributor = dir_distributor
 
     def polish(self, reads, consensus):
-        # type: (ReadCollection, Contig) -> str
+        # type: (Iterable[NamedSequence], Contig) -> str
         dir, new_files, same = self.dir_distributor.fillNextDir([([consensus], "ref.fasta"), (reads, "reads.fasta")])
         consensus_file_name = new_files[0]
         reads_file_name = new_files[1]
@@ -102,6 +103,38 @@ class Polisher:
             else:
                 best = self.polishAndAnalyse(reads, Contig(base_start, "base"), len(base_start) + 100).suffix(pos_start)
         return best
+    
+    def polishSegment(self, seg, als):
+        # type: (Segment, List[AlignmentPiece]) -> str
+        #IMPLEMENT split segment into subsegments, polish, glue together
+        pass
+
+    def polishSmallSegment(self, seg, als):
+        # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
+        reads = []
+        start = basic.randomSequence(200)
+        end = basic.randomSequence(200)
+        for al in als:
+            new_seq = ""
+            al = al.reduce(target=seg)
+            if al.seg_to.left < seg.left + 3:
+                new_seq += start
+            new_seq += al.seg_from.Seq()
+            if al.seg_to.right > seg.right - 3:
+                new_seq += end
+            reads.append(NamedSequence(new_seq, al.seg_from.contig.id))
+        base = Contig(start + seg.Seq() + end, "base")
+        polished = Contig(self.polish(reads, base), "polished")
+        al = self.aligner.alignClean([polished], [base]).next()
+        return al.reduce(target=base.segment(len(start), len(base) - len(end))).changeTargetSegment(seg)
+
+    def polishEnd(self, contig, als, min_cov):
+        # type: (EasyContig, List[AlignmentPiece]) -> Tuple[EasyContig, List[AlignmentPiece]]
+        #IMPLEMENT Extend sequence to the right and report new sequence and alignment of reads to it
+        pass
+
+
+
 
 
 class FakePolishingArgs:
