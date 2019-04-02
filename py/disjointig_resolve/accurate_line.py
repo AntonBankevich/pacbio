@@ -2,16 +2,17 @@ from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig
+from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, EasyContig
 from common.alignment_storage import AlignmentPiece, AlignedRead, Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, UniqueMarker
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
 
 
-class NewLine(NamedSequence):
-    def __init__(self, seq, id, rc = None, zero_pos = 0):
-        # type: (str, str, Optional[NewLine], int) -> None
-        NamedSequence.__init__(self, seq, id, zero_pos)
+class NewLine(EasyContig):
+    def __init__(self, seq, id, rc = None):
+        # type: (str, str, Optional[NewLine]) -> None
+        self.seq = seq
+        self.id = id
         if rc is None:
             self.initial = AlignmentStorage()
             self.correct_segments = SegmentStorage()
@@ -19,7 +20,7 @@ class NewLine(NamedSequence):
             self.disjointig_alignments = AlignmentStorage()
             self.read_alignments = AlignmentStorage()
             self.listeners = [self.initial, self.correct_segments, self.disjointig_alignments, self.read_alignments] # type: List[LineListener]
-            self.rc = NewLine(basic.RC(seq), basic.Reverse(self.id), len(seq) - zero_pos) #type: NewLine
+            rc = NewLine(basic.RC(seq), basic.Reverse(self.id)) #type: NewLine
         else:
             self.initial = rc.initial.rc # type: AlignmentStorage
             self.correct_segments = rc.correct_segments.rc # type: SegmentStorage
@@ -27,7 +28,8 @@ class NewLine(NamedSequence):
             self.disjointig_alignments = rc.disjointig_alignments.rc # type: AlignmentStorage
             self.read_alignments = rc.read_alignments.rc # type: AlignmentStorage
             self.listeners = [listener.rc for listener in rc.listeners[::-1]] # type: List[LineListener]
-            self.rc = rc #type: NewLine
+        EasyContig.__init__(self, seq, id, rc)
+        self.rc = rc #type: NewLine
 
     def addReads(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
@@ -41,7 +43,7 @@ class NewLine(NamedSequence):
         return Segment(self, start, end)
 
     def asSegment(self):
-        return self.segment(-self.zero_pos, len(self) - self.zero_pos)
+        return self.segment(0, len(self))
 
     def __len__(self):
         # type: () -> int
@@ -51,15 +53,15 @@ class NewLine(NamedSequence):
         # type: (Optional[int], Optional[int]) -> Segment
         assert (pos is None) != (length is None), str([pos, length])
         if length is not None:
-            pos = len(self) - length - self.zero_pos
-        return self.segment(pos, len(self) - self.zero_pos)
+            pos = len(self) - length
+        return self.segment(pos, len(self))
 
     def prefix(self, pos = None, length = None):
         # type: (Optional[int], Optional[int]) -> Segment
         assert (pos is None) != (length is None), str([pos, length])
         if length is not None:
-            pos = length - self.zero_pos
-        return self.segment(pos, len(self) - self.zero_pos)
+            pos = length
+        return self.segment(pos, len(self))
 
 
     def extendRight(self, seq):
@@ -69,7 +71,6 @@ class NewLine(NamedSequence):
         self.notifyBeforeExtendRight(new_seq, seq)
         self.seq = self.seq + seq
         self.rc.seq = basic.RC(seq) + self.rc.seq
-        self.rc.zero_pos += len(seq)
         self.notifyAfterExtendRight(seq)
 
     def notifyBeforeExtendRight(self, new_seq, seq):
@@ -84,15 +85,14 @@ class NewLine(NamedSequence):
 
 
     def cutRight(self, pos):
-        assert pos > 0 and pos + self.zero_pos <= len(self)
-        cut_length = len(self) - pos - self.zero_pos
+        assert pos > 0 and pos <= len(self)
+        cut_length = len(self) - pos
         if cut_length == 0:
             return
         new_seq = Contig(self.seq[:pos], "TMP_" + self.id)
         self.notifyBeforeCutRight(new_seq, pos)
         self.seq = self.seq[:-cut_length]
         self.rc.seq = self.rc.seq[cut_length:]
-        self.rc.zero_pos -= cut_length
         self.notifyAfterCutRight(pos)
 
     def notifyBeforeCutRight(self, new_seq, pos):
@@ -112,8 +112,6 @@ class NewLine(NamedSequence):
         self.notifyBeforeCorrect(correction)
         self.seq = correction.seq_from.seq
         self.rc.seq = basic.RC(self.seq)
-        self.zero_pos = correction.mapPositionsUp([0])[0]
-        self.rc.zero_pos = len(self) - self.zero_pos
         self.notifyAfterCorrect()
 
     def notifyBeforeCorrect(self, alignments):
@@ -284,11 +282,11 @@ class LinePosition(LineListener):
         self.pos = pos
         line.addListener(self)
         if rc is None:
-            rc = LinePosition(line.rc, len(line) - 1 - (pos + line.zero_pos) - line.rc.zero_pos)
+            rc = LinePosition(line.rc, len(line) - 1 - pos)
         LineListener.__init__(self, rc)
 
     def fixRC(self):
-        self.rc.pos = len(self.line) - 1 - (self.pos + self.line.zero_pos) - self.line.rc.zero_pos
+        self.rc.pos = len(self.line) - 1 - self.pos
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None

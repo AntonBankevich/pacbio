@@ -8,9 +8,10 @@ sys.path.append("py")
 from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
 from dag_resolve.repeat_graph import Graph
-from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam
-from common.alignment_storage import AlignedRead
-from typing import Optional, Iterable, Tuple, Generator, BinaryIO
+from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam, EasyContig, \
+    EasyContigStorage
+from common.alignment_storage import AlignedRead, AlignmentPiece
+from typing import Optional, Iterable, Tuple, Generator, BinaryIO, Dict
 from common import basic, sam_parser, SeqIO, params
 
 
@@ -384,7 +385,7 @@ class Aligner:
         return res
 
     def align(self, reads, reference):
-        # type: (Iterable[NamedSequence], Iterable[Contig]) -> sam_parser.Samfile
+        # type: (Iterable[NamedSequence], Iterable[EasyContig]) -> sam_parser.Samfile
         dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (reads, "reads.fasta")])
         contigs_file = new_files[0]
         reads_file = new_files[1]
@@ -398,6 +399,23 @@ class Aligner:
             print "Performing alignment:", alignment_file
             make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
+
+    def alignClean(self, reads, reference):
+        # type: (Iterable[EasyContig], Iterable[EasyContig]) -> Generator[AlignmentPiece]
+        parser = self.align(reads, reference)
+        read_dict = EasyContigStorage(reads, True)
+        ref_dict = EasyContigStorage(reference, True)
+        for rec in parser:
+            if rec.is_unmapped:
+                continue
+            rname = rec.query_name.split()[0]
+            if rname.startswith("contig_"):
+                rname = rname[len("contig_"):]
+            seq_from = read_dict[rname]
+            seq_to = ref_dict[rec.tname]
+            if rname in read_dict:
+                yield AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
+
 
     # def matchingAlignment(self, seqs, contig):
     #     # type: (list[str], Contig) -> list[AlignedSequences]

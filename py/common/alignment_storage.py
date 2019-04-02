@@ -5,7 +5,7 @@ from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterat
 from common import sam_parser, params
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, Contig, ContigCollection
+from common.sequences import Segment, Contig, ContigCollection, EasyContig
 from common.line_align import Scorer
 
 
@@ -27,6 +27,43 @@ class AlignmentPiece:
             self.rc = AlignmentPiece(seg_from.RC(), seg_to.RC(), sam_parser.RCCigar(self.cigar), self)
         else:
             self.rc = rc
+
+    @staticmethod
+    def FromSamRecord(seq_from, seq_to, rec):
+        # type: (EasyContig, EasyContig, sam_parser.SAMEntryInfo) -> AlignmentPiece
+        cigar_list = list(sam_parser.CigarToList(rec.cigar))
+        ls = 0
+        rs = 0
+        if cigar_list[0][0] in "HS":
+            ls = cigar_list[0][1]
+        if cigar_list[-1][0] in "HS":
+            rs = cigar_list[-1][1]
+        new_cigar = []
+        for s, num in cigar_list:
+            if s not in "HS":
+                new_cigar.append(num)
+                new_cigar.append(s)
+        new_cigar = "".join(map(str, new_cigar))
+        seg_from = Segment(seq_from, ls, len(seq_from) - rs)
+        seg_to = Segment(seq_to, rec.pos - 1, rec.pos - 1 + rec.alen)
+        if rec.rc:
+            seg_from = Segment(seq_from.rc, ls, len(seq_from) - rs).RC()
+            seg_to = seg_to.RC()
+            new_cigar = sam_parser.RCCigar(new_cigar)
+        piece = AlignmentPiece(seg_from, seg_to, new_cigar)
+        seg_from.contig.alignments.append(piece)
+        seg_from.contig.rc.alignments.append(piece.rc)
+        # self.rc.alignments.append(piece.RC())
+        # if piece.percentIdentity() < 0.3:
+        #     print piece
+        #     print rec.pos, rec.rc, rec.query_name, rec.tname, rec.alen
+        #     print rec.cigar
+        #     print piece.seg_from.Seq()
+        #     print piece.seg_to.Seq()
+        #     print "\n".join(map(str, piece.matchingPositions()))
+        #     assert False
+        return piece
+
 
     def __str__(self):
         # type: () -> str
@@ -352,15 +389,15 @@ class MatchingSequence:
         return len(self.matches)
 
 
-class AlignedRead(NamedSequence):
+class AlignedRead(EasyContig):
     def __init__(self, rec, rc=None):
         # type: (NamedSequence, Optional[AlignedRead]) -> None
         if rec.id.startswith("contig_"):
             rec.id = rec.id[len("contig_"):]
-        NamedSequence.__init__(self, rec.seq, rec.id)
         self.alignments = []  # type: list[AlignmentPiece]
         if rc is None:
             rc = AlignedRead(rec.RC(), self)
+        EasyContig.__init__(self, rec.seq, rec.id, rc)
         self.rc = rc  # type: AlignedRead
 
     def __len__(self):
@@ -378,15 +415,15 @@ class AlignedRead(NamedSequence):
             handler.writeTokenLine(al.cigar)
 
     @staticmethod
-    def load(handler, collections):
-        # type: (TokenReader, List) -> AlignedRead
+    def load(handler, collection):
+        # type: (TokenReader, Any) -> AlignedRead
         id = handler.readToken()
         seq = handler.readToken()
         res = AlignedRead(NamedSequence(seq, id))
         n = handler.readInt()
         for i in range(n):
             seg_from = Segment.load(handler, res)
-            seg_to = Segment.load(handler, collections)
+            seg_to = Segment.load(handler, collection)
             cigar = handler.readToken()
             res.alignments.append(AlignmentPiece(seg_from, seg_to, cigar))
         return res
@@ -400,38 +437,7 @@ class AlignedRead(NamedSequence):
 
     def AddSamAlignment(self, rec, contig):
         # type: (sam_parser.SAMEntryInfo, Contig) -> AlignmentPiece
-        cigar_list = list(sam_parser.CigarToList(rec.cigar))
-        ls = 0
-        rs = 0
-        if cigar_list[0][0] in "HS":
-            ls = cigar_list[0][1]
-        if cigar_list[-1][0] in "HS":
-            rs = cigar_list[-1][1]
-        new_cigar = []
-        for s, num in cigar_list:
-            if s not in "HS":
-                new_cigar.append(num)
-                new_cigar.append(s)
-        new_cigar = "".join(map(str, new_cigar))
-        seg_from = Segment(self, ls, len(self.seq) - rs)
-        seg_to = Segment(contig, rec.pos - 1, rec.pos - 1 + rec.alen)
-        if rec.rc:
-            seg_from = Segment(self.rc, ls, len(self.seq) - rs).RC()
-            seg_to = seg_to.RC()
-            new_cigar = sam_parser.RCCigar(new_cigar)
-        piece = AlignmentPiece(seg_from, seg_to, new_cigar)
-        seg_from.contig.alignments.append(piece)
-        seg_from.contig.rc.alignments.append(piece.rc)
-        # self.rc.alignments.append(piece.RC())
-        # if piece.percentIdentity() < 0.3:
-        #     print piece
-        #     print rec.pos, rec.rc, rec.query_name, rec.tname, rec.alen
-        #     print rec.cigar
-        #     print piece.seg_from.Seq()
-        #     print piece.seg_to.Seq()
-        #     print "\n".join(map(str, piece.matchingPositions()))
-        #     assert False
-        return piece
+        return AlignmentPiece.FromSamRecord(self, contig, rec)
 
     def addAlignment(self, al):
         # type: (AlignmentPiece) -> None

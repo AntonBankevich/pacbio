@@ -9,6 +9,34 @@ sys.path.append("py")
 from common import sam_parser, SeqIO, basic, params
 from typing import Generator, Iterator, Dict, Optional, Union, Callable, Iterable, Any, BinaryIO
 
+class EasyContig(NamedSequence):
+    def __init__(self, seq, id, rc = None):
+        # type: (str, str, Optional[EasyContig]) -> None
+        NamedSequence.__init__(self, seq, id)
+        if rc is None:
+            rc = EasyContig(basic.RC(seq), basic.Reverse(id), self)
+        self.rc = rc
+
+class EasyContigStorage:
+    def __init__(self, iter, add_rc = True):
+        # type: (Iterable[EasyContig], bool) -> None
+        self.items = dict() # type: Dict[str, EasyContig]
+        self.add_rc = add_rc
+        for item in iter:
+            self.add(item)
+
+    def add(self, item):
+        # type: (EasyContig) -> None
+        self.items[item.id] = item
+        if self.add_rc:
+            self.items[item.rc.id] = item.rc
+
+    def __getitem__(self, item):
+        # type: (str) -> Optional[EasyContig]
+        if item in self.items:
+            return self.items[item]
+        return None
+
 
 class ContigCollection():
     def __init__(self, contigs_list=None):
@@ -105,7 +133,7 @@ class TmpInfo:
         self.misc = l
 
 
-class Contig(NamedSequence):
+class Contig(EasyContig):
     def __init__(self, seq, id, info=None, rc=None):
         # type: (str, str, Optional[TmpInfo], Optional[Contig]) -> None
         if info is None:
@@ -116,7 +144,7 @@ class Contig(NamedSequence):
         if rc is None:
             rc = Contig(basic.RC(seq), basic.Reverse(id), info, self)
         self.rc = rc
-        NamedSequence.__init__(self, seq, id)
+        EasyContig.__init__(self, seq, id, rc)
 
     def segment(self, left, right):
         return Segment(self, left, right)
@@ -171,7 +199,7 @@ class Segment:
             left = 0
         if right is None:
             right = len(contig)
-        assert 0 <= left + contig.zero_pos <= right + contig.zero_pos <= len(contig), str([0, left, right, len(contig), contig.id])
+        assert 0 <= left <= right <= len(contig), str([0, left, right, len(contig), contig.id])
         self.contig = contig
         self.left = left
         self.right = right
@@ -189,9 +217,7 @@ class Segment:
     def RC(self):
         # type: () -> Segment
         l = len(self.contig)
-        return Segment(self.contig.rc,
-                       l - self.right - self.contig.zero_pos - self.contig.rc.zero_pos,
-                       l - self.left - self.contig.zero_pos - self.contig.rc.zero_pos)
+        return Segment(self.contig.rc, l - self.right, l - self.left)
 
     def asNamedSequence(self):
         # type: () -> NamedSequence
@@ -226,11 +252,11 @@ class Segment:
 
     def Seq(self):
         # type: () -> str
-        return self.contig.seq[self.left + self.contig.zero_pos:self.right + self.contig.zero_pos]
+        return self.contig.seq[self.left:self.right]
 
     def __str__(self):
         # type: () -> str
-        if self.contig.zero_pos == 0 and (self.right < len(self.contig) * 0.6 or (
+        if (self.right < len(self.contig) * 0.6 or (
                 self.right < 0.9 * len(self.contig) and len(self.contig) - self.right > 500)):
             return str(self.contig.id) + "[" + str(self.left) + ":" + str(self.right) + "]"
         else:
@@ -260,7 +286,7 @@ class Segment:
 
     def contigAsSegment(self, seg):
         # type: (Segment) -> Segment
-        return Segment(seg.contig, self.left + seg.left + self.contig.zero_pos, self.right + seg.left + self.contig.zero_pos)
+        return Segment(seg.contig, self.left + seg.left, self.right + seg.left)
 
     def save(self, handler):
         # type: (TokenWriter) -> None

@@ -1,4 +1,4 @@
-from typing import Optional, Iterator, List, Any, Iterable, Tuple
+from typing import Optional, Iterator, List, Any, Iterable, Tuple, Generator
 
 from common.alignment_storage import AlignmentPiece, Correction
 from common.save_load import TokenWriter, TokenReader
@@ -322,25 +322,17 @@ class AlignmentStorage(SmartStorage):
                 result.append(al)
         return result
 
-    def allContaining(self, seg):
-        # type: (Segment) -> List[AlignmentPiece]
-        result = []
+    def getAlignmentsTo(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
         for al in self: # type: AlignmentPiece
             if al.seg_to.contains(seg):
-                result.append(al)
-        return result
+                yield al
 
     def load(self, handler, collection_from, collection_to):
         # type: (TokenReader, Any, Any) -> None
         n = handler.readInt()
         for i in range(n):
             self.add(AlignmentPiece.load(handler, collection_from, collection_to))
-
-    def clean(self):
-        if self.isCanonical():
-            self.items = []
-        else:
-            self.rc.items = []
 
     def reverse(self):
         res = AlignmentStorage()

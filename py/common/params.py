@@ -9,6 +9,7 @@ min_expected_Pacbio_PI = 0.78
 min_allowed_Pacbio_PI = 0.7
 max_jump = 6000
 assert_pi = True
+k = 500
 
 class Scores:
     ins_score = 8

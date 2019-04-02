@@ -2,22 +2,23 @@ from typing import Dict, List, Optional, BinaryIO, Callable, Iterator, Generator
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection
+from common.sequences import Segment, UniqueList, ReadCollection, EasyContig
 from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.smart_storage import AlignmentStorage
 
 
-class Disjointig(NamedSequence):
+class Disjointig(EasyContig):
     def __init__(self, seq, id, rc=None):
         # type: (str, str, Optional[Disjointig]) -> None
-        NamedSequence.__init__(self, seq, id)
         self.seq = seq
+        self.id = id
         if rc is None:
             self.read_alignments = AlignmentStorage() # type: AlignmentStorage
-            self.rc = Disjointig(basic.RC(seq), basic.Reverse(id), self) # type: Disjointig
+            rc = Disjointig(basic.RC(seq), basic.Reverse(id), self) # type: Disjointig
         else:
             self.read_alignments = self.rc.read_alignments.rc  # type: AlignmentStorage
-            self.rc = rc # type:Disjointig
+        EasyContig.__init__(self, seq, id, rc)
+        self.rc = rc # type:Disjointig
 
     def addAlignments(self, alignments):
         # type: (List[AlignmentPiece]) -> None

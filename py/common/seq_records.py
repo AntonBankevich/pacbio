@@ -4,21 +4,20 @@ from common import basic
 
 
 class NamedSequence:
-    def __init__(self, seq, id, zero_pos = 0):
-        # type: (str, str, int) -> NamedSequence
+    def __init__(self, seq, id):
+        # type: (str, str) -> NamedSequence
         self.id = id # type: str
         self.seq = seq.upper()
-        self.zero_pos = zero_pos
 
     def left(self):
-        return -self.zero_pos
+        return 0
 
     def right(self):
-        return len(self) - self.zero_pos
+        return len(self)
 
     def subSequence(self, left, right):
         # type: (int, int) -> NamedSequence
-        return NamedSequence(self.seq[left + self.zero_pos:right + self.zero_pos], self.id + "(" + str(left) +"," + str(right) + ")")
+        return NamedSequence(self.seq[left:right], self.id + "(" + str(left) +"," + str(right) + ")")
 
     def __len__(self):
         # type: () -> int
@@ -29,14 +28,14 @@ class NamedSequence:
         return NamedSequence(basic.RC(self.seq), basic.Reverse(self.id))
 
     def __getitem__(self, item):
-        return self.seq[item + self.zero_pos]
+        return self.seq[item]
 
 
 class SeqRecord(NamedSequence):
-    def __init__(self, seq, id, qual = None, info = None, zero_pos = 0):
-        # type: (str, str, Optional[str], Optional[str], int) -> SeqRecord
+    def __init__(self, seq, id, qual = None, info = None):
+        # type: (str, str, Optional[str], Optional[str]) -> SeqRecord
         assert qual is None or len(qual) == len(seq)
-        NamedSequence.__init__(self, seq, id, zero_pos)
+        NamedSequence.__init__(self, seq, id)
         self.qual = qual
         self.info = info
 
