@@ -64,6 +64,33 @@ class AlignmentPiece:
             other = seg_from
         return AlignmentPiece(seg_from, other, str(len(seg_from)) + "M")
 
+    @staticmethod
+    def GlueOverlappingAlignments(als):
+        # type: (List[AlignmentPiece]) -> AlignmentPiece
+        contig = als[0].seg_to.contig
+        als1 = [al.matchingSequence() for al in als]
+        truncated = [als[0].seg_to]
+        last = als[0].matchingSequence()
+        for al in als[1:]:
+            next = al.matchingSequence()
+            shared = list(last.common_to(next))
+            if len(shared) != 0:
+                pos1, pos2 = shared[len(shared) / 2]
+                truncated[-1] = truncated[-1].prefix(pos=last.matches[pos1][1])
+                truncated.append(al.seg_to.suffix(pos=next.matches[pos2][1]))
+            last = next
+        als = [al.reduce(target=seg) for al, seg in zip(als, truncated)]
+        return AlignmentPiece.GlueFittingAlignments(als)
+
+    @staticmethod
+    def GlueFittingAlignments(als):
+        # type: (List[AlignmentPiece]) -> AlignmentPiece
+        contig = als[0].seg_to.contig
+        new_seq = "".join((al.seg_from.Seq() for al in als))
+        new_contig = EasyContig(new_seq, "glued")
+        new_cigar = "".join(al.cigar for al in als)
+        return AlignmentPiece(new_contig.asSegment(), contig.segment(als[0].seg_to.left, als[-1].seg_to.right),
+                              new_cigar)
 
     def __str__(self):
         # type: () -> str
@@ -224,6 +251,7 @@ class AlignmentPiece:
 
     def reduce(self, segment=None, query=None, target=None):
         # type: (Optional[Segment], Optional[Segment], Optional[Segment]) -> AlignmentPiece
+        # IMPLEMENT alignment reduce without additional translation. Same for alignment glue and composition
         if segment is not None:
             if segment.contig == self.seg_from.contig:
                 query = segment
@@ -278,7 +306,7 @@ class MatchingSequence:
         self.seq_to = seq_to
         self.matches = matchingPositions
 
-    def common(self, other):
+    def common_from(self, other):
         # type: (MatchingSequence) -> Generator[Tuple[int, int]]
         assert self.seq_from == other.seq_from
         cur_self = 0
@@ -287,6 +315,21 @@ class MatchingSequence:
             if self.matches[cur_self][0] < other.matches[cur_other][0]:
                 cur_self += 1
             elif self.matches[cur_self][0] > other.matches[cur_other][0]:
+                cur_other += 1
+            else:
+                yield (cur_self, cur_other)
+                cur_self += 1
+                cur_other += 1
+
+    def common_to(self, other):
+        # type: (MatchingSequence) -> Generator[Tuple[int, int]]
+        assert self.seq_from == other.seq_from
+        cur_self = 0
+        cur_other = 0
+        while cur_self < len(self) and cur_other < len(other):
+            if self.matches[cur_self][1] < other.matches[cur_other][1]:
+                cur_self += 1
+            elif self.matches[cur_self][1] > other.matches[cur_other][1]:
                 cur_other += 1
             else:
                 yield (cur_self, cur_other)
@@ -346,7 +389,7 @@ class MatchingSequence:
     def composeDifference(self, other):
         # type: (MatchingSequence) -> MatchingSequence
         matchings = [(self.matches[pos_self][1], other.matches[pos_other][1]) for pos_self, pos_other in
-                     self.common(other)]
+                     self.common_from(other)]
         return MatchingSequence(self.seq_to, other.seq_to, matchings)
 
     def compose(self, other):

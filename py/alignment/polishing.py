@@ -1,12 +1,12 @@
 import os
 
-from typing import Optional, List, Iterable
+from typing import Optional, List, Iterable, Tuple
 
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO, params
 from common.seq_records import NamedSequence
 from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, Segment, EasyContig
-from common.alignment_storage import AlignmentPiece
+from common.alignment_storage import AlignmentPiece, AlignedRead
 from flye_tools.polysh_job import JobPolishing
 
 
@@ -103,12 +103,31 @@ class Polisher:
             else:
                 best = self.polishAndAnalyse(reads, Contig(base_start, "base"), len(base_start) + 100).suffix(pos_start)
         return best
-    
-    def polishSegment(self, seg, als):
-        # type: (Segment, List[AlignmentPiece]) -> str
-        #IMPLEMENT split segment into subsegments, polish, glue together
-        pass
 
+    # Returns alignment of polished sequence to old sequence
+    def polishSegment(self, seg, als):
+        # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
+        w = 400
+        r = 50
+        first = seg.left / w * w
+        last = min(seg.right + w - 1, len(seg.contig)) / w * w
+        segs = []
+        for i in range(first, last + 1):
+            segs.append(Segment(seg.contig, max(0, i * w - r), min(len(seg.contig), (i + 1) * w + r)))
+        als_by_segment = [[] for i in range(last - first + 1)]
+        for al in als:
+            l = al.seg_to.left / w * w
+            r = al.seg_to.right / w * w + 1
+            for i in range(max(0, l - first - 1), min(last - first + 1, r - first + 2)):
+                if al.seg_to.inter(segs[i]):
+                    als_by_segment[i].append(al)
+        res_als = []
+        for seg, seg_als in zip(segs, als_by_segment):
+            res_als.append(self.polishSmallSegment(seg, seg_als))
+        res = AlignmentPiece.GlueOverlappingAlignments(res_als)
+        return res.reduce(target=seg)
+
+    # Returns alignment of polished sequence to old sequence
     def polishSmallSegment(self, seg, als):
         # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
         reads = []
@@ -128,13 +147,66 @@ class Polisher:
         al = self.aligner.alignClean([polished], [base]).next()
         return al.reduce(target=base.segment(len(start), len(base) - len(end))).changeTargetSegment(seg)
 
-    def polishEnd(self, contig, als, min_cov):
-        # type: (EasyContig, List[AlignmentPiece]) -> Tuple[EasyContig, List[AlignmentPiece]]
-        #IMPLEMENT Extend sequence to the right and report new sequence and alignment of reads to it
-        pass
-
-
-
+    def polishEnd(self, als, min_cov = 4):
+        # type: (List[AlignmentPiece], int) -> Tuple[EasyContig, List[AlignmentPiece]]
+        contig = als[0].seg_to.contig
+        relevant_seg = contig.asSegment().suffix(length=1000)
+        new_contig = relevant_seg.asEasyContig()
+        mapping = AlignmentPiece.Identical(relevant_seg, new_contig.asSegment())
+        relevant_als = [al.compose(mapping) for al in als]
+        finished_als = []
+        while True:
+            tmp = []
+            for al in relevant_als:
+                if al.seg_to.inter(new_contig.asSegment().suffix(length=20)):
+                   tmp.append(al)
+                else:
+                    finished_als.append(al)
+            relevant_als = tmp
+            # TODO replace with position search in cigar
+            if len(relevant_als) < min_cov:
+                break
+            start = new_contig.asSegment().suffix(length=200)
+            reduced_read_list = [
+                AlignedRead(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right), al.seg_from.contig.id)
+                for al in relevant_als]
+            reduced_reads = ReadCollection(reduced_read_list)
+            for base_al in relevant_als:
+                if len(base_al.seg_from.contig) - base_al.seg_from.right < 300:
+                    continue
+                # Base consists of copy of the previous 200 nucleotides and a segment of read of length at most 500
+                base_segment = base_al.seg_from.contig.segment(base_al.seg_from.right,
+                                                     min(len(base_al.seg_from.contig), base_al.seg_from.right + 500))
+                base = start + base_segment.Seq()
+                polished_base = EasyContig(self.polish(reduced_reads, base), "polished_base")
+                self.aligner.alignReadCollection(reduced_reads, polished_base)
+                candidate_alignments = []
+                for read in reduced_read_list:
+                    candidate_alignments.append(None)
+                    for al in read.alignmentsTo(polished_base.asSegment()):
+                        if al.seg_to.left == 0 and (candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right):
+                            candidate_alignments[-1] = al
+                positions = []
+                for al in candidate_alignments:
+                    if al is None:
+                        continue
+                    positions.append(al.seg_to.right)
+                positions = sorted(positions)[::-1]
+                num = max(min_cov, len(relevant_als) / 10 * 8)
+                if num >= len(positions):
+                    continue
+                cutoff_pos = max(positions[num - 1], len(start))
+                if cutoff_pos > len(start) + 100:
+                    cut_polished_base = polished_base.asSegment().prefix(pos=cutoff_pos).asEasyContig()
+                    candidate_alignments = [al.reduce(target = polished_base.segment(0, cutoff_pos)).changeTargetContig(cut_polished_base) for al in candidate_alignments]
+                    new_contig_candidate = EasyContig(new_contig[:-len(start)] + cut_polished_base[len(start):], "candidate")
+                    candidate_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().suffix(len(cut_polished_base))) for al in candidate_alignments]
+                    corrected_relevant_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in relevant_als]
+                    relevant_als = [AlignmentPiece.GlueOverlappingAlignments([al1, al2]) for al1, al2 in zip(corrected_relevant_alignments, candidate_alignments)]
+                    finished_als = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in finished_als]
+                    new_contig = new_contig_candidate
+                    break
+        return new_contig, relevant_als + finished_als
 
 
 class FakePolishingArgs:

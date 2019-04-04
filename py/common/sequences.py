@@ -230,6 +230,10 @@ class Segment:
         # type: () -> NamedSequence
         return NamedSequence(self.Seq(), self.contig.id + "[" + str(self.left) + "," + str(self.right) + "]")
 
+    def asEasyContig(self):
+        # type: () -> EasyContig
+        return EasyContig(self.Seq(), self.contig.id + "[" + str(self.left) + "," + str(self.right) + "]")
+
     def precedes(self, other, delta=0):
         # type: (Segment, int) -> bool
         return self.contig == other.contig and self.right <= other.left + delta

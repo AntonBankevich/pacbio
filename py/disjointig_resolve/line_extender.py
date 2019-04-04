@@ -72,6 +72,7 @@ class LineExtender:
 
     def tryExtend(self, line):
         # type: (NewLine) -> int
+        # IMPLEMENT Rewrite general resolution strategy and include line expansion.
         line.completely_resolved.mergeSegments(k)
         bound = LinePosition(line, line.left())
         new_recruits = 0
@@ -86,24 +87,23 @@ class LineExtender:
                     break
             if seg_to_resolve is None:
                 break
-            while True:
-                result = self.attemptCleanResolution(seg_to_resolve)
-                to_correct = [seg for seg, num in result if num > 0]
-                to_correct = sorted(to_correct, key = lambda seg: (basic.Normalize(seg.contig.id), seg.left))
-                for line, it in itertools.groupby(to_correct, key = lambda seg: seg.contig): # type: NewLine, Iterable[Segment]
-                    to_polysh = []
-                    for seg in it:
-                        if seg.contig != line:
-                           to_polysh.append(seg.RC())
-                        else:
-                            to_polysh.append(seg)
-                    line.polyshSegments(to_polysh)# IMPLEMENT
-                    line.updateCorrectSegments()# IMPLEMENT
-                self.updateCompletelyResolved(line)# IMPLEMENT
-                total = sum([num for seg, num in result])
-                new_recruits += total
-                if total == 0:
-                    break
+            result = self.attemptCleanResolution(seg_to_resolve)
+            to_correct = [seg for seg, num in result if num > 0]
+            to_correct = sorted(to_correct, key = lambda seg: (basic.Normalize(seg.contig.id), seg.left))
+            for line, it in itertools.groupby(to_correct, key = lambda seg: seg.contig): # type: NewLine, Iterable[Segment]
+                to_polysh = []
+                for seg in it:
+                    if seg.contig != line:
+                       to_polysh.append(seg.RC())
+                    else:
+                        to_polysh.append(seg)
+                line.polyshSegments(to_polysh)# IMPLEMENT
+                line.updateCorrectSegments()# IMPLEMENT
+            self.updateCompletelyResolved(line)# IMPLEMENT
+            total = sum([num for seg, num in result])
+            new_recruits += total
+            if total == 0:
+                break
         return new_recruits
 
 
