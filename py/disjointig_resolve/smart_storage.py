@@ -1,4 +1,4 @@
-from typing import Optional, Iterator, List, Any, Iterable, Tuple, Generator
+from typing import Optional, Iterator, List, Any, Iterable, Generator
 
 from common.alignment_storage import AlignmentPiece, Correction
 from common.save_load import TokenWriter, TokenReader
@@ -89,6 +89,12 @@ class SmartStorage(LineListener):
             return len(self.items)
         else:
             return len(self.rc)
+
+    def clean(self):
+        if not self.isCanonical():
+            self.rc.clean()
+        else:
+            self.items = []
 
 
 # Collection of segments where no segment contains another.
@@ -236,7 +242,6 @@ class SegmentStorage(SmartStorage):
             if candidate.interSize(seg) >= min_inter:
                 return candidate
         return None
-            
 
 
 class AlignmentStorage(SmartStorage):

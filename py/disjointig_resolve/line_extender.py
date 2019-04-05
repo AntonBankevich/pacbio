@@ -79,25 +79,25 @@ class LineExtender:
 
     def tryExtend(self, line):
         # type: (NewLine) -> int
-        # IMPLEMENT Rewrite general resolution strategy and include line expansion.
         line.completely_resolved.mergeSegments(k)
         bound = LinePosition(line, line.left())
         new_recruits = 0
-        bound = line.position(0)
         while True:
             seg_to_resolve = line.completely_resolved.find(bound.suffix(), k)
             if seg_to_resolve is None:
                 break
             result = self.attemptCleanResolution(seg_to_resolve)
-            to_correct = [seg for seg, num in result if num > 0]
-            self.updateAllStructures(to_correct)
-            if seg_to_resolve.right > len(line) - 2000:
-                self.attemptExtend(line) # IMPLEMENT
-                knotter.tryKnot(line)
             total = sum([num for seg, num in result])
             new_recruits += total
             if total == 0:
-                break
+                bound = seg_to_resolve.right - k + 1
+                continue
+            to_correct = [seg for seg, num in result if num > 0]
+            self.updateAllStructures(to_correct)
+            if seg_to_resolve.right > len(line) - 2000:
+                self.attemptExtend(line)
+                if knotter.tryKnot(line) is not None:
+                    return new_recruits
         return new_recruits
 
     def updateAllStructures(self, to_correct):
@@ -110,30 +110,36 @@ class LineExtender:
                     to_polysh.append(seg.RC())
                 else:
                     to_polysh.append(seg)
-            self.polyshSegments(line, to_polysh)  # IMPLEMENT
-            self.updateCorrectSegments(line)  # IMPLEMENT
+            self.polyshSegments(line, to_polysh)
+            self.updateCorrectSegments(line)
             self.updateCompletelyResolved(line)  # IMPLEMENT
 
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, int]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
-        line_alignments = list(self.dot_plot.getAlignmentsTo(resolved)) # type: List[AlignmentPiece]
-        line = resolved.contig # type: NewLine
-        tmp = list(line.getPotentialAlignmentsTo(resolved.suffix(length = params.k))) # type: List[AlignmentPiece]
-        readsToLine = []
-        for al in tmp:
-            read = al.seg_from.contig # type: AlignedRead
-            selected = False
-            for al1 in read.alignments:
-                for al2 in line_alignments:
-                    if al1.seg_to.inter(al2.seg_from):
-                        selected = True
-            if not selected:
-                readsToLine.append(al)
-        #IMPLEMENT For each read we find all its alignmens that can compete with alignments to this line
-        read_alignments = self.generateReadToLineAlignments(readsToLine, line_alignments) # type: List[List[AlignmentPiece]]
+        resolved = resolved.suffix(length = min(len(resolved), 5000))
+        line_alignments = filter(lambda al: len(al.seg_to) >= k, self.dot_plot.getAlignmentsTo(resolved)) # type: List[AlignmentPiece]
+        line_alignments = [al.reduce(target=resolved) for al in line_alignments]
+        read_alignments = []
+        for i, ltl in enumerate(line_alignments):
+            line = ltl.seg_from.contig # type: NewLine
+            read_alignments.extend(line.getPotentialAlignmentsTo(resolved.suffix(length = params.k)))
+        read_alignments = sorted(read_alignments, key=lambda al: al.seg_from.contig.name)
+        alignments_by_read = itertools.groupby(lambda al: al.seg_from.contig.name, read_alignments)
         new_recruits = 0
-        for als in read_alignments:
+        for name, it in alignments_by_read:
+            als = list(it) # type: List[AlignmentPiece]
+            read = als[0].seg_from.contig # type: AlignedRead
+            skip = False
+            for al1 in als:
+                for al2 in read.alignments:
+                    if al1.seg_to.inter(al2.seg_to):
+                        skip = True
+                        break
+                if skip:
+                    break
+            if skip:
+                continue
             winner = self.tournament(als) #type: AlignmentPiece
             if winner is not None:
                 line = winner.seg_to.contig # type: NewLine
@@ -144,7 +150,7 @@ class LineExtender:
 
     def compare(self, c1, c2):
         # type: (AlignmentPiece, AlignmentPiece) -> Tuple[Optional[int], Optional[int], Optional[int]]
-
+        # IMPLEMENT accurate score
         return None, None, None
 
 
@@ -212,4 +218,22 @@ class LineExtender:
             self.polisher.polishSegment(segs[i], list(line.read_alignments.allInter(segs[i])))
         line.removeListener(segs)
 
-
+    def updateCorrectSegments(self, line):
+        # type: (NewLine) -> None
+        positions = []
+        for al in line.read_alignments:
+            positions.append((al.seg_to.left, -1))
+            positions.append((al.seg_to.right, 1))
+        positions = sorted(positions)
+        line.correct_segments.clean()
+        cur = 0
+        last = None
+        for pos, delta in positions:
+            cur += delta
+            if cur == params.reliable_coverage:
+                if last is None:
+                    last = pos
+                else:
+                    if pos > last:
+                        line.correct_segments.add(line.segment(last, pos))
+                    last = None
