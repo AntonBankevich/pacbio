@@ -8,7 +8,7 @@ sys.path.append("py")
 from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
 from dag_resolve.repeat_graph import Graph
-from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam, EasyContig, \
+from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam, Contig, \
     EasyContigStorage
 from common.alignment_storage import AlignedRead, AlignmentPiece
 from typing import Optional, Iterable, Tuple, Generator, BinaryIO, Dict
@@ -176,7 +176,7 @@ class Aligner:
         return res
 
     def align(self, reads, reference):
-        # type: (Iterable[NamedSequence], Iterable[EasyContig]) -> sam_parser.Samfile
+        # type: (Iterable[NamedSequence], Iterable[Contig]) -> sam_parser.Samfile
         dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (reads, "reads.fasta")])
         contigs_file = new_files[0]
         reads_file = new_files[1]
@@ -192,7 +192,7 @@ class Aligner:
         return sam_parser.Samfile(open(alignment_file, "r"))
 
     def alignClean(self, reads, reference):
-        # type: (Iterable[EasyContig], Iterable[EasyContig]) -> Generator[AlignmentPiece]
+        # type: (Iterable[Contig], Iterable[Contig]) -> Generator[AlignmentPiece]
         parser = self.align(reads, reference)
         read_dict = EasyContigStorage(reads, True)
         ref_dict = EasyContigStorage(reference, True)

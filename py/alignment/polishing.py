@@ -5,7 +5,7 @@ from typing import Optional, List, Iterable, Tuple
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO, params
 from common.seq_records import NamedSequence
-from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, Segment, EasyContig
+from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, Segment, Contig
 from common.alignment_storage import AlignmentPiece, AlignedRead
 from flye_tools.polysh_job import JobPolishing
 
@@ -148,10 +148,10 @@ class Polisher:
         return al.reduce(target=base.segment(len(start), len(base) - len(end))).changeTargetSegment(seg)
 
     def polishEnd(self, als, min_cov = 4):
-        # type: (List[AlignmentPiece], int) -> Tuple[EasyContig, List[AlignmentPiece]]
+        # type: (List[AlignmentPiece], int) -> Tuple[Contig, List[AlignmentPiece]]
         contig = als[0].seg_to.contig
         relevant_seg = contig.asSegment().suffix(length=1000)
-        new_contig = relevant_seg.asEasyContig()
+        new_contig = relevant_seg.asContig()
         mapping = AlignmentPiece.Identical(relevant_seg, new_contig.asSegment())
         relevant_als = [al.compose(mapping) for al in als]
         finished_als = []
@@ -178,7 +178,7 @@ class Polisher:
                 base_segment = base_al.seg_from.contig.segment(base_al.seg_from.right,
                                                      min(len(base_al.seg_from.contig), base_al.seg_from.right + 500))
                 base = start + base_segment.Seq()
-                polished_base = EasyContig(self.polish(reduced_reads, base), "polished_base")
+                polished_base = Contig(self.polish(reduced_reads, base), "polished_base")
                 self.aligner.alignReadCollection(reduced_reads, polished_base)
                 candidate_alignments = []
                 for read in reduced_read_list:
@@ -197,9 +197,9 @@ class Polisher:
                     continue
                 cutoff_pos = max(positions[num - 1], len(start))
                 if cutoff_pos > len(start) + 100:
-                    cut_polished_base = polished_base.asSegment().prefix(pos=cutoff_pos).asEasyContig()
+                    cut_polished_base = polished_base.asSegment().prefix(pos=cutoff_pos).asContig()
                     candidate_alignments = [al.reduce(target = polished_base.segment(0, cutoff_pos)).changeTargetContig(cut_polished_base) for al in candidate_alignments]
-                    new_contig_candidate = EasyContig(new_contig[:-len(start)] + cut_polished_base[len(start):], "candidate")
+                    new_contig_candidate = Contig(new_contig[:-len(start)] + cut_polished_base[len(start):], "candidate")
                     candidate_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().suffix(len(cut_polished_base))) for al in candidate_alignments]
                     corrected_relevant_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in relevant_als]
                     relevant_als = [AlignmentPiece.GlueOverlappingAlignments([al1, al2]) for al1, al2 in zip(corrected_relevant_alignments, candidate_alignments)]

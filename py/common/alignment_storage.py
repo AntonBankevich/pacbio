@@ -5,7 +5,7 @@ from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterat
 from common import sam_parser, params, easy_cigar
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, Contig, ContigCollection, EasyContig
+from common.sequences import Segment, Contig, ContigCollection, Contig
 from common.line_align import Scorer
 
 
@@ -32,7 +32,7 @@ class AlignmentPiece:
 
     @staticmethod
     def FromSamRecord(seq_from, seq_to, rec):
-        # type: (EasyContig, EasyContig, sam_parser.SAMEntryInfo) -> AlignmentPiece
+        # type: (Contig, Contig, sam_parser.SAMEntryInfo) -> AlignmentPiece
         cigar_list = list(easy_cigar.CigarToList(rec.cigar))
         ls = 0
         rs = 0
@@ -87,7 +87,7 @@ class AlignmentPiece:
         # type: (List[AlignmentPiece]) -> AlignmentPiece
         contig = als[0].seg_to.contig
         new_seq = "".join((al.seg_from.Seq() for al in als))
-        new_contig = EasyContig(new_seq, "glued")
+        new_contig = Contig(new_seq, "glued")
         new_cigar = "".join(al.cigar for al in als)
         return AlignmentPiece(new_contig.asSegment(), contig.segment(als[0].seg_to.left, als[-1].seg_to.right),
                               new_cigar)
@@ -437,7 +437,7 @@ class MatchingSequence:
         return len(self.matches)
 
 
-class AlignedRead(EasyContig):
+class AlignedRead(Contig):
     def __init__(self, rec, rc=None):
         # type: (NamedSequence, Optional[AlignedRead]) -> None
         if rec.id.startswith("contig_"):
@@ -445,7 +445,7 @@ class AlignedRead(EasyContig):
         self.alignments = []  # type: list[AlignmentPiece]
         if rc is None:
             rc = AlignedRead(rec.RC(), self)
-        EasyContig.__init__(self, rec.seq, rec.id, rc)
+        Contig.__init__(self, rec.seq, rec.id, rc)
         self.rc = rc  # type: AlignedRead
 
     def __len__(self):

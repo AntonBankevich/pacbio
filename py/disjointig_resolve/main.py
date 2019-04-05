@@ -50,8 +50,8 @@ def main(args):
 
     save_handler = SaveHandler(params.save_dir)
     print "Resolving"
-    extender = LineExtender(disjointigs)
     knotter = LineKnotter(lines)#IMPLEMENT
+    extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     cnt = 0
     while True:
         stop = True

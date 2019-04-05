@@ -228,6 +228,16 @@ class SegmentStorage(SmartStorage):
         for i in range(n):
             self.add(Segment.load(handler, contig))
 
+    #returns the leftmost segment that intersects with seg by at least min_inter (or tockes seg in case min_inter = 0)
+    def find(self, seg, min_inter = 0):
+        # type: (Segment, int) -> Optional[Segment]
+        self.sort()
+        for candidate in self:
+            if candidate.interSize(seg) >= min_inter:
+                return candidate
+        return None
+            
+
 
 class AlignmentStorage(SmartStorage):
     def __init__(self, rc=None):
@@ -308,13 +318,19 @@ class AlignmentStorage(SmartStorage):
         self.makeCanonical()
         self.items = [al.targetAsSegment(Segment(line, line.left(), line.right())) for al in self.items] # type: List[AlignmentPiece]
 
+    # Optimize? We are only interested with some of the last alignments.
     def allInter(self, seg):
-        # type: (Segment) -> List[AlignmentPiece]
-        result = []
+        # type: (Segment) -> Generator[AlignmentPiece]
         for al in self: # type: AlignmentPiece
             if al.seg_to.inter(seg):
-                result.append(al)
-        return result
+                yield al
+
+    def removeInter(self, seg):
+        # type: (Segment) -> None
+        if not self.isCanonical():
+            self.rc.removeInter(seg.RC())
+        else:
+            self.items = filter(lambda al: not al.seg_to.inter(seg), self.items)
 
     def getAlignmentsTo(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]

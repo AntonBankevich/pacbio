@@ -47,7 +47,7 @@ class Edge(Contig):
         if rc is None:
             rc = Edge(basic.Reverse(id), end.rc, start.rc, basic.RC(consensus), info, self)
         self.rc = rc # type: Edge
-        Contig.__init__(self, consensus, id, info, self.rc)
+        Contig.__init__(self, consensus, id, self.rc)
         self.info = info
         self.reads = ReadCollection()
 

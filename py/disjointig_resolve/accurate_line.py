@@ -4,7 +4,7 @@ from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any, Gene
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, EasyContig
+from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, Contig
 from common.alignment_storage import AlignmentPiece, AlignedRead, Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, UniqueMarker, Disjointig
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
@@ -55,7 +55,7 @@ class ReadAlignmentListener(LineListener):
         self.refreshReadAlignments()
 
 # Reads only store alignments to lines they were selected to.
-class NewLine(EasyContig):
+class NewLine(Contig):
     def __init__(self, seq, id, rc = None):
         # type: (str, str, Optional[NewLine]) -> None
         self.seq = seq
@@ -77,7 +77,7 @@ class NewLine(EasyContig):
             self.read_alignments = rc.read_alignments.rc # type: AlignmentStorage
             self.read_listener = rc.read_listener.rc # type: ReadAlignmentListener
             self.listeners = [listener.rc for listener in rc.listeners] # type: List[LineListener]
-        EasyContig.__init__(self, seq, id, rc)
+        Contig.__init__(self, seq, id, rc)
         self.rc = rc #type: NewLine
 
     def addReads(self, alignments):
@@ -109,24 +109,9 @@ class NewLine(EasyContig):
                     yield al
                     readRes.append(al)
 
-    def __len__(self):
-        # type: () -> int
-        return len(self.seq)
-
-    def suffix(self, pos = None, length = None):
-        # type: (Optional[int], Optional[int]) -> Segment
-        assert (pos is None) != (length is None), str([pos, length])
-        if length is not None:
-            pos = len(self) - length
-        return self.segment(pos, len(self))
-
-    def prefix(self, pos = None, length = None):
-        # type: (Optional[int], Optional[int]) -> Segment
-        assert (pos is None) != (length is None), str([pos, length])
-        if length is not None:
-            pos = length
-        return self.segment(pos, len(self))
-
+    def position(self, pos):
+        # type: (int) -> LinePosition
+        return LinePosition(self, pos)
 
     def extendRight(self, seq):
         # type: (str) -> None
@@ -219,7 +204,7 @@ class NewLine(EasyContig):
         self.disjointig_alignments.save(handler)
         self.read_alignments.save(handler)
 
-    def load(self, handler, disjointigs, reads, contigs):
+    def loadLine(self, handler, disjointigs, reads, contigs):
         # type: (TokenReader, DisjointigCollection, ReadCollection, ContigCollection) -> None
         self.id = handler.readToken()
         self.rc.id = basic.RC(self.id)
@@ -327,7 +312,7 @@ class NewLineStorage:
             self.add(handler.readToken(), key)
         for key in keys:
             line = self.lines[key]
-            line.load(handler, self.disjointigs, reads, contigs)
+            line.loadLine(handler, self.disjointigs, reads, contigs)
 
     def printToFile(self, handler):
         # type: (BinaryIO) -> None
@@ -348,6 +333,12 @@ class LinePosition(LineListener):
         if rc is None:
             rc = LinePosition(line.rc, len(line) - 1 - pos)
         LineListener.__init__(self, rc)
+
+    def suffix(self):
+        return self.line.suffix(self.pos)
+
+    def prefix(self):
+        return self.line.prefix(self.pos)
 
     def fixRC(self):
         self.rc.pos = len(self.line) - 1 - self.pos

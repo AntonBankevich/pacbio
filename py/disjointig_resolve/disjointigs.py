@@ -2,12 +2,12 @@ from typing import Dict, List, Optional, BinaryIO, Callable, Iterator, Generator
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection, EasyContig
+from common.sequences import Segment, UniqueList, ReadCollection, Contig
 from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.smart_storage import AlignmentStorage
 
 
-class Disjointig(EasyContig):
+class Disjointig(Contig):
     def __init__(self, seq, id, rc=None):
         # type: (str, str, Optional[Disjointig]) -> None
         self.seq = seq
@@ -17,7 +17,7 @@ class Disjointig(EasyContig):
             rc = Disjointig(basic.RC(seq), basic.Reverse(id), self) # type: Disjointig
         else:
             self.read_alignments = self.rc.read_alignments.rc  # type: AlignmentStorage
-        EasyContig.__init__(self, seq, id, rc)
+        Contig.__init__(self, seq, id, rc)
         self.rc = rc # type:Disjointig
 
     def addAlignments(self, als):
@@ -38,8 +38,7 @@ class Disjointig(EasyContig):
         handler.writeTokenLine(self.seq)
         self.read_alignments.save(handler)
 
-
-    def load(self, handler, disjointigs, reads):
+    def loadDisjointig(self, handler, disjointigs, reads):
         # type: (TokenReader, DisjointigCollection, ReadCollection) -> None
         self.id = handler.readToken()
         self.rc.id = basic.RC(self.id)
@@ -68,7 +67,7 @@ class UniqueMarker:
 
 class DisjointigCollection:
     def __init__(self):
-        self.disjointigs = dict() # type: Dict[int, Disjointig]
+        self.disjointigs = dict() # type: Dict[str, Disjointig]
         self.cnt = 1
 
     def __iter__(self):
@@ -144,7 +143,7 @@ class DisjointigCollection:
             disjointig = self.add(seq, key)
             assert key == disjointig.id, key + " " + disjointig.id
         for key in keys:
-            self.disjointigs[key].load(handler, self, reads)
+            self.disjointigs[key].loadDisjointig(handler, self, reads)
 
 
 

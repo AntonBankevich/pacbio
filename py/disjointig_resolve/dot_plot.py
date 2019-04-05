@@ -9,7 +9,7 @@ from common.seq_records import NamedSequence
 from disjointig_resolve.accurate_line import NewLineStorage, NewLine
 from disjointig_resolve.smart_storage import LineListener, AlignmentStorage
 from common.save_load import TokenWriter, TokenReader
-from common.sequences import Segment, Contig, UniqueList, EasyContig
+from common.sequences import Segment, Contig, UniqueList, Contig
 
 
 # Unlike all other storages AutoAlignmentStorage stores only half of the alignments. The other half are the reversals of the stored half.
@@ -17,7 +17,7 @@ from common.sequences import Segment, Contig, UniqueList, EasyContig
 class AutoAlignmentStorage(LineListener):
 
     def __init__(self, line, rc = None):
-        # type: (EasyContig, Optional[AutoAlignmentStorage]) -> None
+        # type: (Contig, Optional[AutoAlignmentStorage]) -> None
         self.line = line
         if rc is None:
             self.content = AlignmentStorage()
@@ -96,7 +96,7 @@ class AutoAlignmentStorage(LineListener):
 class RCAlignmentStorage(LineListener):
 
     def __init__(self, line, rc = None):
-        # type: (EasyContig, Optional[RCAlignmentStorage]) -> None
+        # type: (Contig, Optional[RCAlignmentStorage]) -> None
         self.line = line
         if rc is None:
             self.content = AlignmentStorage()
@@ -171,7 +171,7 @@ class RCAlignmentStorage(LineListener):
 class TwoLineAlignmentStorage(LineListener):
 
     def __init__(self, line_from, line_to, rc = None, reverse = None):
-        # type: (EasyContig, EasyContig, Optional[TwoLineAlignmentStorage], TwoLineAlignmentStorage) -> None
+        # type: (Contig, Contig, Optional[TwoLineAlignmentStorage], TwoLineAlignmentStorage) -> None
         assert line_from.id != line_to.id and line_from.rc.id != line_to.id
         self.line_from = line_from
         self.line_to = line_to
@@ -250,8 +250,8 @@ class TwoLineAlignmentStorage(LineListener):
 
 class DotPlot:
     def __init__(self, lines):
-        # type: (Iterable[EasyContig]) -> None
-        self.lines = dict() # type: Dict[str, EasyContig]
+        # type: (Iterable[Contig]) -> None
+        self.lines = dict() # type: Dict[str, Contig]
         for line in lines:
             self.lines[line.id] = line
         for line in lines:
@@ -264,7 +264,7 @@ class DotPlot:
         self.rc_alignments = dict() # type: Dict[str, RCAlignmentStorage] # here we stora alignments of line to its RC
 
     def addTwoLineStorage(self, line1, line2):
-        # type: (EasyContig, EasyContig) -> TwoLineAlignmentStorage
+        # type: (Contig, Contig) -> TwoLineAlignmentStorage
         storage = TwoLineAlignmentStorage(line1, line2)
         if line2.id not in self.alignmentsToFrom:
             self.alignmentsToFrom[line2.id] = dict()
@@ -295,14 +295,14 @@ class DotPlot:
         self.simpleAddAlignment(al.reverse())
 
     def addRCAlignmentStorage(self, line):
-        # type: (EasyContig) -> RCAlignmentStorage
+        # type: (Contig) -> RCAlignmentStorage
         storage = RCAlignmentStorage(line)
         self.rc_alignments[line.id] = storage
         self.rc_alignments[line.rc.id] = storage.rc
         return storage
 
     def addSelfAlignmentStorage(self, line):
-        # type: (EasyContig) -> AutoAlignmentStorage
+        # type: (Contig) -> AutoAlignmentStorage
         storage = AutoAlignmentStorage(line)
         self.auto_alignments[line.id] = storage
         self.auto_alignments[line.rc.id] = storage.rc

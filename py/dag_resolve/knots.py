@@ -44,9 +44,9 @@ class Knotter:
             else:
                 seg1 = line1.suffix(left2 - right1)
                 seg2 = line2.prefix(right1 - left2)
-                segment_read = AlignedRead(seg1.subcontig())
+                segment_read = AlignedRead(seg1.asContig())
                 alignment = ReadCollection()
-                self.aligner.alignReadCollection(alignment, [seg2.subcontig()])
+                self.aligner.alignReadCollection(alignment, [seg2.asContig()])
                 found = False
                 for al in segment_read.alignments:
                     if len(al.seg_from) > 0.8 * len(segment_read) and al.percentIdentity() > 0.8:

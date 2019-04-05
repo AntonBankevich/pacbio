@@ -54,7 +54,7 @@ class Line(Contig):
             rc = Line(edge.rc, aligner, self)
         self.rc = rc # type: Line
         self.consensus = Consensus(edge.seq, [1000] * len(edge.seq))
-        Contig.__init__(self, edge.seq, edge.id, None, self.rc)
+        Contig.__init__(self, edge.seq, edge.id, self.rc)
         self.chain = [AlignmentPiece.Identical(self.asSegment(), edge.asSegment())] # type: list[AlignmentPiece]
         self.reads = ReadCollection()
         self.invalidated_reads = [] # type: list[AlignedRead]

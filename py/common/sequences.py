@@ -9,12 +9,12 @@ sys.path.append("py")
 from common import sam_parser, SeqIO, basic, params
 from typing import Generator, Iterator, Dict, Optional, Union, Callable, Iterable, Any, BinaryIO
 
-class EasyContig(NamedSequence):
+class Contig(NamedSequence):
     def __init__(self, seq, id, rc = None):
-        # type: (str, str, Optional[EasyContig]) -> None
+        # type: (str, str, Optional[Contig]) -> None
         NamedSequence.__init__(self, seq, id)
         if rc is None:
-            rc = EasyContig(basic.RC(seq), basic.Reverse(id), self)
+            rc = Contig(basic.RC(seq), basic.Reverse(id), self)
         self.rc = rc
 
     def asSegment(self):
@@ -23,28 +23,62 @@ class EasyContig(NamedSequence):
     def segment(self, left, right):
         return Segment(self,left, right)
 
+    def suffix(self, pos):
+        # type: (int) -> Segment
+        if pos < 0:
+            pos = self.__len__() + pos
+        if pos < 0:
+            pos = 0
+        if pos > len(self):
+            pos = len(self)
+        return Segment(self, pos, self.__len__())
+
+    def prefix(self, len):
+        # type: (int) -> Segment
+        len = min(len, self.__len__())
+        return Segment(self, 0, len)
+
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        handler.writeTokenLine(self.id)
+        handler.writeTokenLine(self.seq)
+
+    @staticmethod
+    def loadContig(handler):
+        # type: (TokenReader) -> Contig
+        id = handler.readToken()
+        seq = handler.readToken()
+        return Contig(seq, id)
+
+    def __str__(self):
+        return str(self.id) + "(" + str(self.__len__()) + ")"
+
+    def print_fasta(self, handler):
+        # type: (file) -> None
+        SeqIO.write(self, handler, "fasta")
+
 
 class EasyContigStorage:
     def __init__(self, iter, add_rc = True):
-        # type: (Iterable[EasyContig], bool) -> None
-        self.items = dict() # type: Dict[str, EasyContig]
+        # type: (Iterable[Contig], bool) -> None
+        self.items = dict() # type: Dict[str, Contig]
         self.add_rc = add_rc
         for item in iter:
             self.add(item)
 
     def add(self, item):
-        # type: (EasyContig) -> None
+        # type: (Contig) -> None
         self.items[item.id] = item
         if self.add_rc:
             self.items[item.rc.id] = item.rc
 
     def __getitem__(self, item):
-        # type: (str) -> Optional[EasyContig]
+        # type: (str) -> Optional[Contig]
         if item in self.items:
             return self.items[item]
         return None
 
-
+#TODO: Merge with EasyContigStorage
 class ContigCollection():
     def __init__(self, contigs_list=None):
         # type: (Optional[Iterable[Contig]]) -> ContigCollection
@@ -76,7 +110,7 @@ class ContigCollection():
     def print_names(self, handler):
         # type: (file) -> None
         for contig in self:
-            handler.write(str(contig.id) + " " + " ".join(contig.info.misc) + "\n")
+            handler.write(str(contig.id) + "\n")
 
     def __iter__(self):
         return self.contigs.values().__iter__()
@@ -127,7 +161,7 @@ class ContigCollection():
         keys = set(handler.readTokens())
         n = handler.readInt()
         for i in range(n):
-            contig = Contig.load(handler)
+            contig = Contig.loadContig(handler)
             self.add(contig)
             if contig.rc.id in keys:
                 self.add(contig.rc)
@@ -138,65 +172,6 @@ class ContigCollection():
 class TmpInfo:
     def __init__(self, l):
         self.misc = l
-
-
-class Contig(EasyContig):
-    def __init__(self, seq, id, info=None, rc=None):
-        # type: (str, str, Optional[TmpInfo], Optional[Contig]) -> None
-        if info is None:
-            info = []
-        if isinstance(info, list):
-            info = TmpInfo(info)
-        self.info = info
-        if rc is None:
-            rc = Contig(basic.RC(seq), basic.Reverse(id), info, self)
-        self.rc = rc
-        EasyContig.__init__(self, seq, id, rc)
-
-    def segment(self, left, right):
-        return Segment(self, left, right)
-
-    def suffix(self, pos):
-        # type: (int) -> Segment
-        if pos < 0:
-            pos = self.__len__() + pos
-        if pos < 0:
-            pos = 0
-        if pos > len(self):
-            pos = len(self)
-        return Segment(self, pos, self.__len__())
-
-    def prefix(self, len):
-        # type: (int) -> Segment
-        len = min(len, self.__len__())
-        return Segment(self, 0, len)
-
-    def asSegment(self):
-        # type: () -> Segment
-        return Segment(self, 0, len(self))
-
-    def print_fasta(self, handler):
-        # type: (file) -> None
-        SeqIO.write(self, handler, "fasta")
-
-    def __len__(self):
-        # type: () -> int
-        return len(self.seq)
-
-    def __str__(self):
-        return str(self.id) + "(" + str(self.__len__()) + ")"
-
-    def save(self, handler):
-        # type: (TokenWriter) -> None
-        handler.writeTokenLine(self.id)
-        handler.writeTokenLine(self.seq)
-
-    @staticmethod
-    def load(handler):
-        # type: (TokenReader) -> Contig
-        id = handler.readToken()
-        seq = handler.readToken()
-        return Contig(seq, id)
 
 
 class Segment:
@@ -230,10 +205,6 @@ class Segment:
         # type: () -> NamedSequence
         return NamedSequence(self.Seq(), self.contig.id + "[" + str(self.left) + "," + str(self.right) + "]")
 
-    def asEasyContig(self):
-        # type: () -> EasyContig
-        return EasyContig(self.Seq(), self.contig.id + "[" + str(self.left) + "," + str(self.right) + "]")
-
     def precedes(self, other, delta=0):
         # type: (Segment, int) -> bool
         return self.contig == other.contig and self.right <= other.left + delta
@@ -242,18 +213,26 @@ class Segment:
         # type: (Segment, int) -> bool
         return self.contig == other.contig and self.right - delta <= other.left <= self.right + delta
 
+    # Return true if at least one character in common
     def inter(self, other):
         # type: (Segment) -> bool
         return self.contig.id == other.contig.id and not (self.right <= other.left or self.left >= other.right)
+
+    # Return -1 if no intersection, 0 if segments touch, and overlap length if segments overlap
+    def interSize(self, other):
+        # type: (Segment) -> int
+        if self.contig.id != other.contig.id or self.right < other.left or self.left > other.right:
+            return -1
+        return min(self.right, other.right) - max(self.left, other.left)
 
     def contains(self, other):
         # type: (Segment) -> bool
         return self.contig.id == other.contig.id and self.left <= other.left and self.right >= other.right
 
-    def subcontig(self):
+    def asContig(self):
         # type: () -> Contig
         return Contig(self.Seq(),
-                      "(" + self.contig.id + ")[" + str(self.left) + "," + str(self.right) + "]", self.contig.info)
+                      "(" + self.contig.id + ")[" + str(self.left) + "," + str(self.right) + "]")
 
     def merge(self, other):
         return Segment(self.contig, self.left, other.right)
