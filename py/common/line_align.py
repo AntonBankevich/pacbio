@@ -1,5 +1,7 @@
 from typing import Optional, Tuple, List, Dict
 
+from common.sequences import Segment
+
 if __name__ == "__main__":
     import sys
     sys.path.append("py")
@@ -156,6 +158,38 @@ class Scorer:
                   str(accurate1) + " " + str(accurate2) + " " + \
                   str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" + str(accurate1 + accurate2)
         return self.accurateScore(matches1), self.accurateScore(matches2), self.accurateScore(composite)
+
+    def scoreInCorrectSegments(self, al1, seg1, al2, seg2):
+        # type: (AlignmentPiece, Segment, AlignmentPiece, Segment) -> Tuple[Optional[int], Optional[int], Optional[int]]
+        p1 = 0
+        p2 = 0
+        alignment_length_penalty = min(self.scores.ins_score, self.scores.del_score)
+        # we penalize alignment that ends earlier on the left by the alignment length differenth but only up to the start of alignment target
+        if al1.seg_from.left > al2.seg_from.left:
+            p1 += min(al1.seg_from.left - al2.seg_from.left, al1.seg_to.left) * alignment_length_penalty
+        else:
+            p2 += min(al2.seg_from.left - al1.seg_from.left, al2.seg_to.left) * alignment_length_penalty
+        # same for the right end
+        if al1.seg_from.right > al2.seg_from.right:
+            p2 += min(al1.seg_from.right - al2.seg_from.right, len(al2.seg_to.contig) - al2.seg_to.right) * alignment_length_penalty
+        else:
+            p1 += min(al2.seg_from.right - al1.seg_from.right, len(al1.seg_to.contig) - al1.seg_to.right) * alignment_length_penalty
+
+        full_scores = self.scoreCommon(al1, al2)
+
+        # On this segment both alignments go to correct sequences. We place larger weight on differences in this segment.
+        seg = al1.reduce(target=seg1).seg_from.cap(al2.reduce(target=seg2).seg_from)
+        correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
+        if correct_scores[0] > correct_scores[1]:
+            p = p1 - p2
+        else:
+            p = p2 - p1
+        s1 = (full_scores[0] + correct_scores[0] * 9) / 10 + p1
+        s2 = (full_scores[1] + correct_scores[1] * 9) / 10 + p2
+        s12 = (full_scores[2] + correct_scores[2] * 9) / 10 + p
+        print (p1, p2), full_scores, correct_scores, (s1, s2, s12)
+        return s1, s2, s12
+
 
 
 class Storage:

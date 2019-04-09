@@ -63,8 +63,8 @@ class AutoAlignmentStorage(LineListener):
         self.reverse()
         self.content.fireBeforeCorrect(alignments)
 
-    def fireAfterExtendRight(self, line, seq):
-        # type: (Any, str) -> None
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
+        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         self.content.fireAfterExtendRight(line, seq)
         self.reverse()
         self.content.fireAfterExtendRight(line, seq)
@@ -136,8 +136,8 @@ class RCAlignmentStorage(LineListener):
         self.reverse()
         self.content.fireBeforeCorrect(alignments)
 
-    def fireAfterExtendRight(self, line, seq):
-        # type: (Any, str) -> None
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
+        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         self.content.fireAfterExtendRight(line, seq)
         self.reverse()
         self.content.fireAfterExtendRight(line, seq)
@@ -223,7 +223,7 @@ class TwoLineAlignmentStorage(LineListener):
         self.content.fireBeforeCorrect(alignments)
         self.normalizeReverse()
 
-    def fireAfterExtendRight(self, line, seq):
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
         # type: (Any, str) -> None
         self.content.fireAfterExtendRight(line, seq)
         self.normalizeReverse()
@@ -371,7 +371,6 @@ class LineDotPlot(LineListener, DotPlot):
         for line in lines:
             line.addListener(self)
 
-    # IMPLEMENT construct additional alignments when expanding maybe when correcting too. Maybe additional operation find new alignments of a segment
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
         for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
@@ -385,9 +384,9 @@ class LineDotPlot(LineListener, DotPlot):
         # type: (Any, Contig, int) -> None
         for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
-                storage.fireBeforeExtendRight(line, new_seq, seq)
-        self.auto_alignments[line.id].fireBeforeExtendRight(line, new_seq, seq)
-        self.rc_alignments[line.id].fireBeforeExtendRight(line, new_seq, seq)
+                storage.fireBeforeCutRight(line, new_seq, pos)
+        self.auto_alignments[line.id].fireBeforeCutRight(line, new_seq, pos)
+        self.rc_alignments[line.id].fireBeforeCutRight(line, new_seq, pos)
 
     # alignments from new sequence to new sequence
     def fireBeforeCorrect(self, alignments):
@@ -399,8 +398,9 @@ class LineDotPlot(LineListener, DotPlot):
         self.auto_alignments[line.id].fireBeforeCorrect(alignments)
         self.rc_alignments[line.id].fireBeforeCorrect(alignments)
 
-    def fireAfterExtendRight(self, line, seq):
-        # type: (Any, str) -> None
+    # IMPLEMENT find new line-to-line alignments
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
+        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireAfterExtendRight(line, seq)

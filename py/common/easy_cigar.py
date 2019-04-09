@@ -1,6 +1,6 @@
 import re
 
-from typing import Generator, Tuple
+from typing import Generator, Tuple, Optional
 
 pattern = re.compile('([0-9]*)([MIDNSHP])')
 

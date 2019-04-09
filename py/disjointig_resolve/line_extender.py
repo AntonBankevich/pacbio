@@ -117,23 +117,27 @@ class LineExtender:
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, int]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
-        resolved = resolved.suffix(length = min(len(resolved), 5000))
+        resolved = resolved.suffix(length = min(len(resolved), k))
         line_alignments = filter(lambda al: len(al.seg_to) >= k, self.dot_plot.getAlignmentsTo(resolved)) # type: List[AlignmentPiece]
         line_alignments = [al.reduce(target=resolved) for al in line_alignments]
-        read_alignments = []
-        for i, ltl in enumerate(line_alignments):
+        read_alignments = [] # type: List[Tuple[AlignmentPiece, Segment]]
+        correct_segments = []
+        for ltl in line_alignments:
             line = ltl.seg_from.contig # type: NewLine
-            read_alignments.extend(line.getPotentialAlignmentsTo(resolved.suffix(length = params.k)))
-        read_alignments = sorted(read_alignments, key=lambda al: al.seg_from.contig.name)
+            correct_segments.append(line.correct_segments.find(ltl.seg_from))
+            assert correct_segments[-1] is not None and correct_segments[-1].contains(ltl.seg_from)
+            read_alignments.extend(zip(line.getPotentialAlignmentsTo(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
+        read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.name)
+        # removing all reads that are already sorted to one of the contigs
         alignments_by_read = itertools.groupby(lambda al: al.seg_from.contig.name, read_alignments)
         new_recruits = 0
         for name, it in alignments_by_read:
-            als = list(it) # type: List[AlignmentPiece]
-            read = als[0].seg_from.contig # type: AlignedRead
+            als = list(it) # type: List[Tuple[AlignmentPiece, Segment]]
+            read = als[0][0].seg_from.contig # type: AlignedRead
             skip = False
             for al1 in als:
                 for al2 in read.alignments:
-                    if al1.seg_to.inter(al2.seg_to):
+                    if al1[0].seg_to.inter(al2.seg_to):
                         skip = True
                         break
                 if skip:
@@ -148,17 +152,10 @@ class LineExtender:
                     new_recruits += 1
         return new_recruits
 
-    def compare(self, c1, c2):
-        # type: (AlignmentPiece, AlignmentPiece) -> Tuple[Optional[int], Optional[int], Optional[int]]
-        # IMPLEMENT accurate score
-        return None, None, None
-
-
     def fight(self, c1, c2):
-        # type: (AlignmentPiece, AlignmentPiece) -> Optional[AlignmentPiece]
-        assert c1.seg_from.contig == c2.seg_from.contig
-        s1, s2, s12 = self.compare(c1, c2)
-        winner = None
+        # type: (Tuple[AlignmentPiece, Segment], Tuple[AlignmentPiece, Segment]) -> Optional[AlignmentPiece]
+        assert c1[0].seg_from.contig == c2[0].seg_from.contig
+        s1, s2, s12 = self.scorer.scoreInCorrectSegments(c1[0], c1[1], c2[0], c2[1])
         if s12 is None:
             if s1 is None:
                 winner = c2
@@ -178,7 +175,7 @@ class LineExtender:
         return winner
 
     def tournament(self, candidates):
-        # type: (list[AlignmentPiece]) -> Optional[AlignmentPiece]
+        # type: (list[Tuple[AlignmentPiece, Segment]]) -> Optional[AlignmentPiece]
         best = None
         for candidate in candidates:
             if best is None:
@@ -202,11 +199,7 @@ class LineExtender:
         if len(new_contig) == len(line):
             return
         assert line.seq == new_contig.prefix(len=len(line)).Seq()
-        line.read_alignments.removeInter(line.suffix(1000))
-        line.extendRight(new_contig.suffix(pos = len(line)).Seq())
-        for al in relevant_als:
-            line.read_alignments.add(al.changeTargetContig(line))
-        # IMPLEMENT find alignments of new sequence to other lines and disjointigs
+        line.extendRight(new_contig.suffix(pos = len(line)).Seq(), relevant_als)
 
     def polyshSegments(self, line, to_polysh):
         # type: (NewLine, List[Segment]) -> None

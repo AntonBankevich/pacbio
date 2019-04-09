@@ -1,7 +1,10 @@
 import os
+import shutil
 import sys
+import time
 
 from alignment.align_tools import Aligner, DirDistributor
+from common import basic
 from disjointig_resolve.dot_plot import LineDotPlot
 
 sys.path.append("py")
@@ -17,7 +20,9 @@ from disjointig_resolve.cl_params import Params
 
 def main(args):
     params = Params().parse(args)
-    # IMPLEMENT add logger from old main
+    CreateLog(params)
+    sys.stdout.write("Started\n")
+    print (time.strftime("%d.%m.%Y  %I:%M:%S"))
     print "Preparing initial state"
     if params.load_from is not None:
         print "Loading initial state from saves"
@@ -41,7 +46,7 @@ def main(args):
         contigs.loadFromFasta(open(params.contigs_file, "r"), num_names=True)
 
         print "Creating line collection"
-        lines = NewLineStorage(disjointigs)
+        lines = NewLineStorage(disjointigs, aligner)
         lines.fillFromContigs(contigs)
         lines.fillFromDisjointigs()
 
@@ -71,6 +76,17 @@ def main(args):
     lines.printToFasta(open(os.path.join(params.dir, "lines.fasta"), "w"))
 
 
+def CreateLog(params):
+    old_logs_dir = os.path.join(params.dir, "old")
+    basic.ensure_dir_existance(old_logs_dir)
+    log_file = os.path.join(dir, "log.info")
+    if os.path.isfile(log_file):
+        num = len(os.listdir(old_logs_dir))
+        shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
+    log = open(log_file, "w")
+    sys.stdout = basic.OStreamWrapper(sys.stdout, log)
+    sys.stderr = sys.stdout
+    print " ".join(params.args)
 
 
 if __name__ == "__main__":

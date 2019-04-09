@@ -20,7 +20,7 @@ def loadAll(handler):
     reads.loadFromFasta(open(params.reads_file, "r"))
     disjointigs = DisjointigCollection()
     disjointigs.load(handler, reads)
-    lines = NewLineStorage(disjointigs)
+    lines = NewLineStorage(disjointigs, aligner)
     lines.load(handler, reads, contigs)
     dot_plot = LineDotPlot(lines)
     dot_plot.load(handler)

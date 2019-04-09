@@ -24,8 +24,8 @@ class LineListener:
         # type: (Correction) -> None
         pass
 
-    def fireAfterExtendRight(self, line, seq):
-        # type: (Any, str) -> None
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
+        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         pass
 
     def fireAfterCutRight(self, line, pos):
@@ -215,8 +215,8 @@ class SegmentStorage(SmartStorage):
         self.sort()
         self.items = correction.mapSegmentsUp(self.items)
 
-    def fireAfterExtendRight(self, line, seq):
-        # type: (Any, str) -> None
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
+        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         pass
 
     def fireAfterCutRight(self, line, pos):
@@ -291,8 +291,8 @@ class AlignmentStorage(SmartStorage):
         self.makeCanonical()
         self.items = [al.targetAsSegment(Segment(new_seq, 0, len(line))) for al in self.items]
 
-    def fireAfterExtendRight(self, line, seq):
-        # type: (Any, str) -> None
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
+        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         self.makeCanonical()
         self.items = [al.targetAsSegment(Segment(line, 0, len(line))) for al in self.items]
 
@@ -354,3 +354,15 @@ class AlignmentStorage(SmartStorage):
         for al in self:
             res.add(al.reverse())
         return res
+
+    def addAndMergeRight(self, al):
+        # type: (AlignmentPiece) -> None
+        if self.isCanonical():
+            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
+                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left <= al.seg_from.left:
+                    self.items[i] = AlignmentPiece.GlueOverlappingAlignments([al1, al])
+                    return
+            self.add(al)
+
+        else:
+            self.rc.addAndMergeRight(al.rc)

@@ -18,6 +18,7 @@ class Contig(NamedSequence):
         self.rc = rc
 
     def asSegment(self):
+        # type: () -> Segment
         return Segment(self, 0, len(self))
 
     def segment(self, left, right):
@@ -278,6 +279,7 @@ class Segment:
         # type: (Segment) -> Segment
         return Segment(seg.contig, self.left + seg.left, self.right + seg.left)
 
+    # TODO: make the same in contigs
     def suffix(self, pos = None, length = None):
         assert (pos is not None) != (length is not None)
         if length is not None:

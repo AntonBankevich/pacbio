@@ -56,7 +56,7 @@ class UniqueMarker:
     # Mark unique regions on all disjointigs as correct
     def findUnique(self, contig):
         # type: (NamedSequence) -> Generator[Segment]
-        # IMPLEMENT search for unique segments in disjointigs including construction of dot plot
+        # TODO: search for unique segments in disjointigs including construction of dot plot
         pass
 
     def findAllUnique(self, sequences):

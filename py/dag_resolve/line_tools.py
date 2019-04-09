@@ -127,7 +127,7 @@ class Line(Contig):
     def addAlignment(self, piece):
         self.cutAlignments(piece.seg_from.left)
         if self.chain[-1].connects(piece, 5):
-            self.chain[-1] = self.chain[-1].merge(piece)
+            self.chain[-1] = self.chain[-1].mergeDistant(piece)
         else:
             self.chain.append(piece)
         self.rc.chain = [al.rc for al in self.chain[::-1]]

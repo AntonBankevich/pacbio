@@ -9,6 +9,7 @@ from common.sequences import Segment, Contig, ContigCollection, Contig
 from common.line_align import Scorer
 
 
+# TODO merge with MatchingSequence. Make cigar a GlobalAlignment class with effective operations.
 class AlignmentPiece:
     def __init__(self, seg_from, seg_to, cigar, rc = None):
         # type: (Segment, Segment, str, Optional[AlignmentPiece]) -> None
@@ -65,7 +66,7 @@ class AlignmentPiece:
         return AlignmentPiece(seg_from, other, str(len(seg_from)) + "M")
 
     @staticmethod
-    def GlueOverlappingAlignments(als):
+    def GlueOverlappingAlignments(als):# Glue a list of alignments such that consecutive segments overlap. Can return None
         # type: (List[AlignmentPiece]) -> AlignmentPiece
         contig = als[0].seg_to.contig
         als1 = [al.matchingSequence() for al in als]
@@ -74,6 +75,8 @@ class AlignmentPiece:
         for al in als[1:]:
             next = al.matchingSequence()
             shared = list(last.common_to(next))
+            if len(shared) == 0:
+                return None
             if len(shared) != 0:
                 pos1, pos2 = shared[len(shared) / 2]
                 truncated[-1] = truncated[-1].prefix(pos=last.matches[pos1][1])
@@ -83,7 +86,7 @@ class AlignmentPiece:
         return AlignmentPiece.GlueFittingAlignments(als)
 
     @staticmethod
-    def GlueFittingAlignments(als):
+    def GlueFittingAlignments(als): # Glue a list of alignments with seg_from and seg_to exactly matching together
         # type: (List[AlignmentPiece]) -> AlignmentPiece
         contig = als[0].seg_to.contig
         new_seq = "".join((al.seg_from.Seq() for al in als))
@@ -133,7 +136,8 @@ class AlignmentPiece:
         # type: (AlignmentPiece) -> bool
         return self.seg_from.contains(other.seg_from) and self.seg_to.contains(other.seg_to)
 
-    def merge(self, other):
+    # TODO: do not use this
+    def mergeDistant(self, other):
         ins = ""
         if not self.connects(other):
             d = (other.seg_from.left - self.seg_from.right, other.seg_to.left - self.seg_to.right)
@@ -161,10 +165,7 @@ class AlignmentPiece:
 
     def matchingPositions(self, equalOnly=False):
         # type: (bool) -> Generator[Tuple[int, int]]
-        if self.cigar == "=":
-            for i in range(len(self.seg_from)):
-                yield (self.seg_from.left + i, self.seg_to.left + i)
-            return
+        assert self.cigar != "="
         cur_query = self.seg_from.left
         cur_tar = self.seg_to.left
         for n, c in easy_cigar.CigarToList(self.cigar):
@@ -240,7 +241,6 @@ class AlignmentPiece:
 
     def targetAsSegment(self, seg):
         # type: (Segment) -> AlignmentPiece
-        # print "ContigAsSegment", self, seg
         seg_to = self.seg_to.contigAsSegment(seg)
         return AlignmentPiece(self.seg_from, seg_to, self.cigar)
 
@@ -251,13 +251,7 @@ class AlignmentPiece:
 
     def reduce(self, segment=None, query=None, target=None):
         # type: (Optional[Segment], Optional[Segment], Optional[Segment]) -> AlignmentPiece
-        # IMPLEMENT alignment reduce without additional translation. Same for alignment glue and composition
-        if segment is not None:
-            if segment.contig == self.seg_from.contig:
-                query = segment
-            else:
-                target = segment
-        assert (query is None) != (target is None), str(query) + " " + str(target)
+        # TODO alignment reduce without additional translation. Same for alignment glue and composition
         if query is not None:
             return self.matchingSequence().reduceQuery(query.left, query.right).asAlignmentPiece(self.seg_from.contig,
                                                                                                  self.seg_to.contig)
