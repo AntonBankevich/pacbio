@@ -9,7 +9,7 @@ from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
 from dag_resolve.repeat_graph import Graph
 from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam, Contig, \
-    EasyContigStorage
+    ContigStorage
 from common.alignment_storage import AlignedRead, AlignmentPiece
 from typing import Optional, Iterable, Tuple, Generator, BinaryIO, Dict
 from common import basic, sam_parser, SeqIO, params
@@ -191,11 +191,12 @@ class Aligner:
             make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
+    # TODO: make this method accept reference dict of dome sort
     def alignClean(self, reads, reference):
-        # type: (Iterable[Contig], Iterable[Contig]) -> Generator[AlignmentPiece]
+        # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
         parser = self.align(reads, reference)
-        read_dict = EasyContigStorage(reads, True)
-        ref_dict = EasyContigStorage(reference, True)
+        read_dict = ContigStorage(reads, False)
+        ref_dict = reference
         for rec in parser:
             if rec.is_unmapped:
                 continue
@@ -249,7 +250,7 @@ class Aligner:
             if not rec.is_unmapped:
                 read = graph.reads[rec.query_name]
                 edge = graph.E[rec.tname]
-                edge.reads.add(read)
+                edge.reads.addNew(read)
                 edge.reads.addNewAlignment(rec, edge)
         graph.newEdges = []
 

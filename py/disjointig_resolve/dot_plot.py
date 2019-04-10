@@ -9,7 +9,7 @@ from common.seq_records import NamedSequence
 from disjointig_resolve.accurate_line import NewLineStorage, NewLine
 from disjointig_resolve.smart_storage import LineListener, AlignmentStorage
 from common.save_load import TokenWriter, TokenReader
-from common.sequences import Segment, Contig, UniqueList, Contig
+from common.sequences import Segment, Contig, UniqueList, Contig, ContigStorage
 
 
 # Unlike all other storages AutoAlignmentStorage stores only half of the alignments. The other half are the reversals of the stored half.
@@ -25,10 +25,30 @@ class AutoAlignmentStorage(LineListener):
             rc.content = self.content.rc
         LineListener.__init__(self, rc)
         self.rc = rc # type: AutoAlignmentStorage
+        self.state = 1 # from precedes to
 
-    def add(self, alignment):
+    def makeCanonical(self, al):
+        if (self.state == 1) == (al.seg_from.left < al.seg_from.right):
+            return al
+        else:
+            return al.reverse()
+
+    def isCanonical(self, al):
+        return (self.state == 1) == (al.seg_from.left < al.seg_from.right)
+
+    def add(self, al):
         # type: (AlignmentPiece) -> None
-        self.content.add(alignment)
+        if al.isIdentical():
+            return
+        self.content.add(self.makeCanonical(al))
+
+    def addAndMergeRight(self, al):
+        if al.isIdentical():
+            return
+        if self.isCanonical(al):
+            self.content.addAndMergeRight(al)
+        else:
+            self.content.addAndMergeLeft(al.reverse())
 
     def __iter__(self):
         # type: () -> Generator[AlignmentPiece]
@@ -82,6 +102,7 @@ class AutoAlignmentStorage(LineListener):
         self.content.fireAfterCorrect(line)
 
     def reverse(self):
+        self.state = -self.state
         self.content = self.content.reverse()
         self.rc.content = self.content.rc
 
@@ -92,6 +113,7 @@ class AutoAlignmentStorage(LineListener):
     def load(self, handler):
         # type: (TokenReader) -> None
         self.content.load(handler, self.line, self.line)
+
 
 class RCAlignmentStorage(LineListener):
 
@@ -116,6 +138,11 @@ class RCAlignmentStorage(LineListener):
     def add(self, alignment):
         self.content.add(alignment)
         self.content.add(alignment.reverse().rc)
+
+    def addAndMergeRight(self, al):
+        # type: (AlignmentPiece) -> None
+        self.content.addAndMergeRight(al)
+        self.content.addAndMergeLeft(al.reverse().rc)
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
@@ -224,7 +251,7 @@ class TwoLineAlignmentStorage(LineListener):
         self.normalizeReverse()
 
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str) -> None
+        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         self.content.fireAfterExtendRight(line, seq)
         self.normalizeReverse()
 
@@ -236,6 +263,10 @@ class TwoLineAlignmentStorage(LineListener):
     def fireAfterCorrect(self, line):
         # type: (Any) -> None
         self.content.fireAfterCorrect(line)
+        self.normalizeReverse()
+
+    def addAndMergeRight(self, al):
+        self.content.addAndMergeRight(al)
         self.normalizeReverse()
 
     def save(self, handler):
@@ -250,8 +281,8 @@ class TwoLineAlignmentStorage(LineListener):
 
 class DotPlot:
     def __init__(self, lines):
-        # type: (Iterable[Contig]) -> None
-        self.lines = dict() # type: Dict[str, Contig]
+        # type: (ContigStorage) -> None
+        self.lines = lines
         for line in lines:
             self.lines[line.id] = line
         for line in lines:
@@ -321,7 +352,7 @@ class DotPlot:
     def construct(self, aligner):
         # type: (Aligner) -> None
         sequences = UniqueList(self.lines.values())
-        for al in aligner.alignClean(sequences, sequences):
+        for al in aligner.alignClean(sequences, ContigStorage(sequences)):
             if len(al) > params.k and al.percentIdentity() > 0.8:
                 self.addAlignment(al)
 
@@ -364,12 +395,14 @@ class DotPlot:
 
 class LineDotPlot(LineListener, DotPlot):
 
-    def __init__(self, lines):
-        # type: (Iterable[NewLine]) -> None
+    def __init__(self, lines, aligner):
+        # type: (NewLineStorage, Aligner) -> None
         DotPlot.__init__(self, lines)
         LineListener.__init__(self, self)
-        for line in lines:
+        self.lines = lines # type: NewLineStorage
+        for line in lines.unique():
             line.addListener(self)
+        self.aligner = aligner
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
@@ -398,14 +431,18 @@ class LineDotPlot(LineListener, DotPlot):
         self.auto_alignments[line.id].fireBeforeCorrect(alignments)
         self.rc_alignments[line.id].fireBeforeCorrect(alignments)
 
-    # IMPLEMENT find new line-to-line alignments
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
+        # type: (NewLine, str, Optional[List[AlignmentPiece]]) -> None
         for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
             for storage in d.values():
                 storage.fireAfterExtendRight(line, seq)
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
+        new_seg = line.asSegment().suffix(length=len(seq) + 1000)
+        for al in self.aligner.alignClean([new_seg.asContig()], self.lines):
+            al = al.queryAsSegment(new_seg)
+            self.addAndMergeRight(al)
+
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None
@@ -422,4 +459,13 @@ class LineDotPlot(LineListener, DotPlot):
                 storage.fireAfterCorrect(line)
         self.auto_alignments[line.id].fireAfterCorrect(line)
         self.rc_alignments[line.id].fireAfterCorrect(line)
+
+    def addAndMergeRight(self, al):
+        # type: (AlignmentPiece) -> None
+        if al.seg_to.contig == al.seg_from.contig:
+            self.auto_alignments[al.seg_to.contig.id].addAndMergeRight(al)
+        elif al.seg_to.contig == al.seg_from.contig.rc:
+            self.rc_alignments[al.seg_to.contig.id].addAndMergeRight(al)
+        else:
+            self.alignmentsToFrom[al.seg_to.contig.id][al.seg_from.contig.id].addAndMergeRight(al)
 

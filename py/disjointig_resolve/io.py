@@ -22,7 +22,7 @@ def loadAll(handler):
     disjointigs.load(handler, reads)
     lines = NewLineStorage(disjointigs, aligner)
     lines.load(handler, reads, contigs)
-    dot_plot = LineDotPlot(lines)
+    dot_plot = LineDotPlot(lines, aligner)
     dot_plot.load(handler)
     return params, aligner, contigs, reads, disjointigs, lines, dot_plot
 

@@ -229,8 +229,8 @@ class Graph:
                 continue
             read = self.reads[rec.query_name]
             new_al = read.AddSamAlignment(rec, self.E[edge_id])
-            new_al.seg_to.contig.reads.add(read)
-            new_al.seg_to.contig.rc.reads.add(read.rc)
+            new_al.seg_to.contig.reads.addNew(read)
+            new_al.seg_to.contig.rc.reads.addNew(read.rc)
         self.newEdges = []
 
     def fillRelevant(self, relevants, reads):

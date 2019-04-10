@@ -10,7 +10,7 @@ def main(ref_file, contig_name, rlen, cov, dir):
     basic.ensure_dir_existance(dir)
     all_contigs = ContigCollection().loadFromFasta(open(ref_file, "r"), False)
     for contig_name in contig_names:
-        if contig_name not in all_contigs.contigs.keys():
+        if contig_name not in all_contigs.items.keys():
             print "Fail", contig_name
             continue
         ref = all_contigs[contig_name]

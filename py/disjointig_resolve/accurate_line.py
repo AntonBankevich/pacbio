@@ -6,7 +6,7 @@ from alignment.align_tools import Aligner
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, Contig
+from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, UniqueMarker, Disjointig
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
@@ -262,38 +262,31 @@ class NewLine(Contig):
         self.read_alignments.removeInter(seg)
 
 
-class NewLineStorage:
+class NewLineStorage(ContigStorage):
     def __init__(self, disjointigs, aligner):
         # type: (DisjointigCollection, Aligner) -> None
+        ContigStorage.__init__(self, [], False)
         self.disjointigs = disjointigs
         self.aligner = aligner
-        self.lines = dict() # type: Dict[str, NewLine]
+        self.items = dict() # type: Dict[str, NewLine]
         self.cnt = 1
 
     def __iter__(self):
         # type: () -> Iterator[NewLine]
-        return self.lines.values().__iter__()
-
-    def __contains__(self, item):
-        # type: (NamedSequence) -> bool
-        return item.id in self.lines
+        return self.items.values().__iter__()
 
     def __getitem__(self, item):
         # type: (str) -> NewLine
-        return self.lines[item]
+        return self.items[item]
 
-    def containsKey(self, key):
-        # type: (str) -> bool
-        return key in self.lines
-
-    def add(self, seq, name = None):
+    def addNew(self, seq, name = None):
         # type: (str, Optional[str]) -> NewLine
         if name is None:
             name = str(self.cnt)
             self.cnt += 1
-        new_line = NewLine(seq, name, self.aligner)
-        self.lines[name] = new_line
-        self.lines[new_line.rc.id] = new_line.rc
+        new_line = NewLine(seq, name, ExtensionHandler(self.disjointigs, self.aligner))
+        self.items[name] = new_line
+        self.items[new_line.rc.id] = new_line.rc
         return new_line
 
     def fillFromContigs(self, contigs):
@@ -304,7 +297,7 @@ class NewLineStorage:
             if len(segments) == 0:
                 print "No unique segments found in contig", contig
                 continue
-            line = self.add(contig.seq)
+            line = self.addNew(contig.seq)
             line.initial.add(AlignmentPiece.Identical(line.asSegment(), contig.asSegment()))
             for seg in segments:
                 line.correct_segments.add(seg.contigAsSegment(line.asSegment()))
@@ -314,7 +307,7 @@ class NewLineStorage:
     def fillFromDisjointigs(self):
         # type: () -> None
         for seg in UniqueMarker(self.disjointigs).findAllUnique(self.disjointigs):
-            line = self.add(seg.Seq())
+            line = self.addNew(seg.Seq())
             line.initial.add(AlignmentPiece.Identical(line.asSegment(), seg))
         #TODO Filter all lines already present in the collection
 
@@ -322,45 +315,44 @@ class NewLineStorage:
         # type: (AlignmentPiece) -> NewLine
         line1 = alignment.seg_from.contig #type: NewLine
         line2 = alignment.seg_to.contig #type: NewLine
-        line = self.add(line1.seq, name = "(" + line1.id + "," + line2.id + ")")
+        line = self.addNew(line1.seq, name ="(" + line1.id + "," + line2.id + ")")
         line.extendRightWithAlignment(alignment.changeQueryContig(line))
         # IMPLEMENT merge lines into a new line based on the given alignment. Polysh the result. Transfer all reads, segments and alignments
-        del self.lines[line1.id]
-        del self.lines[line2.id]
+        del self.items[line1.id]
+        del self.items[line2.id]
         return line
+
+    def printToFile(self, handler):
+        # type: (BinaryIO) -> None
+        for line in self.items:
+            handler.write(line.__str__() + "\n")
+
+    def printToFasta(self, handler):
+        # type: (BinaryIO) -> None
+        for line in UniqueList(self.items.values()):
+            SeqIO.write(line, handler, "fasta")
 
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeTokenLine(str(self.cnt))
-        line_ids = map(lambda line: line.id, UniqueList(self.lines.values()))
+        line_ids = map(lambda line: line.id, UniqueList(self.items.values()))
         handler.writeTokens(line_ids)
         for line_id in line_ids:
-            line = self.lines[line_id]
+            line = self.items[line_id]
             handler.writeTokenLine(line.seq)
         for line_id in line_ids:
-            line = self.lines[line_id]
+            line = self.items[line_id]
             line.save(handler)
-
 
     def load(self, handler, reads, contigs):
         # type: (TokenReader, ReadCollection, ContigCollection) -> None
         self.cnt = int(handler.readToken())
         keys = handler.readTokens()
         for key in keys:
-            self.add(handler.readToken(), key)
+            self.addNew(handler.readToken(), key)
         for key in keys:
-            line = self.lines[key]
+            line = self.items[key]
             line.loadLine(handler, self.disjointigs, reads, contigs)
-
-    def printToFile(self, handler):
-        # type: (BinaryIO) -> None
-        for line in self.lines:
-            handler.write(line.__str__() + "\n")
-
-    def printToFasta(self, handler):
-        # type: (BinaryIO) -> None
-        for line in UniqueList(self.lines.values()):
-            SeqIO.write(line, handler, "fasta")
 
 class LinePosition(LineListener):
     def __init__(self, line, pos, rc=None):

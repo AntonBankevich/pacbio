@@ -131,6 +131,7 @@ class LineExtender:
         # removing all reads that are already sorted to one of the contigs
         alignments_by_read = itertools.groupby(lambda al: al.seg_from.contig.name, read_alignments)
         new_recruits = 0
+        # TODO: parallel
         for name, it in alignments_by_read:
             als = list(it) # type: List[Tuple[AlignmentPiece, Segment]]
             read = als[0][0].seg_from.contig # type: AlignedRead

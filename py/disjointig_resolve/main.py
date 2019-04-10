@@ -6,6 +6,7 @@ import time
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic
 from disjointig_resolve.dot_plot import LineDotPlot
+from disjointig_resolve.knotter import LineKnotter
 
 sys.path.append("py")
 
@@ -39,7 +40,7 @@ def main(args):
         reads.loadFromFasta(open(params.reads_file, "r"))
 
         print "Aligning reads to disjointigs"
-        disjointigs.addAll(aligner.alignClean(reads, disjointigs))
+        disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
 
         print "Creating contig collection"
         contigs = ContigCollection()
@@ -50,12 +51,12 @@ def main(args):
         lines.fillFromContigs(contigs)
         lines.fillFromDisjointigs()
 
-        dot_plot = LineDotPlot(lines)
+        dot_plot = LineDotPlot(lines, aligner)
         dot_plot.construct(aligner)
 
     save_handler = SaveHandler(params.save_dir)
     print "Resolving"
-    knotter = LineKnotter(lines)#IMPLEMENT
+    knotter = LineKnotter(lines)
     extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     cnt = 0
     while True:
@@ -65,7 +66,7 @@ def main(args):
             if extended:
                 cnt += 1
                 stop = False
-                knotter.tryKnot(line)
+                knotter.tryKnotRight(line)
             if cnt > 20:
                 cnt = 0
                 saveAll(save_handler.getWriter(), params, aligner, contigs, reads, disjointigs, lines, dot_plot)

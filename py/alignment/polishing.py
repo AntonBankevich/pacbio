@@ -5,7 +5,7 @@ from typing import Optional, List, Iterable, Tuple
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO, params
 from common.seq_records import NamedSequence
-from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, Segment, Contig
+from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, Segment, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead
 from flye_tools.polysh_job import JobPolishing
 
@@ -144,7 +144,7 @@ class Polisher:
             reads.append(NamedSequence(new_seq, al.seg_from.contig.id))
         base = Contig(start + seg.Seq() + end, "base")
         polished = Contig(self.polish(reads, base), "polished")
-        al = self.aligner.alignClean([polished], [base]).next()
+        al = self.aligner.alignClean([polished], ContigStorage([base])).next()
         return al.reduce(target=base.segment(len(start), len(base) - len(end))).changeTargetSegment(seg)
 
     def polishEnd(self, als, min_cov = 4):

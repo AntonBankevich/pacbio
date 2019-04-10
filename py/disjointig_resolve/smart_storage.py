@@ -1,6 +1,7 @@
 from typing import Optional, Iterator, List, Any, Iterable, Generator
 
 from common.alignment_storage import AlignmentPiece, Correction
+from common.line_align import Scorer
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, Contig
@@ -131,7 +132,7 @@ class SegmentStorage(SmartStorage):
             self.items.append(seg)
             self.sorted = False
         else:
-            self.rc.add(seg.RC())
+            self.rc.addNew(seg.RC())
 
     def remove(self, seg):
         # type: (Segment) -> None
@@ -318,6 +319,7 @@ class AlignmentStorage(SmartStorage):
         self.makeCanonical()
         self.items = correction.composeQueryDifferences(self.items) # type: List[AlignmentPiece]
 
+
     def fireAfterCorrect(self, line):
         # type: (Any) -> None
         self.makeCanonical()
@@ -364,5 +366,16 @@ class AlignmentStorage(SmartStorage):
                     return
             self.add(al)
 
+        else:
+            self.rc.addAndMergeLeft(al.rc)
+
+    def addAndMergeLeft(self, al):
+        # type: (AlignmentPiece) -> None
+        if self.isCanonical():
+            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
+                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left >= al.seg_from.left:
+                    self.items[i] = AlignmentPiece.GlueOverlappingAlignments([al, al1])
+                    return
+            self.add(al)
         else:
             self.rc.addAndMergeRight(al.rc)

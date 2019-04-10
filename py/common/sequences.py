@@ -54,18 +54,22 @@ class Contig(NamedSequence):
     def __str__(self):
         return str(self.id) + "(" + str(self.__len__()) + ")"
 
+    def __repr__(self):
+        return self.__str__()
+
     def print_fasta(self, handler):
         # type: (file) -> None
         SeqIO.write(self, handler, "fasta")
 
 
-class EasyContigStorage:
-    def __init__(self, iter, add_rc = True):
-        # type: (Iterable[Contig], bool) -> None
+class ContigStorage:
+    def __init__(self, contigs_list = None, add_rc = True):
+        # type: (Optional[Iterable[Contig]], bool) -> None
         self.items = dict() # type: Dict[str, Contig]
         self.add_rc = add_rc
-        for item in iter:
-            self.add(item)
+        if contigs_list is not None:
+            for item in contigs_list:
+                self.add(item)
 
     def add(self, item):
         # type: (Contig) -> None
@@ -79,46 +83,39 @@ class EasyContigStorage:
             return self.items[item]
         return None
 
+    def __iter__(self):
+        return self.items.values().__iter__()
+
+    def unique(self):
+        return UniqueList(self).__iter__()
+
+    def __contains__(self, item):
+        # type: (Contig) -> bool
+        return item.id in self.items
+
+    def containsKey(self, key):
+        # type: (str) -> bool
+        return key in self.items
+
+
 #TODO: Merge with EasyContigStorage
-class ContigCollection():
+class ContigCollection(ContigStorage):
     def __init__(self, contigs_list=None):
         # type: (Optional[Iterable[Contig]]) -> ContigCollection
-        self.contigs = dict()  # type: Dict[str, Contig]
-        if contigs_list is not None:
-            for contig in contigs_list:
-                self.add(contig)
-
-    def add(self, contig):
-        # type: (Contig) -> None
-        self.contigs[contig.id] = contig
+        ContigStorage.__init__(self, contigs_list, False)
 
     def filter(self, condition):
         # type: (callable(Contig)) -> ContigCollection
         res = ContigCollection()
-        for contig in self.contigs.values():
+        for contig in self.items.values():
             if condition(contig):
                 res.add(contig)
         return res
-
-    def incoming(self):
-        # type: () -> ContigCollection
-        return self.filter(lambda contig: "in" in contig.info.misc)
-
-    def outgoing(self):
-        # type: () -> ContigCollection
-        return self.filter(lambda contig: "out" in contig.info.misc)
 
     def print_names(self, handler):
         # type: (file) -> None
         for contig in self:
             handler.write(str(contig.id) + "\n")
-
-    def __iter__(self):
-        return self.contigs.values().__iter__()
-
-    def __getitem__(self, contig_id):
-        # type: (str) -> Contig
-        return self.contigs[contig_id]
 
     def loadFromFasta(self, handler, num_names=True):
         # type: (BinaryIO, bool) -> ContigCollection
@@ -131,28 +128,28 @@ class ContigCollection():
 
     def print_fasta(self, handler):
         # type: (file) -> None
-        for contig in self.contigs.values():
+        for contig in self.items.values():
             contig.print_fasta(handler)
 
     def RC(self):
-        return ContigCollection(map(lambda contig: contig.rc, self.contigs.values()))
+        return ContigCollection(map(lambda contig: contig.rc, self.items.values()))
 
     def __len__(self):
         # type: () -> int
-        return len(self.contigs)
+        return len(self.items)
 
     def __contains__(self, item):
-        return item.id in self.contigs
+        return item.id in self.items
 
     def containsKey(self, key):
-        return key in self.contigs
+        return key in self.items
 
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeTokenLine("ContigCollection")
-        handler.writeTokens(self.contigs.keys())
-        handler.writeIntLine(len(list(UniqueList(self.contigs.values()))))
-        for contig in UniqueList(self.contigs.values()):
+        handler.writeTokens(self.items.keys())
+        handler.writeIntLine(len(list(UniqueList(self.items.values()))))
+        for contig in UniqueList(self.items.values()):
             contig.save(handler)
 
     def load(self, handler):
@@ -210,6 +207,10 @@ class Segment:
         # type: (Segment, int) -> bool
         return self.contig == other.contig and self.right <= other.left + delta
 
+    def __le__(self, other):
+        # type: (Segment) -> bool
+        return self.contig == other.contig and self.left <= other.left and self.right <= other.right
+
     def connects(self, other, delta=0):
         # type: (Segment, int) -> bool
         return self.contig == other.contig and self.right - delta <= other.left <= self.right + delta
@@ -253,6 +254,9 @@ class Segment:
         else:
             return str(self.contig.id) + "[" + str(self.left) + ":" + str(len(self.contig)) + "-" + str(
                 len(self.contig) - self.right) + "]"
+
+    def __repr__(self):
+        return self.__str__()
 
     def __len__(self):
         return self.right - self.left
@@ -328,7 +332,7 @@ def loadFromSam(reads, sam, contigs, filter=lambda rec: True):
         addRC = False
         if new_rec.is_unmapped:
             continue
-        assert new_rec.tname in contigs.contigs, str(new_rec.tname) + " " + str(list(contigs.contigs.keys()))
+        assert new_rec.tname in contigs.items, str(new_rec.tname) + " " + str(list(contigs.items.keys()))
         contig = contigs[new_rec.tname]
         alignment = read.AddSamAlignment(new_rec, contig)
         if alignment.seg_to.contig.rc in contigs:

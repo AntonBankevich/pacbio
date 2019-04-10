@@ -84,8 +84,12 @@ class Scorer:
             return old_val, old_shift
 
     def polyshAlignment(self, alignment):
+        # type: (AlignmentPiece) -> AlignmentPiece
+        return self.polyshMatching(alignment.matchingSequence()).asAlignmentPiece(alignment.seg_from.contig, alignment.seg_to.contig)
+
+    def polyshMatching(self, alignment):
         # type: (MatchingSequence) -> MatchingSequence
-        # TEST
+        # TODO: TEST
         cur = 0
         storage = RectStorage(alignment[0][0], alignment[-1][0])
         prev = Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius, self.scores.inf)

@@ -95,6 +95,9 @@ class AlignmentPiece:
         return AlignmentPiece(new_contig.asSegment(), contig.segment(als[0].seg_to.left, als[-1].seg_to.right),
                               new_cigar)
 
+    def isIdentical(self):
+        return self.seg_from == self.seg_to
+
     def __str__(self):
         # type: () -> str
         if len(self) < 20000:
@@ -109,6 +112,9 @@ class AlignmentPiece:
         if self.contradicting():
             suffix = "!!!"
         return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ":" + spid + suffix + ")"
+
+    def __repr__(self):
+        return self.__str__()
 
     def changeQueryContig(self, read):
         return AlignmentPiece(self.seg_from.changeContig(read), self.seg_to, self.cigar)
@@ -127,6 +133,14 @@ class AlignmentPiece:
     def precedes(self, other, delta=0):
         # type: (AlignmentPiece, int) -> bool
         return self.seg_from.precedes(other.seg_from, delta) and self.seg_to.precedes(other.seg_to, delta)
+
+    def __le__(self, other):
+        # type: (AlignmentPiece) -> bool
+        return self.seg_from <= other.seg_from and self.seg_to <= other.seg_to
+
+    def canMergeTo(self, other):
+        # type: (AlignmentPiece) -> bool
+        return self <= other or other <= self or self.contains(other) or other.contains(self)
 
     def connects(self, other, delta=0):
         # type: (AlignmentPiece, int) -> bool
@@ -671,6 +685,7 @@ class Correction:
     # This method may change the order of alignments. But they will be sorted by start.
     def composeQueryDifferences(self, als):
         # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
+        # TODO: make parallel
         als = sorted(als, key = lambda al: al.seg_to.left)
         # Sorting alignments into those that intersect corrections (complex) and those that do not (easy)
         easy = []
@@ -698,6 +713,7 @@ class Correction:
         matchings = [al.matchingSequence(True) for al in complex]
         positions = map(lambda matching: map(lambda pair: pair[1], matching), matchings)
         generator = self.continuousMapping(func, itertools.chain.from_iterable(positions))
+        # TODO: parallel
         for al, matching in zip(complex, matchings):
             new_pairs = []
             for pos_from, pos_to in matching.matches:
@@ -705,7 +721,7 @@ class Correction:
                 if new_pos is not None:
                     new_pairs.append((pos_from, new_pos))
             new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
-            corrected_matching = self.scorer.polyshAlignment(new_matching)
+            corrected_matching = self.scorer.polyshMatching(new_matching)
             res.append(corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from))
         return sorted(res, key = lambda al: al.seg_to.left)
 

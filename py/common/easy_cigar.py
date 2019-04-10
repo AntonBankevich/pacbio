@@ -18,15 +18,12 @@ def RCCigar(cigar):
 def ReverseCigar(cigar):
     # type: (str) -> str
     res = []
-    for n, c in list(pattern.findall(cigar)):
+    for c in cigar:
         if c == "D":
             c = "I"
         elif c == "I":
             c = "D"
-        if n:
-            res.append(n + c)
-        else:
-            res.append(c)
+        res.append(c)
     return "".join(res)
 
 

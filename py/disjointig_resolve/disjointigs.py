@@ -1,8 +1,8 @@
-from typing import Dict, List, Optional, BinaryIO, Callable, Iterator, Generator, Iterable, Union
+from typing import Dict, Optional, BinaryIO, Callable, Iterator, Generator, Iterable, Union
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection, Contig
+from common.sequences import Segment, UniqueList, ReadCollection, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.smart_storage import AlignmentStorage
 
@@ -65,35 +65,28 @@ class UniqueMarker:
             for seg in self.findUnique(disjointig):
                 yield seg
 
-class DisjointigCollection:
+class DisjointigCollection(ContigStorage):
     def __init__(self):
-        self.disjointigs = dict() # type: Dict[str, Disjointig]
+        ContigStorage.__init__(self, [], False)
+        self.items = self.items # type: Dict[str, Disjointig]
         self.cnt = 1
 
     def __iter__(self):
         # type: () -> Iterator[Disjointig]
-        return self.disjointigs.values().__iter__()
+        return self.items.values().__iter__()
 
     def __getitem__(self, item):
         # type: (str) -> Disjointig
-        return self.disjointigs[item]
+        return self.items[item]
 
-    def __contains__(self, item):
-        # type: (Disjointig) -> bool
-        return item.id in self.disjointigs
-
-    def containsKey(self, key):
-        # type: (str) -> bool
-        return key in self.disjointigs
-
-    def add(self, seq, name = None):
+    def addNew(self, seq, name = None):
         # type: (str, Optional[str]) -> Disjointig
         if name is None:
             name = "D" + str(self.cnt)
             self.cnt += 1
         new_disjointig = Disjointig(seq, name)
-        self.disjointigs[name] = new_disjointig
-        self.disjointigs[new_disjointig.rc.id] = new_disjointig.rc
+        self.items[name] = new_disjointig
+        self.items[new_disjointig.rc.id] = new_disjointig.rc
         return new_disjointig
 
     def loadFromFasta(self, handler, save_names = False, int_ids = False, filter = lambda rec: True):
@@ -101,7 +94,7 @@ class DisjointigCollection:
         recs = list(SeqIO.parse_fasta(handler))
         if save_names:
             for rec in recs:
-                assert rec.id not in self.disjointigs.keys() and basic.Reverse(rec.id) not in self.disjointigs.keys()
+                assert rec.id not in self.items.keys() and basic.Reverse(rec.id) not in self.items.keys()
         for rec in recs:
             if not filter(rec):
                 continue
@@ -110,13 +103,13 @@ class DisjointigCollection:
                 if number is not None:
                     self.cnt = max(self.cnt, int(abs(number)) + 1)
                 if int_ids:
-                    self.add(rec.seq, str(number))
+                    self.addNew(rec.seq, str(number))
                 else:
-                    self.add(rec.seq, rec.id)
+                    self.addNew(rec.seq, rec.id)
             else:
-                self.add(rec.seq)
+                self.addNew(rec.seq)
 
-    def addAll(self, als):
+    def addAlignments(self, als):
         # type: (Union[Generator[AlignmentPiece], Iterable[AlignmentPiece]]) -> None
         for al in als:
             dt = al.seg_from.contig # type: Disjointig
@@ -125,11 +118,11 @@ class DisjointigCollection:
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeTokenLine(str(self.cnt))
-        handler.writeTokens(str(map(lambda line: line.id, UniqueList(self.disjointigs.values()))))
-        for disjointig in UniqueList(self.disjointigs.values()):
+        handler.writeTokens(str(map(lambda line: line.id, UniqueList(self.items.values()))))
+        for disjointig in UniqueList(self.items.values()):
             handler.writeTokenLine(disjointig.id)
             handler.writeTokenLine(disjointig.seq)
-        for disjointig in UniqueList(self.disjointigs.values()):
+        for disjointig in UniqueList(self.items.values()):
             disjointig.save(handler)
 
     def load(self, handler, reads):
@@ -140,10 +133,10 @@ class DisjointigCollection:
             id = handler.readToken()
             assert id == key
             seq = handler.readToken()
-            disjointig = self.add(seq, key)
+            disjointig = self.addNew(seq, key)
             assert key == disjointig.id, key + " " + disjointig.id
         for key in keys:
-            self.disjointigs[key].loadDisjointig(handler, self, reads)
+            self.items[key].loadDisjointig(handler, self, reads)
 
 
 
