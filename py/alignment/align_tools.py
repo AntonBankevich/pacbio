@@ -192,21 +192,17 @@ class Aligner:
         return sam_parser.Samfile(open(alignment_file, "r"))
 
     # TODO: make this method accept reference dict of dome sort
-    def alignClean(self, reads, reference):
+    def alignClean(self, reads, ref_storage):
         # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
-        parser = self.align(reads, reference)
-        read_dict = ContigStorage(reads, False)
-        ref_dict = reference
+        parser = self.align(reads, ref_storage)
+        read_storage = ContigStorage(reads, False)
         for rec in parser:
             if rec.is_unmapped:
                 continue
-            rname = rec.query_name.split()[0]
-            if rname.startswith("contig_"):
-                rname = rname[len("contig_"):]
-            seq_from = read_dict[rname]
-            seq_to = ref_dict[rec.tname]
-            if rname in read_dict:
-                yield AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
+            rname = rec.query_name
+            seq_from = read_storage[rname]
+            seq_to = ref_storage[rec.tname]
+            yield AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
 
 
     # def matchingAlignment(self, seqs, contig):

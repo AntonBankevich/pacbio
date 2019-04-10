@@ -284,10 +284,8 @@ class DotPlot:
         # type: (ContigStorage) -> None
         self.lines = lines
         for line in lines:
-            self.lines[line.id] = line
-        for line in lines:
             self.alignmentsToFrom[line.id] = dict()
-        for line in UniqueList(lines):
+        for line in lines.unique():
             self.addRCAlignmentStorage(line)
             self.addSelfAlignmentStorage(line)
         self.auto_alignments = dict() # type: Dict[str, AutoAlignmentStorage] # here we store alignments of line to itself
