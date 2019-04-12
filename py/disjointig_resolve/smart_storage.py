@@ -1,10 +1,13 @@
-from typing import Optional, Iterator, List, Any, Iterable, Generator
+import itertools
+
+from typing import Optional, Iterator, List, Any, Iterable, Generator, Tuple
 
 from common.alignment_storage import AlignmentPiece, Correction
-from common.line_align import Scorer
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, Contig
+
+import accurate_line
 
 
 class LineListener:
@@ -13,11 +16,11 @@ class LineListener:
         self.rc = rc
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, Contig, str) -> None
+        # type: (accurate_line.NewLine, Contig, str) -> None
         pass
 
     def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, Contig, int) -> None
+        # type: (accurate_line.NewLine, Contig, int) -> None
         pass
 
     # alignments from new sequence to new sequence
@@ -26,15 +29,23 @@ class LineListener:
         pass
 
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
+        # type: (accurate_line.NewLine, str, Optional[List[AlignmentPiece]]) -> None
         pass
 
     def fireAfterCutRight(self, line, pos):
-        # type: (Any, int) -> None
+        # type: (accurate_line.NewLine, int) -> None
         pass
 
     def fireAfterCorrect(self, line):
-        # type: (Any) -> None
+        # type: (accurate_line.NewLine) -> None
+        pass
+
+    def fireMerge(self, new_line, line_left, line_right):
+        # type: (accurate_line.NewLine, accurate_line.NewLine, accurate_line.NewLine) -> None
+        pass
+
+    def fireSplit(self, old_line, line_left, line_right):
+        # type: (accurate_line.NewLine, accurate_line.NewLine, accurate_line.NewLine) -> None
         pass
 
 
@@ -108,6 +119,7 @@ class SegmentStorage(SmartStorage):
             rc = SegmentStorage(self)
             self.items = []  # List[Segment]
         SmartStorage.__init__(self, rc)
+        self.rc = rc # type: SegmentStorage
         self.key = lambda seg: seg.left
 
     def __getitem__(self, item):
@@ -132,7 +144,7 @@ class SegmentStorage(SmartStorage):
             self.items.append(seg)
             self.sorted = False
         else:
-            self.rc.addNew(seg.RC())
+            self.rc.add(seg.RC())
 
     def remove(self, seg):
         # type: (Segment) -> None
@@ -196,12 +208,12 @@ class SegmentStorage(SmartStorage):
         self.sorted = self.rc.sorted
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, Contig, str) -> None
+        # type: (accurate_line.NewLine, Contig, str) -> None
         self.makeCanonical()
 
 
     def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, Contig, int) -> None
+        # type: (accurate_line.NewLine, Contig, int) -> None
         self.makeCanonical()
         self.sort()
         self.items = [seg for seg in self.items if seg.left < pos] # type: List[Segment]
@@ -217,17 +229,44 @@ class SegmentStorage(SmartStorage):
         self.items = correction.mapSegmentsUp(self.items)
 
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
+        # type: (accurate_line.NewLine, str, Optional[List[AlignmentPiece]]) -> None
         pass
 
     def fireAfterCutRight(self, line, pos):
-        # type: (Any, int) -> None
+        # type: (accurate_line.NewLine, int) -> None
         pass
 
     def fireAfterCorrect(self, line):
-        # type: (Any) -> None
+        # type: (accurate_line.NewLine) -> None
         self.makeCanonical()
         self.items = [seg.contigAsSegment(line.segment(line.left(), line.right())) for seg in self.items]
+
+    def merge(self, other, inter_size = 0):
+        # type: (SegmentStorage, int) -> SegmentStorage
+        new_storge = SegmentStorage()
+        new_storge.addAll(self)
+        new_storge.addAll(other)
+        new_storge.mergeSegments(inter_size)
+
+    def subStorage(self, seg, inter_size = 0):
+        # type: (Segment, int) -> SegmentStorage
+        if self.isCanonical():
+            res = SegmentStorage()
+            for seg1 in self:
+                if seg1.interSize(seg) > inter_size:
+                    res.add(seg1)
+            return res
+        else:
+            return self.rc.subStorage(seg.RC(), inter_size).rc
+
+    def contigAsSegment(self, seg):
+        # type: (Segment) -> SegmentStorage
+        if self.isCanonical():
+            res = SegmentStorage()
+            res.addAll(map(lambda seg1: seg1.contigAsSegment(seg), self))
+            return res
+        else:
+            return self.rc.contigAsSegment(seg.RC())
 
     def load(self, handler, contig):
         # type: (TokenReader, NamedSequence) -> None
@@ -253,6 +292,7 @@ class AlignmentStorage(SmartStorage):
             rc = AlignmentStorage(self)
             self.items = []
         SmartStorage.__init__(self, rc)
+        self.items = self.items # type: List[AlignmentPiece]
         self.rc = rc # type: AlignmentStorage
         self.key = lambda al: al.seg_to.left
 
@@ -288,17 +328,17 @@ class AlignmentStorage(SmartStorage):
             self.rc.add(al.rc)
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, Contig, str) -> None
+        # type: (accurate_line.NewLine, Contig, str) -> None
         self.makeCanonical()
         self.items = [al.targetAsSegment(Segment(new_seq, 0, len(line))) for al in self.items]
 
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
+        # type: (accurate_line.NewLine, str, Optional[List[AlignmentPiece]]) -> None
         self.makeCanonical()
         self.items = [al.targetAsSegment(Segment(line, 0, len(line))) for al in self.items]
 
     def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, Contig, int) -> None
+        # type: (accurate_line.NewLine, Contig, int) -> None
         self.makeCanonical()
         new_items = []
         for al in self.items: # type: AlignmentPiece
@@ -309,7 +349,7 @@ class AlignmentStorage(SmartStorage):
         self.items = new_items # type: List[Segment]
 
     def fireAfterCutRight(self, line, pos):
-        # type: (Any, int) -> None
+        # type: (accurate_line.NewLine, int) -> None
         self.makeCanonical()
         self.items = [al.changeTargetContig(line) for al in self.items]
 
@@ -321,7 +361,7 @@ class AlignmentStorage(SmartStorage):
 
 
     def fireAfterCorrect(self, line):
-        # type: (Any) -> None
+        # type: (accurate_line.NewLine) -> None
         self.makeCanonical()
         self.items = [al.targetAsSegment(Segment(line, line.left(), line.right())) for al in self.items] # type: List[AlignmentPiece]
 
@@ -374,8 +414,74 @@ class AlignmentStorage(SmartStorage):
         if self.isCanonical():
             for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
                 if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left >= al.seg_from.left:
-                    self.items[i] = AlignmentPiece.GlueOverlappingAlignments([al, al1])
-                    return
+                    tmp = AlignmentPiece.GlueOverlappingAlignments([al, al1])
+                    if tmp is not None:
+                        self.items[i] = tmp
+                        return
             self.add(al)
         else:
             self.rc.addAndMergeRight(al.rc)
+
+    # This works in square time in worst case bu should work fast if alignments are to left and right sides of the contig
+    def merge(self, other):
+        # type: (AlignmentStorage) -> AlignmentStorage
+        left_items = [(al, -1) for al in self.items]
+        right_items = [(al, 1) for al in other.items]
+        new_items = left_items + right_items
+        right_items = sorted(other.items, key = lambda al: (al.seg_to.contig.id, al.seg_from.contig.id, al.seg_from.left))
+        new_items = sorted(self.items, key = lambda (al, side): (al.seg_to.contig.id, al.seg_from.contig.id, al.seg_from.left))
+        res = []
+        for (c_to, c_from), it in itertools.groupby(self.items, lambda al: (al.seg_to.contig, al.seg_from.contig)):
+            al_sides = list(it)
+            als_left = [al for al, side in al_sides if side == -1] # type: List[AlignmentPiece]
+            als_left = sorted(als_left, key = lambda al: al.seg_from.right)
+            als_right = [al for al, side in al_sides if side == 1] # type: List[AlignmentPiece]
+            curr = len(als_right)
+            for al in als_left:
+                while curr > 0 and (als_right[curr - 1] is not None or als_right[curr - 1].seg_from.left > al.seg_from.right):
+                    curr -= 1
+                for j in range(curr): # type: int
+                    if als_right[j] is not None and al.canMergeTo(als_right[j]):
+                        tmp = AlignmentPiece.GlueOverlappingAlignments([al, als_right[j]])
+                        if tmp is not None:
+                            al = tmp
+                            als_right[j] = None
+                            break
+                res.append(al)
+        new_storge = AlignmentStorage()
+        new_storge.addAll(res)
+
+    def subStorage(self, query = None, target = None, inter_size = 0):
+        # type: (Optional[Segment], Optional[Segment], int) -> AlignmentStorage
+        if self.isCanonical():
+            items = self.items
+            if query is not None:
+                items = filter(lambda al: al.seg_from.interSize(query) >= inter_size, items)
+            if target is not None:
+                items = filter(lambda al: al.seg_to.interSize(target) >= inter_size, items)
+            self.items[0].reduce(query=query, target=target)
+            items = map(lambda al: al.reduce(query=query, target=target), items)
+            res = AlignmentStorage()
+            res.addAll(items)
+            return res
+        else:
+            return self.rc.subStorage(query, target, inter_size).rc
+
+    def targetAsSegment(self, seg):
+        # type: (Segment) -> AlignmentStorage
+        if self.isCanonical():
+            res = AlignmentStorage()
+            res.addAll(map(lambda al: al.targetAsSegment(seg), self))
+            return res
+        else:
+            return self.rc.targetAsSegment(seg.RC())
+
+    def queryAsSegment(self, seg):
+        # type: (Segment) -> AlignmentStorage
+        if self.isCanonical():
+            res = AlignmentStorage()
+            res.addAll(map(lambda al: al.queryAsSegment(seg), self))
+            return res
+        else:
+            return self.rc.queryAsSegment(seg.RC())
+

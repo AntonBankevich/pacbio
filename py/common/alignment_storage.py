@@ -1,6 +1,6 @@
 import itertools
 
-from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator
+from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator, Iterable
 
 from common import sam_parser, params, easy_cigar
 from common.save_load import TokenWriter, TokenReader
@@ -621,7 +621,8 @@ class Correction:
         return [Segment(self.seq_from, l, r) for l, r in zip(left, right)]
 
     def mapSegmentsDown(self, segments):
-        # type: (List[Segment]) -> List[Segment]
+        # type: (Iterable[Segment]) -> List[Segment]
+        segments = list(segments)
         left = self.mapPositionsDown([seg.left for seg in segments])
         right = self.mapPositionsDown([seg.right for seg in segments])
         return [Segment(self.seq_to, l, r) for l, r in zip(left, right)]

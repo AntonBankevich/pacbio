@@ -3,7 +3,7 @@ import itertools
 from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any, Generator
 
 from alignment.align_tools import Aligner
-from common import basic, SeqIO
+from common import basic, SeqIO, params
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, Contig, ContigStorage
@@ -106,6 +106,26 @@ class NewLine(Contig):
         Contig.__init__(self, seq, id, rc)
         self.rc = rc #type: NewLine
 
+    def updateCorrectSegments(self, seg, threshold = params.reliable_coverage):
+        # type: (Segment, int) -> None
+        positions = []
+        for al in self.read_alignments.allInter(seg):
+            positions.append((al.seg_to.left, -1))
+            positions.append((al.seg_to.right, 1))
+        positions = sorted(positions)
+        cur = 0
+        last = None
+        for pos, delta in positions:
+            cur += delta
+            if cur == threshold:
+                if last is None:
+                    last = pos
+                else:
+                    if pos > last:
+                        self.correct_segments.add(self.segment(last, pos))
+                    last = None
+        self.correct_segments.mergeSegments()
+
     def addReads(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
         self.read_alignments.addAll(alignments)
@@ -183,7 +203,8 @@ class NewLine(Contig):
             listener.fireAfterCutRight(self, pos)
 
     def correctSequence(self, alignments):
-        # type: (List[AlignmentPiece]) -> None
+        # type: (Iterable[AlignmentPiece]) -> None
+        alignments = list(alignments)
         assert len(alignments) > 0
         correction = Correction.constructCorrection(alignments)
         self.notifyBeforeCorrect(correction)
@@ -238,7 +259,7 @@ class NewLine(Contig):
         # type: (TokenReader, DisjointigCollection, ReadCollection, ContigCollection) -> None
         self.id = handler.readToken()
         self.rc.id = basic.RC(self.id)
-        self.initial.load(handler, disjointigs, self)
+        self.initial.load(handler, contigs, self)
         self.correct_segments.load(handler, self)
         self.completely_resolved.load(handler, self)
         self.disjointig_alignments.load(handler, disjointigs, self)
@@ -261,6 +282,13 @@ class NewLine(Contig):
             read.alignments.remove(al)
         self.read_alignments.removeInter(seg)
 
+class LineStorageListener:
+    def __init__(self):
+        pass
+
+    def FireMergedLines(self, al1, al2):
+        # type: (AlignmentPiece, AlignmentPiece) -> None
+        pass
 
 class NewLineStorage(ContigStorage):
     def __init__(self, disjointigs, aligner):
@@ -270,6 +298,7 @@ class NewLineStorage(ContigStorage):
         self.aligner = aligner
         self.items = dict() # type: Dict[str, NewLine]
         self.cnt = 1
+        self.listeners = [] # type: List[LineStorageListener]
 
     def __iter__(self):
         # type: () -> Iterator[NewLine]
@@ -278,6 +307,17 @@ class NewLineStorage(ContigStorage):
     def __getitem__(self, item):
         # type: (str) -> NewLine
         return self.items[item]
+
+    def addListener(self, listener):
+        self.listeners.append(listener)
+
+    def removeListener(self, listener):
+        self.listeners.remove(listener)
+
+    def notifyMergedLines(self, al1, al2):
+        # type: (AlignmentPiece, AlignmentPiece) -> None
+        for listener in self.listeners:
+            listener.FireMergedLines(al1, al2)
 
     def addNew(self, seq, name = None):
         # type: (str, Optional[str]) -> NewLine
@@ -311,13 +351,32 @@ class NewLineStorage(ContigStorage):
             line.initial.add(AlignmentPiece.Identical(line.asSegment(), seg))
         #TODO Filter all lines already present in the collection
 
-    def mergeLines(self, alignment):
-        # type: (AlignmentPiece) -> NewLine
+    def mergeLines(self, alignment, k):
+        # type: (AlignmentPiece, int) -> NewLine
         line1 = alignment.seg_from.contig #type: NewLine
         line2 = alignment.seg_to.contig #type: NewLine
-        line = self.addNew(line1.seq, name ="(" + line1.id + "," + line2.id + ")")
-        line.extendRightWithAlignment(alignment.changeQueryContig(line))
-        # IMPLEMENT merge lines into a new line based on the given alignment. Polysh the result. Transfer all reads, segments and alignments
+
+        new_line1_seq = Contig(line1.asSegment().prefix(pos=alignment.seg_from.left) + alignment.seg_to.Seq(), "corrected")
+        alignment = alignment.changeTargetSegment(new_line1_seq.asSegment().suffix(length = alignment.seg_to.__len__()))
+        line1.correctSequence([alignment])
+
+        # Now lines have exact match
+        seq = line1.asSegment().prefix(pos = alignment.seg_from.left) + line2.asSegment().suffix(pos = alignment.seg_to.left)
+        name = "(" + line1.id + "," + line2.id + ")"
+        line = self.addNew(seq, name)
+        al1 = AlignmentPiece.Identical(line1.asSegment(), line.asSegment().prefix(length=len(line1)))
+        al2 = AlignmentPiece.Identical(line2.asSegment(), line.asSegment().suffix(length=len(line2)))
+
+        line.initial.addAll(line1.initial.targetAsSegment(al1.seg_to).merge(line2.initial.targetAsSegment(al2.seg_to)))
+        line.correct_segments.addAll(line1.correct_segments.contigAsSegment(al1.seg_to).
+                                     merge(line2.correct_segments.contigAsSegment(al2.seg_to)))
+        line.correct_segments.addAll(line1.completely_resolved.contigAsSegment(al1.seg_to).
+                                     merge(line2.completely_resolved.contigAsSegment(al2.seg_to), k))
+        line.disjointig_alignments.addAll(line1.disjointig_alignments.targetAsSegment(al1.seg_to).
+                                          merge(line2.disjointig_alignments.targetAsSegment(al2.seg_to)))
+        line.read_alignments.addAll(line1.read_alignments.targetAsSegment(al1.seg_to).
+                                          merge(line2.read_alignments.targetAsSegment(al2.seg_to)))
+        self.notifyMergedLines(al1, al2)
         del self.items[line1.id]
         del self.items[line2.id]
         return line

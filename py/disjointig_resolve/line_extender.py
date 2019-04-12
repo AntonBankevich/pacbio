@@ -11,7 +11,7 @@ from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
-from disjointig_resolve.smart_storage import SegmentStorage
+from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 
 k = 1000
 
@@ -205,29 +205,15 @@ class LineExtender:
     def polyshSegments(self, line, to_polysh):
         # type: (NewLine, List[Segment]) -> None
         segs = SegmentStorage()
+        corrections = AlignmentStorage()
         line.addListener(segs)
         segs.addAll(to_polysh)
         segs.sort()
         for i in range(len(segs)):
-            self.polisher.polishSegment(segs[i], list(line.read_alignments.allInter(segs[i])))
+            corrections.add(self.polisher.polishSegment(segs[i], list(line.read_alignments.allInter(segs[i]))))
+        line.correctSequence(corrections.items)
         line.removeListener(segs)
 
     def updateCorrectSegments(self, line):
         # type: (NewLine) -> None
-        positions = []
-        for al in line.read_alignments:
-            positions.append((al.seg_to.left, -1))
-            positions.append((al.seg_to.right, 1))
-        positions = sorted(positions)
-        line.correct_segments.clean()
-        cur = 0
-        last = None
-        for pos, delta in positions:
-            cur += delta
-            if cur == params.reliable_coverage:
-                if last is None:
-                    last = pos
-                else:
-                    if pos > last:
-                        line.correct_segments.add(line.segment(last, pos))
-                    last = None
+        line.updateCorrectSegments(line.asSegment())

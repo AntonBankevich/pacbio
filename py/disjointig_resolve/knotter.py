@@ -2,15 +2,17 @@ import itertools
 
 from typing import Iterator, Tuple
 
+from alignment.polishing import Polisher
 from common.alignment_storage import AlignedRead, AlignmentPiece
 from common.line_align import Scorer
 from disjointig_resolve.accurate_line import NewLine, NewLineStorage
 
 
 class LineKnotter:
-    def __init__(self, storage):
-        # type: (NewLineStorage) -> None
+    def __init__(self, storage, polisher):
+        # type: (NewLineStorage, Polisher) -> None
         self.storage = storage
+        self.polisher = polisher
 
     # Find connection of line to any other line using reads. Line is supposed to contain or precede the other line.
     def tryKnotRight(self, line):
@@ -48,8 +50,14 @@ class LineKnotter:
         else:
             print "Merging", line, "with", final[2], "with gap", final[0]
             line_alignment = final[3][0][1].composeTargetDifference(final[3][0][2])
+            pref = line_alignment.seg_from.left
+            suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)
-            self.storage.mergeLines(line_alignment)
+            new_line = self.storage.mergeLines(line_alignment, 500)
+            seg = new_line.segment(pref, len(new_line) - suff)
+            correction = self.polisher.polishSegment(seg, list(new_line.read_alignments.allInter(seg)))
+            new_line.correctSequence([correction])
+            new_line.updateCorrectSegments(new_line.segment(pref, len(new_line) - suff).expand(100))
             return True
 
 
