@@ -74,9 +74,10 @@ class SmartStorage(LineListener):
         pass
 
     def addAll(self, items):
-        # type: (Iterable) -> None
+        # type: (Iterable) -> SmartStorage
         for item in items:
             self.add(item)
+        return self
 
     def sort(self):
         # type: () -> None
@@ -157,15 +158,26 @@ class SegmentStorage(SmartStorage):
             self.rc.remove(seg.RC())
 
     def addAll(self, segs):
-        # type: (Iterable[Segment]) -> None
+        # type: (Iterable[Segment]) -> SegmentStorage
         for seg in segs:
             self.add(seg)
+        return self
 
     def isIn(self, seg):
         # type: (Segment) -> bool
         if self.isCanonical():
             for seg1 in self.items:
                 if seg1.contains(seg):
+                    return True
+            return False
+        else:
+            return self.rc.isIn(seg.RC())
+
+    def inter(self, seg, min_size = 0):
+        # type: (Segment, int) -> bool
+        if self.isCanonical():
+            for seg1 in self.items:
+                if seg1.interSize(seg) >= min_size:
                     return True
             return False
         else:
@@ -189,8 +201,8 @@ class SegmentStorage(SmartStorage):
         else:
             self.rc.mergeSegments(inter_size)
 
-    def cap(self, seg):
-        # type: (Segment) -> List[Segment]
+    def reduce(self, seg):
+        # type: (Segment) -> SegmentStorage
         if self.isCanonical():
             res = []
             for seg1 in self.items:
@@ -198,7 +210,7 @@ class SegmentStorage(SmartStorage):
                     res.append(seg.cap(seg1))
             return res
         else:
-            return [seg1.RC() for seg1 in self.rc.cap(seg.RC())]
+            return self.rc.reduce(seg.RC())
 
     def makeCanonical(self):
         if self.isCanonical():
@@ -258,6 +270,62 @@ class SegmentStorage(SmartStorage):
             return res
         else:
             return self.rc.subStorage(seg.RC(), inter_size).rc
+
+    # here we assume that segments inside each colection can not have intersection at least min_inter
+    def cap(self, other, min_inter = 0):
+        # type: (SegmentStorage, int) -> SegmentStorage
+        if not self.isCanonical():
+            return self.rc.cap(other.rc).rc
+        cur = 0
+        res = SegmentStorage()
+        for seg in other:
+            while cur < len(self) and self.items[cur].right <= seg.right:
+                if seg.interSize(self.items[cur]) >= min_inter:
+                    res.add(seg.cap(self.items[cur]))
+                cur += 1
+            if cur < len(self) and seg.interSize(self.items[cur]) >= min_inter:
+                res.add(seg.cap(self.items[cur]))
+        return res
+
+    # This method returns Segment storage that only contain intersections of segments seg1, seg2 when seg1 <= seg2
+    def orderedCap(self, other, min_inter = 0):
+        # type: (SegmentStorage, int) -> SegmentStorage
+        res = SegmentStorage()
+        cur = 0
+        for seg in self:
+            while cur < len(other) and other[cur].right < seg.right:
+                cur += 1
+            if cur < len(other) and seg <= other[cur] and seg.interSize(other[cur]) >= min_inter:
+                res.add(seg.cap(other[cur]))
+        return res
+
+    def expand(self, radius):
+        # type: (int) -> SegmentStorage
+        if self.isCanonical():
+            return SegmentStorage().addAll([seg.expand(radius) for seg in self.items])
+        else:
+            return self.rc.expand(radius).rc
+
+    def filterBySize(self, min = 0, max = 10000000000):
+        # type: (int, int) -> SegmentStorage
+        return SegmentStorage().addAll([seg for seg in self if min <= len(seg) < max])
+
+    def reverse(self):
+        # type: () -> SegmentStorage
+        if self.isCanonical():
+            self.sort()
+            res = SegmentStorage()
+            contig = self.items[0].contig
+            last = 0
+            for seg in self:
+                if seg.left > last:
+                    res.add(contig.segment(last, seg.left))
+                last = max(seg.right, last)
+            if last < len(contig):
+                res.add(contig.asSegment().suffix(pos=last))
+            return res
+        else:
+            return self.rc.reverse().rc
 
     def contigAsSegment(self, seg):
         # type: (Segment) -> SegmentStorage
@@ -484,4 +552,44 @@ class AlignmentStorage(SmartStorage):
             return res
         else:
             return self.rc.queryAsSegment(seg.RC())
+
+    def filterByCoverage(self, mi = 0, ma = 1000000):
+        # type: (int, int) -> SegmentStorage
+        segs = self.calculateCoverage()
+        if mi == 0:
+            last = 0
+        else:
+            last = None
+        contig = self[0].seg_to.contig
+        res = SegmentStorage()
+        for seg, cov in segs:
+            if last is None and (mi <= cov < ma):
+                last = seg.left
+            elif last is not None and (cov < mi or cov >= ma):
+                res.add(Segment(contig, last, seg.left))
+                last = None
+        if last is not None:
+            assert mi == 0
+            res.add(Segment(contig, last, len(contig)))
+        return res
+
+    def calculateCoverage(self):
+        # type: () -> Generator[Tuple[Segment, int]]
+        positions = []
+        for al in alignments:
+            positions.append((al.seg_to.left, 1))
+            positions.append((al.seg_to.right, -1))
+        positions = sorted(positions)
+        positions = [(pos, sum(delta for pos, delta in iter)) for pos, iter in
+                     itertools.groupby(positions, key=lambda pos: pos[0])]
+        contig = alignments[0].seg_to.contig
+        cur = 0
+        last = 0
+        for pos, delta in positions:
+            if last < pos:
+                yield contig.segment(last, pos), cur
+            cur += delta
+        if positions[-1][0] < len(contig):
+            yield contig.asSegment().suffix(pos=positions[-1][0]), 0
+
 

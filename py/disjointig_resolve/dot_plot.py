@@ -61,6 +61,11 @@ class AutoAlignmentStorage(LineListener):
             if al.seg_to.contains(seg):
                 yield al
 
+    def allInter(self, seg):
+        for al in self:
+            if al.seg_to.inter(seg):
+                yield al
+
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
         self.content.fireBeforeExtendRight(line, new_seq, seq)
@@ -72,8 +77,8 @@ class AutoAlignmentStorage(LineListener):
         self.content.fireBeforeCutRight(line, new_seq, pos)
         self.reverse()
         self.content.fireBeforeCutRight(line, new_seq, pos)
-
     # alignments from new sequence to new sequence
+
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
         self.content.fireBeforeCorrect(alignments)
@@ -132,6 +137,9 @@ class RCAlignmentStorage(LineListener):
         # type: (Segment) -> Generator[AlignmentPiece]
         return self.content.getAlignmentsTo(seg)
 
+    def allInter(self, seg):
+        return self.content.allInter(seg)
+
     def add(self, alignment):
         self.content.add(alignment)
         self.content.add(alignment.reverse().rc)
@@ -152,8 +160,8 @@ class RCAlignmentStorage(LineListener):
         self.content.fireBeforeCutRight(line, new_seq, pos)
         self.reverse()
         self.content.fireBeforeCutRight(line, new_seq, pos)
-
     # alignments from new sequence to new sequence
+
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
         self.content.fireBeforeCorrect(alignments)
@@ -177,8 +185,8 @@ class RCAlignmentStorage(LineListener):
         self.content.fireAfterCorrect(line)
         self.reverse()
         self.content.fireAfterCorrect(line)
-
     # This is CRAAAZY!!! But correct.
+
     def reverse(self):
         self.rc.content = self.content.reverse()
         self.content = self.rc.content.rc
@@ -228,6 +236,9 @@ class TwoLineAlignmentStorage(LineListener):
         # type: (Segment) -> Generator[AlignmentPiece]
         return self.content.getAlignmentsTo(seg)
 
+    def allInter(self, seg):
+        return self.content.allInter(seg)
+
     def normalizeReverse(self):
         self.reverse.content = self.content.reverse()
 
@@ -240,8 +251,8 @@ class TwoLineAlignmentStorage(LineListener):
         # type: (Any, Contig, int) -> None
         self.content.fireBeforeCutRight(line, new_seq, pos)
         self.normalizeReverse()
-
     # alignments from new sequence to new sequence
+
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
         self.content.fireBeforeCorrect(alignments)
@@ -345,6 +356,16 @@ class DotPlot:
             yield al
         for storage in self.alignmentsToFrom[seg.contig.id].values():
             for al in storage.getAlignmentsTo(seg):
+                yield al
+
+    def allInter(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
+        for al in self.auto_alignments[seg.contig.id].allInter(seg):
+            yield al
+        for al in self.rc_alignments[seg.contig.id].allInter(seg):
+            yield al
+        for storage in self.alignmentsToFrom[seg.contig.id].values():
+            for al in storage.allInter(seg):
                 yield al
 
     def construct(self, aligner):

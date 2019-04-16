@@ -4,6 +4,7 @@ import sys
 import time
 
 from alignment.align_tools import Aligner, DirDistributor
+from alignment.polishing import Polisher
 from common import basic
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineKnotter
@@ -56,7 +57,7 @@ def main(args):
 
     save_handler = SaveHandler(params.save_dir)
     print "Resolving"
-    knotter = LineKnotter(lines)
+    knotter = LineKnotter(lines, Polisher(aligner, aligner.dir_distributor))
     extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     cnt = 0
     while True:

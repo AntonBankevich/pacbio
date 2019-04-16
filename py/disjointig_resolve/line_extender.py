@@ -11,6 +11,7 @@ from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
+from disjointig_resolve.knotter import LineKnotter
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 
 k = 1000
@@ -69,7 +70,7 @@ k = 1000
 # The results of its work is reflected in lines themselves as they grow and knot to each other
 class LineExtender:
     def __init__(self, aligner, knotter, disjointigs, dot_plot):
-        # type: (Aligner, Knotter, DisjointigCollection, LineDotPlot) -> None
+        # type: (Aligner, LineKnotter, DisjointigCollection, LineDotPlot) -> None
         self.aligner = aligner
         self.polisher = Polisher(aligner, aligner.dir_distributor)
         self.knotter = knotter
@@ -96,12 +97,13 @@ class LineExtender:
             self.updateAllStructures(to_correct)
             if seg_to_resolve.right > len(line) - 2000:
                 self.attemptExtend(line)
-                if knotter.tryKnot(line) is not None:
+                if self.knotter.tryKnotRight(line):
                     return new_recruits
         return new_recruits
 
     def updateAllStructures(self, to_correct):
         to_correct = sorted(to_correct, key=lambda seg: (basic.Normalize(seg.contig.id), seg.left))
+        relevant_positions = []
         for line, it in itertools.groupby(to_correct,
                                                key=lambda seg: seg.contig):  # type: NewLine, Iterable[Segment]
             to_polysh = []
@@ -111,8 +113,13 @@ class LineExtender:
                 else:
                     to_polysh.append(seg)
             self.polyshSegments(line, to_polysh)
+            old_correct = SegmentStorage().addAll(line.correct_segments)
             self.updateCorrectSegments(line)
-            self.updateCompletelyResolved(line)  # IMPLEMENT
+            for seg in old_correct:
+                seg1 = line.correct_segments.find(seg)
+                if seg1.right > seg.right:
+                    relevant_positions.append(line.position(seg.right))
+        sdfadf
 
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, int]]
@@ -217,3 +224,31 @@ class LineExtender:
     def updateCorrectSegments(self, line):
         # type: (NewLine) -> None
         line.updateCorrectSegments(line.asSegment())
+
+    def updateCompletelyResolved(self, line, old_correct):
+        # type: (NewLine, SegmentStorage) -> None
+        new_correct = line.correct_segments
+        resolved = line.completely_resolved
+        new_correct.sort()
+        old_correct.sort()
+        resolved.sort()
+        cur_old = 0
+        cur_new = 0
+        for seg in resolved:
+            while new_correct[cur_new].right < seg.left:
+                cur_new += 1
+            while old_correct[cur_old].right < seg.left:
+                cur_old += 1
+            old_seg = old_correct[cur_old]
+            new_seg = new_correct[cur_new]
+            assert new_seg.contains(seg)
+            assert old_seg.contains(seg)
+            assert new_seg.contains(old_seg)
+            if new_seg.right == old_seg.right:
+                continue
+            extension = line.segment(seg.right - params.k, new_seg.right)
+            line_alignments = self.dot_plot.allInter(extension)
+            read_alignments = line.getPotentialAlignmentsTo(extension)
+            explained_reads = line.
+
+        pass

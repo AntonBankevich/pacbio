@@ -1,6 +1,6 @@
 import itertools
 
-from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any, Generator
+from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any, Generator, Tuple
 
 from alignment.align_tools import Aligner
 from common import basic, SeqIO, params
@@ -8,7 +8,8 @@ from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, Correction
-from disjointig_resolve.disjointigs import DisjointigCollection, UniqueMarker, Disjointig
+from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
+from disjointig_resolve.unique_marker import UniqueMarker
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
 
 class ReadAlignmentListener(LineListener):
@@ -77,8 +78,6 @@ class ExtensionHandler(LineListener):
             line.disjointig_alignments.addAndMergeRight(al)
 
 
-
-
 # Reads only store alignments to lines they were selected.
 class NewLine(Contig):
     def __init__(self, seq, id, extension_handler, rc = None):
@@ -87,6 +86,7 @@ class NewLine(Contig):
         self.seq = seq
         self.id = id
         if rc is None:
+            # TODO: move all these to separate classes
             self.initial = AlignmentStorage()
             self.correct_segments = SegmentStorage()
             self.completely_resolved = SegmentStorage()
@@ -108,22 +108,8 @@ class NewLine(Contig):
 
     def updateCorrectSegments(self, seg, threshold = params.reliable_coverage):
         # type: (Segment, int) -> None
-        positions = []
-        for al in self.read_alignments.allInter(seg):
-            positions.append((al.seg_to.left, -1))
-            positions.append((al.seg_to.right, 1))
-        positions = sorted(positions)
-        cur = 0
-        last = None
-        for pos, delta in positions:
-            cur += delta
-            if cur == threshold:
-                if last is None:
-                    last = pos
-                else:
-                    if pos > last:
-                        self.correct_segments.add(self.segment(last, pos))
-                    last = None
+        segs = AlignmentStorage().addAll(self.read_alignments.allInter(seg)).filterByCoverage(mi=threshold)
+        self.correct_segments.addAll(segs)
         self.correct_segments.mergeSegments()
 
     def addReads(self, alignments):

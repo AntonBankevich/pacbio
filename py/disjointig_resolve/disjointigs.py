@@ -48,23 +48,6 @@ class Disjointig(Contig):
             read.addAlignment(al)
 
 
-class UniqueMarker:
-    def __init__(self, disjointigs):
-        # type: (DisjointigCollection) -> None
-        self.disjointigs = disjointigs
-
-    # Mark unique regions on all disjointigs as correct
-    def findUnique(self, contig):
-        # type: (NamedSequence) -> Generator[Segment]
-        # TODO: search for unique segments in disjointigs including construction of dot plot
-        pass
-
-    def findAllUnique(self, sequences):
-        # type: (Iterable[NamedSequence]) -> Generator[Segment]
-        for disjointig in UniqueList(sequences):
-            for seg in self.findUnique(disjointig):
-                yield seg
-
 class DisjointigCollection(ContigStorage):
     def __init__(self):
         ContigStorage.__init__(self, [], False)
