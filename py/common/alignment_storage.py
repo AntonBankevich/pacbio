@@ -352,6 +352,32 @@ class MatchingSequence:
         return MatchingSequence(self.seq_from, self.seq_to,
                                 filter(lambda match: left <= match[0] < right, self.matches))
 
+    def mapDown(self, pos, roundDown = True):
+        # type: (int, bool) -> Optional[int]
+        if roundDown:
+            for pos1, pos2 in self.matches[::-1]:
+                if pos1 <= pos:
+                    return pos2
+            return None
+        else:
+            for pos1, pos2 in self.matches:
+                if pos1 >= pos:
+                    return pos2
+            return None
+
+    def mapUp(self, pos, roundDown = True):
+        # type: (int, bool) -> Optional[int]
+        if roundDown:
+            for pos1, pos2 in self.matches[::-1]:
+                if pos2 <= pos:
+                    return pos1
+            return None
+        else:
+            for pos1, pos2 in self.matches:
+                if pos2 >= pos:
+                    return pos1
+            return None
+
     def asAlignmentPiece(self, contig_from, contig_to):
         # type: (NamedSequence, NamedSequence) -> AlignmentPiece
         return AlignmentPiece(self.SegFrom(contig_from), self.SegTo(contig_to), self.cigar())

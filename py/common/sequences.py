@@ -267,6 +267,9 @@ class Segment:
     def __ne__(self, other):
         return self.contig != other.contig or self.left != other.left or self.right != other.right
 
+    def __hash__(self):
+        return hash((self.contig.id, self.left, self.right))
+
     def changeContig(self, contig):
         # type: (Segment) -> Segment
         return Segment(contig, self.left, self.right)

@@ -343,6 +343,7 @@ class SegmentStorage(SmartStorage):
             self.add(Segment.load(handler, contig))
 
     #returns the leftmost segment that intersects with seg by at least min_inter (or tockes seg in case min_inter = 0)
+    # TODO rewrite in log time
     def find(self, seg, min_inter = 0):
         # type: (Segment, int) -> Optional[Segment]
         self.sort()
@@ -350,6 +351,12 @@ class SegmentStorage(SmartStorage):
             if candidate.interSize(seg) >= min_inter:
                 return candidate
         return None
+
+    def allInter(self, seg):
+        # type: (Segment) -> Generator[Segment]
+        for seg1 in self:
+            if seg1.inter(seg):
+                yield seg1
 
 
 class AlignmentStorage(SmartStorage):

@@ -97,42 +97,18 @@ class LineExtender:
             to_correct = [seg for seg, num in result if num > 0]
             self.updateAllStructures(to_correct)
             if seg_to_resolve.right > len(line) - 2000:
-                self.attemptExtend(line)
-                if self.knotter.tryKnotRight(line):
-                    return new_recruits
+                if self.attemptExtend(line):
+                    if self.knotter.tryKnotRight(line):
+                        return new_recruits
+                self.updateAllStructures([line.asSegment().suffix(pos=seg_to_resolve.right)])
         return new_recruits
 
     def updateAllStructures(self, to_correct):
-        to_correct = sorted(to_correct, key=lambda seg: (basic.Normalize(seg.contig.id), seg.left))
-        corrected = []
-        for line, it in itertools.groupby(to_correct,
-                                               key=lambda seg: seg.contig):  # type: NewLine, Iterable[Segment]
-            to_polysh = []
-            for seg in it:
-                if seg.contig != line:
-                    to_polysh.append(seg.RC())
-                else:
-                    to_polysh.append(seg)
-            old_correct = SegmentStorage().addAll(line.correct_segments)
-            new_segments = self.polyshSegments(line, to_polysh)
-            for seg in new_segments:
-                old = old_correct.find(seg)
-                assert old is not None and seg.contains(old)
-                if len(seg) > len(old):
-                    corrected.append(seg)
-            self.updateCorrectSegments(line)
-        records = [] # type: List[LineExtender.Record]
-        good_reads = set()
-        for seg_correct in corrected:
-            line = seg_correct.contig # type:NewLine
-            for seg_resolved in line.completely_resolved:
-                if seg_correct.contains(seg_resolved):
-                    next = line.completely_resolved.find(line.asSegment().suffix(pos=seg_resolved.right))
-                    if next is None:
-                        next_start = len(line)
-                    else:
-                        next_start = next.left
-                    records.append(self.createRecord(seg_resolved, next_start, seg_correct, good_reads))
+        corrected = self.correctSequences(to_correct)
+        records = self.collectRecords(corrected)
+        self.updateResolved(records)
+
+    def updateResolved(self, records):
         ok = True
         while ok:
             ok = False
@@ -144,12 +120,44 @@ class LineExtender:
                     if self.attemptJump(rec):
                         ok = True
         for rec in records:
-            line = rec.resolved.contig # type: NewLine
+            line = rec.resolved.contig  # type: NewLine
             line.completely_resolved.add(rec.resolved)
             for seg in rec.old_resolved:
                 line.completely_resolved.add(seg)
             line.completely_resolved.mergeSegments(k)
 
+    def collectRecords(self, corrected):
+        records = dict()  # type: Dict[Segment, LineExtender.Record]
+        good_reads = set()
+        for seg in corrected:
+            for al in self.dot_plot.allInter(seg):
+                line = al.seg_from.contig  # type:NewLine
+                for seg_correct in line.correct_segments.allInter(al.seg_from):
+                    for seg_resolved in line.completely_resolved.reduce(seg_correct):
+                        next = line.completely_resolved.find(line.asSegment().suffix(pos=seg_resolved.right))
+                        if next is None:
+                            next_start = len(line)
+                        else:
+                            next_start = next.left
+                        records[seg_resolved] = self.createRecord(seg_resolved, next_start, seg_correct, good_reads)
+        records = list(records.values())  # type: List[LineExtender.Record]
+        return records
+
+    def correctSequences(self, to_correct):
+        to_correct = sorted(to_correct, key=lambda seg: (basic.Normalize(seg.contig.id), seg.left))
+        corrected = []
+        for line, it in itertools.groupby(to_correct,
+                                          key=lambda seg: seg.contig):  # type: NewLine, Iterable[Segment]
+            to_polysh = []
+            for seg in it:
+                if seg.contig != line:
+                    to_polysh.append(seg.RC())
+                else:
+                    to_polysh.append(seg)
+            new_segments = self.polyshSegments(line, to_polysh)
+            corrected.extend(new_segments)
+            self.updateCorrectSegments(line)
+        return corrected
 
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, int]]
@@ -232,12 +240,13 @@ class LineExtender:
         return best
 
     def attemptExtend(self, line):
-        # type: (NewLine) -> None
+        # type: (NewLine) -> bool
         new_contig, relevant_als = self.polisher.polishEnd(list(line.read_alignments.allInter(line.suffix(1000))))
         if len(new_contig) == len(line):
-            return
+            return False
         assert line.seq == new_contig.prefix(len=len(line)).Seq()
         line.extendRight(new_contig.suffix(pos = len(line)).Seq(), relevant_als)
+        return True
 
     def polyshSegments(self, line, to_polysh):
         # type: (NewLine, List[Segment]) -> List[Segment]
@@ -319,8 +328,18 @@ class LineExtender:
     def createRecord(self, resolved, next_start, correct, good_reads):
         # type: (Segment, int, Segment, Set[str]) -> Record
         line = resolved.contig # type: NewLine
+        focus = line.segment(resolved.right - k, correct.right)
+        for al in self.dot_plot.allInter(focus):
+            line1 = al.seg_from.contig # type: NewLine
+            ok = False
+            for seg in line1.correct_segments.allInter(al.seg_from): # type: Segment
+                if seg <= al.seg_from and seg.right < al.seg_from.right - 20:
+                    ok = True
+                    next_start = min(next_start, al.matchingSequence(True).mapDown(seg.right))
+            if not ok:
+                next_start = min(next_start, al.seg_to.left + k / 2)
         res = self.Record(resolved, next_start, correct, good_reads)
-        als = line.getPotentialAlignmentsTo(line.segment(resolved.right - k, correct.right))
+        als = line.getPotentialAlignmentsTo(focus)
         als = filter(lambda al: al.seg_from.left > k / 2 + 20, als)
         res.addAll(als)
         res.updateGood()
