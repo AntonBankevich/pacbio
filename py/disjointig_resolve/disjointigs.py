@@ -2,8 +2,8 @@ from typing import Dict, Optional, BinaryIO, Callable, Iterator, Generator, Iter
 from common import basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection, Contig, ContigStorage
-from common.alignment_storage import AlignmentPiece, AlignedRead
+from common.sequences import Segment, UniqueList, Contig, ContigStorage
+from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.smart_storage import AlignmentStorage
 
 

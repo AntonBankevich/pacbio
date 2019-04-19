@@ -2,7 +2,8 @@ import itertools
 
 from typing import Optional, Iterator, List, Any, Iterable, Generator, Tuple
 
-from common.alignment_storage import AlignmentPiece, Correction
+from common.alignment_storage import AlignmentPiece
+from disjointig_resolve.correction import Correction
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, Contig
@@ -115,13 +116,14 @@ class SmartStorage(LineListener):
 class SegmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[SegmentStorage]) -> None
-        self.items = None  # List[Segment]
+        items = None  # type: List[Segment]
         if rc is None:
             rc = SegmentStorage(self)
-            self.items = []  # List[Segment]
+            items = []  # type: List[Segment]
         SmartStorage.__init__(self, rc)
+        self.items = items
         self.rc = rc # type: SegmentStorage
-        self.key = lambda seg: seg.left
+        self.key = lambda seg: (seg.left, seg.right)
 
     def __getitem__(self, item):
         # type: (int) -> Segment
@@ -139,6 +141,13 @@ class SegmentStorage(SmartStorage):
         else:
             for item in self.rc.items[::-1]:
                 yield item.RC()
+
+    def __str__(self):
+        if self.isCanonical():
+            sign = "+"
+        else:
+            sign = "-"
+        return "Storage" + sign + ":" + str(list(self))
 
     def add(self, seg):
         if self.isCanonical():
@@ -358,18 +367,29 @@ class SegmentStorage(SmartStorage):
             if seg1.inter(seg):
                 yield seg1
 
+    def __eq__(self, other):
+        # type: (SegmentStorage) -> bool
+        if len(self) != len(other):
+            return False
+        self.sort()
+        other.sort()
+        for seg1, seg2 in zip(self, other):
+            if seg1 != seg2:
+                return False
+        return True
+
 
 class AlignmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[AlignmentStorage]) -> None
-        self.items = None  # type: List[AlignmentPiece]
+        items = None  # type: List[AlignmentPiece]
         if rc is None:
             rc = AlignmentStorage(self)
-            self.items = []
+            items = []
         SmartStorage.__init__(self, rc)
-        self.items = self.items # type: List[AlignmentPiece]
+        self.items = items # type: List[AlignmentPiece]
         self.rc = rc # type: AlignmentStorage
-        self.key = lambda al: al.seg_to.left
+        self.key = lambda al: (al.seg_to.left, al.seg_to.right, al.seg_from.contig.id)
 
     def __getitem__(self, item):
         # type: (int) -> AlignmentPiece

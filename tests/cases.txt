@@ -1,0 +1,4 @@
+3
+SegmentStorageTest 0
+AlignmentPieceTest 0
+AlignmentPolishingTest 0

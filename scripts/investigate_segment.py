@@ -5,7 +5,9 @@ import sys
 sys.path.append("py")
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic
-from common.sequences import ContigCollection, ReadCollection, Segment
+from common.sequences import ContigCollection, Segment
+from common.alignment_storage import ReadCollection
+
 
 def main(ref_file, segment, dir):
     ref = ContigCollection().loadFromFasta(open(ref_file, "r"), False)

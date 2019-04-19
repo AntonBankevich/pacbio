@@ -7,8 +7,8 @@ sys.path.append("py")
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO
 from common.sam_parser import Samfile
-from common.sequences import ContigCollection, ReadCollection
-from common.alignment_storage import AlignedRead
+from common.sequences import ContigCollection
+from common.alignment_storage import AlignedRead, ReadCollection
 
 
 def main(contig_file, reads_file, sam_file, dir, contig_id):

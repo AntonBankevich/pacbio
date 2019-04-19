@@ -5,15 +5,14 @@ from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any, Gene
 from alignment.align_tools import Aligner
 from common import basic, SeqIO, params
 from common.save_load import TokenWriter, TokenReader
-from common.seq_records import NamedSequence
-from common.sequences import Segment, UniqueList, ReadCollection, ContigCollection, Contig, Contig, ContigStorage
-from common.alignment_storage import AlignmentPiece, AlignedRead, Correction
+from common.sequences import Segment, UniqueList, ContigCollection, Contig, Contig, ContigStorage
+from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
+from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
-from disjointig_resolve.unique_marker import UniqueMarker
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
 
-class ReadAlignmentListener(LineListener):
 
+class ReadAlignmentListener(LineListener):
     def __init__(self, line, rc = None):
         # type: (NewLine, Optional[ReadAlignmentListener]) -> None
         self.line = line # type: NewLine
@@ -166,7 +165,6 @@ class NewLine(Contig):
         for listener in self.listeners:
             listener.fireAfterExtendRight(self, seq, relevant_als)
 
-
     def cutRight(self, pos):
         assert pos > 0 and pos <= len(self)
         cut_length = len(self) - pos
@@ -207,7 +205,6 @@ class NewLine(Contig):
         # type: () -> None
         for listener in self.listeners:
             listener.fireAfterCorrect(self)
-
 
     # def extendRightWithAlignment(self, alignment):
     #     # type: (AlignmentPiece) -> None
@@ -268,6 +265,7 @@ class NewLine(Contig):
             read.alignments.remove(al)
         self.read_alignments.removeInter(seg)
 
+
 class LineStorageListener:
     def __init__(self):
         pass
@@ -318,24 +316,17 @@ class NewLineStorage(ContigStorage):
     def fillFromContigs(self, contigs):
         # type: (Iterable[Contig]) -> None
         for contig in UniqueList(contigs):
-            marker = UniqueMarker(self.disjointigs)
-            segments = list(marker.findUnique(contig))
-            if len(segments) == 0:
-                print "No unique segments found in contig", contig
-                continue
             line = self.addNew(contig.seq)
             line.initial.add(AlignmentPiece.Identical(line.asSegment(), contig.asSegment()))
-            for seg in segments:
-                line.correct_segments.add(seg.contigAsSegment(line.asSegment()))
             for seg in line.correct_segments:
                 line.completely_resolved.add(seg)
 
-    def fillFromDisjointigs(self):
-        # type: () -> None
-        for seg in UniqueMarker(self.disjointigs).findAllUnique(self.disjointigs):
-            line = self.addNew(seg.Seq())
-            line.initial.add(AlignmentPiece.Identical(line.asSegment(), seg))
-        #TODO Filter all lines already present in the collection
+    # def fillFromDisjointigs(self):
+    #     # type: () -> None
+    #     for seg in UniqueMarker(self.disjointigs).findAllUnique(self.disjointigs):
+    #         line = self.addNew(seg.Seq())
+    #         line.initial.add(AlignmentPiece.Identical(line.asSegment(), seg))
+    #     #TODO Filter all lines already present in the collection
 
     def mergeLines(self, alignment, k):
         # type: (AlignmentPiece, int) -> NewLine

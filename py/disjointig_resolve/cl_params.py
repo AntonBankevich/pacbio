@@ -16,11 +16,20 @@ class Params:
         self.dir = None
         self.args = None
         self.threads = 8
+        self.test = False
+
+    def check(self):
+        if self.dir is None:
+            print "Define output dir"
+            self.print_usage_and_exit(1)
+        if os.path.exists(self.dir) and os.path.isfile(self.dir):
+            print "Incorrect output dir"
+            self.print_usage_and_exit(1)
 
     def parse(self, argv):
         # type: (List[str]) -> Params
         self.args = argv
-        long_params = "output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        long_params = "test output-dir= reads= contigs= disjointigs= load= help".split(" ")
         short_params = "o:t:h"
         try:
             options_list, tmp = getopt.gnu_getopt(argv[1:], short_params, long_params)
@@ -34,6 +43,8 @@ class Params:
         for (key, value) in options_list:
             if key == "--output-dir" or key == "-o":
                 self.dir = value
+            elif key == "--test":
+                self.test = True
             elif key == "--reads":
                 self.reads_file = value
             elif key == "--contigs":

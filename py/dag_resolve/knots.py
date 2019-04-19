@@ -4,8 +4,7 @@ from alignment.align_tools import Aligner
 from common import params
 from dag_resolve.line_tools import LineStorage, Line, Knot
 from dag_resolve.repeat_graph import Edge
-from common.sequences import ReadCollection
-from common.alignment_storage import AlignmentPiece, AlignedRead
+from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 
 
 class Knotter:

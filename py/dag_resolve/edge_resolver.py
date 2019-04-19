@@ -9,8 +9,8 @@ from common import params
 from common.line_align import Scorer, Tournament
 from dag_resolve.line_tools import Line, LinePosition
 from dag_resolve.repeat_graph import Graph, Edge, Vertex
-from common.sequences import ReadCollection, Segment, Contig
-from common.alignment_storage import AlignmentPiece
+from common.sequences import Segment, Contig
+from common.alignment_storage import AlignmentPiece, ReadCollection
 
 
 class EdgeResolver:

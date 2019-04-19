@@ -57,8 +57,8 @@ class TokenReader:
     def readToken(self):
         # type: () -> Optional[str]
         if self.line is None or self.pos == len(self.line):
-            line = self.handler.readline().split()
-            pos = 0
+            self.line = self.handler.readline().split()
+            self.pos = 0
         self.pos += 1
         if self.line[self.pos - 1] == "None":
             return None

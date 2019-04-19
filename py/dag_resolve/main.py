@@ -13,7 +13,8 @@ from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.graph_resolver import GraphResolver
 from dag_resolve.line_tools import LineStorage
 from dag_resolve.repeat_graph import Graph, DotParser
-from common.sequences import ContigCollection, ReadCollection, UniqueList
+from common.sequences import ContigCollection, UniqueList
+from common.alignment_storage import ReadCollection
 from common import basic, params
 from dag_resolve.visualization import HistoryPrinter, DotLinePrinter
 

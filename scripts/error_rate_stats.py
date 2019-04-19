@@ -7,7 +7,8 @@ sys.path.append("py")
 from common.line_align import Scorer
 from alignment.align_tools import DirDistributor, Aligner
 from common import basic
-from common.sequences import ContigCollection, Contig, ReadCollection
+from common.sequences import ContigCollection, Contig
+from common.alignment_storage import ReadCollection
 import common.SeqIO as SeqIO
 
 

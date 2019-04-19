@@ -6,7 +6,8 @@ from typing import List, Tuple
 sys.path.append("py")
 from common import SeqIO
 from common.sam_parser import Samfile
-from common.sequences import ContigCollection, ReadCollection, Segment
+from common.sequences import ContigCollection, Segment
+from common.alignment_storage import ReadCollection
 from dag_resolve.repeat_graph import DotParser, Graph, Vertex
 
 

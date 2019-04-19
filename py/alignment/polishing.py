@@ -5,8 +5,8 @@ from typing import Optional, List, Iterable, Tuple
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO, params
 from common.seq_records import NamedSequence
-from common.sequences import Consensus, ReadCollection, Contig, ContigCollection, Segment, Contig, ContigStorage
-from common.alignment_storage import AlignmentPiece, AlignedRead
+from common.sequences import Consensus, Contig, ContigCollection, Segment, Contig, ContigStorage
+from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from flye_tools.polysh_job import JobPolishing
 
 

@@ -2,7 +2,8 @@ from typing import Dict, List, Any, Optional, Generator
 
 from alignment.align_tools import Aligner
 from common import basic, params
-from common.alignment_storage import AlignmentPiece, Correction
+from common.alignment_storage import AlignmentPiece
+from disjointig_resolve.correction import Correction
 from disjointig_resolve.accurate_line import NewLineStorage, NewLine, LineStorageListener
 from disjointig_resolve.smart_storage import LineListener, AlignmentStorage
 from common.save_load import TokenWriter, TokenReader

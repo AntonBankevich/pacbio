@@ -2,7 +2,7 @@ from typing import Generator, Iterable, List, Tuple
 
 from common import params
 from common.sequences import Segment
-from disjointig_resolve.accurate_line import NewLine, CoverageCalculator
+from disjointig_resolve.accurate_line import NewLine, NewLineStorage
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
@@ -55,6 +55,11 @@ class UniqueMarker:
         line.updateCorrectSegments(line.asSegment())
         segs = segs.cap(line.correct_segments, params.k)
         line.completely_resolved.addAll(segs)
+
+    def markAllUnique(self, lines, dot_plot):
+        # type: (NewLineStorage, LineDotPlot) -> None
+        for line in lines.unique():
+            self.markUniqueInLine(line, dot_plot)
 
     def medianCoverage(self, covs, line):
         clen = 0

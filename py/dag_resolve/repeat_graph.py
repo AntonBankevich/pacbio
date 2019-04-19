@@ -1,6 +1,7 @@
 from common import basic, sam_parser, SeqIO
 from typing import Generator, Dict, Optional, Tuple, BinaryIO
-from common.sequences import Contig, ReadCollection, ContigCollection, TmpInfo
+from common.sequences import Contig, ContigCollection, TmpInfo
+from common.alignment_storage import ReadCollection
 
 
 class EdgeInfo(TmpInfo):

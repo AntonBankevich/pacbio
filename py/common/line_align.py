@@ -120,7 +120,7 @@ class Scorer:
                 res, res_shift = self.adjustMin(res, res_shift, prev.get(j) + self.scores.ins_score, (-1, 0))
                 res, res_shift = self.adjustMin(res, res_shift, ne.get(j - 1) + self.scores.del_score, (0, -1))
                 ne.set(j, res)
-                storage.get(i).set((i + res_shift[0], j + res_shift[1]))
+                storage.get(i).set(j, (i + res_shift[0], j + res_shift[1]))
             prev = ne
         cur_i = alignment[-1][0]
         cur_j = alignment[-1][1]
@@ -217,7 +217,7 @@ class Storage:
 
 class RectStorage(Storage):
     def __init__(self, left, right, default = None):
-        Storage.__init__(left, right, default)
+        Storage.__init__(self, left, right, default)
         self.vals = self.vals # type: List[Storage]
 
 class Tournament:

@@ -7,11 +7,10 @@ from common.save_load import TokenWriter, TokenReader
 sys.path.append("py")
 from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
-from dag_resolve.repeat_graph import Graph
-from common.sequences import Contig, ContigCollection, ReadCollection, Segment, loadFromSam, Contig, \
+from common.sequences import ContigCollection, Segment, Contig, \
     ContigStorage
-from common.alignment_storage import AlignedRead, AlignmentPiece
-from typing import Optional, Iterable, Tuple, Generator, BinaryIO, Dict
+from common.alignment_storage import AlignmentPiece, ReadCollection
+from typing import Iterable, Tuple, Generator, BinaryIO
 from common import basic, sam_parser, SeqIO, params
 
 
@@ -239,17 +238,6 @@ class Aligner:
     #             res[tid].addCigar(al.cigar, al.seg_to.left)
     #     return res
 
-    def repairGraphAlignments(self, graph):
-        # type: (Graph) -> None
-        print "Reparing graph alignments for", len(graph.reads), "reads and the following edges:", map(lambda edge: edge.id, graph.newEdges)
-        for rec in self.align(graph.reads, graph.newEdges):
-            if not rec.is_unmapped:
-                read = graph.reads[rec.query_name]
-                edge = graph.E[rec.tname]
-                edge.reads.addNew(read)
-                edge.reads.addNewAlignment(rec, edge)
-        graph.newEdges = []
-
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeIntLine(self.threads)
@@ -267,7 +255,8 @@ if __name__ == "__main__":
     target = sys.argv[3]
     aln = Aligner(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"))
-    loadFromSam(ReadCollection(), aln.align(ReadCollection().loadFromFasta(open(query, "r")), contigs), contigs).print_alignments(sys.stdout)
+    for al in aln.alignClean(ReadCollection().loadFromFasta(open(query, "r")), contigs):
+        print al
 
 
 

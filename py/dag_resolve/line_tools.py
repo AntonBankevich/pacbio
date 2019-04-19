@@ -3,8 +3,8 @@ from typing import Generator, Dict, Set, Optional, Iterable
 from alignment.align_tools import Aligner
 from common import basic
 from dag_resolve.repeat_graph import Edge, Graph, Vertex
-from common.sequences import Consensus, ReadCollection, Contig, ContigCollection
-from common.alignment_storage import AlignmentPiece, AlignedRead
+from common.sequences import Consensus, Contig, ContigCollection
+from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 
 
 # class PseudoLineSegment:

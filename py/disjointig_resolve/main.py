@@ -3,28 +3,48 @@ import shutil
 import sys
 import time
 
+sys.path.append("py")
+
+from disjointig_resolve.unique_marker import UniqueMarker
 from alignment.align_tools import Aligner, DirDistributor
 from alignment.polishing import Polisher
 from common import basic
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineKnotter
-
-sys.path.append("py")
-
+from disjointig_resolve.tests import Tester
 from disjointig_resolve.line_extender import LineExtender
 from common.save_load import TokenReader, SaveHandler
-from common.sequences import ContigCollection, ReadCollection
+from common.sequences import ContigCollection
+from common.alignment_storage import ReadCollection
 from disjointig_resolve.accurate_line import NewLineStorage
 from disjointig_resolve.io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params
 
 
+def CreateLog(params):
+    old_logs_dir = os.path.join(params.dir, "old")
+    basic.ensure_dir_existance(old_logs_dir)
+    log_file = os.path.join(params.dir, "log.info")
+    if os.path.isfile(log_file):
+        num = len(os.listdir(old_logs_dir))
+        shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
+    log = open(log_file, "w")
+    sys.stdout = basic.OStreamWrapper(sys.stdout, log)
+    sys.stderr = sys.stdout
+    print " ".join(params.args)
+
+
 def main(args):
     params = Params().parse(args)
+    params.check()
     CreateLog(params)
     sys.stdout.write("Started\n")
     print (time.strftime("%d.%m.%Y  %I:%M:%S"))
+    if params.test:
+        aligner = Aligner(DirDistributor(params.alignmentDir()))
+        Tester(aligner).testAll("tests/cases.txt")
+        return
     print "Preparing initial state"
     if params.load_from is not None:
         print "Loading initial state from saves"
@@ -50,10 +70,12 @@ def main(args):
         print "Creating line collection"
         lines = NewLineStorage(disjointigs, aligner)
         lines.fillFromContigs(contigs)
-        lines.fillFromDisjointigs()
+        # lines.fillFromDisjointigs()
 
         dot_plot = LineDotPlot(lines, aligner)
         dot_plot.construct(aligner)
+
+        UniqueMarker().markAllUnique(lines, dot_plot)
 
     save_handler = SaveHandler(params.save_dir)
     print "Resolving"
@@ -76,19 +98,6 @@ def main(args):
 
     lines.printToFile(sys.stdout)
     lines.printToFasta(open(os.path.join(params.dir, "lines.fasta"), "w"))
-
-
-def CreateLog(params):
-    old_logs_dir = os.path.join(params.dir, "old")
-    basic.ensure_dir_existance(old_logs_dir)
-    log_file = os.path.join(dir, "log.info")
-    if os.path.isfile(log_file):
-        num = len(os.listdir(old_logs_dir))
-        shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
-    log = open(log_file, "w")
-    sys.stdout = basic.OStreamWrapper(sys.stdout, log)
-    sys.stderr = sys.stdout
-    print " ".join(params.args)
 
 
 if __name__ == "__main__":

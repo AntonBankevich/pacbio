@@ -1,12 +1,12 @@
 import itertools
 
-from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator, Iterable
+from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator, Iterable, BinaryIO
 
-from common import sam_parser, params, easy_cigar
+import common.seq_records
+from common import sam_parser, params, easy_cigar, basic, SeqIO
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
-from common.sequences import Segment, Contig, ContigCollection, Contig
-from common.line_align import Scorer
+from common.sequences import Segment, ContigCollection, Contig, UniqueList
 
 
 # TODO merge with MatchingSequence. Make cigar a GlobalAlignment class with effective operations.
@@ -77,10 +77,9 @@ class AlignmentPiece:
             shared = list(last.common_to(next))
             if len(shared) == 0:
                 return None
-            if len(shared) != 0:
-                pos1, pos2 = shared[len(shared) / 2]
-                truncated[-1] = truncated[-1].prefix(pos=last.matches[pos1][1])
-                truncated.append(al.seg_to.suffix(pos=next.matches[pos2][1]))
+            pos1, pos2 = shared[len(shared) / 2]
+            truncated[-1] = truncated[-1].prefix(pos=last.matches[pos1][1])
+            truncated.append(al.seg_to.suffix(pos=next.matches[pos2][1]))
             last = next
         als = [al.reduce(target=seg) for al, seg in zip(als, truncated)]
         return AlignmentPiece.GlueFittingAlignments(als)
@@ -314,6 +313,9 @@ class MatchingSequence:
         self.seq_to = seq_to
         self.matches = matchingPositions
 
+    def __str__(self):
+        return str(self.matches)
+
     def common_from(self, other):
         # type: (MatchingSequence) -> Generator[Tuple[int, int]]
         assert self.seq_from == other.seq_from
@@ -384,22 +386,22 @@ class MatchingSequence:
 
     def cigar(self):
         # type: () -> str
-        curm = 0
+        curm = 1
         res = []
         for m1, m2 in zip(self.matches[:-1], self.matches[1:]):
             d = (m2[0] - m1[0] - 1, m2[1] - m1[1] - 1)
             if d[0] == d[1]:
                 curm += d[0] + 1
             else:
-                curm += min(d[0], d[1])
-                res.append(str(curm))
-                res.append("M")
+                if curm > 0:
+                    res.append(str(curm))
+                    res.append("M")
                 res.append(str(abs(d[0] - d[1])))
                 if d[0] > d[1]:
                     res.append("I")
                 else:
                     res.append("D")
-                curm = 1
+                curm = min(d[0], d[1]) + 1
         res.append(str(curm))
         res.append("M")
         return "".join(res)
@@ -459,10 +461,10 @@ class MatchingSequence:
         return MatchingSequence(self.seq_to, self.seq_from, map(lambda pair: (pair[1], pair[0]), self.matches))
 
     def SegFrom(self, contig):
-        return Segment(contig, self.matches[0][0], self.matches[-1][0])
+        return Segment(contig, self.matches[0][0], self.matches[-1][0] + 1)
 
     def SegTo(self, contig):
-        return Segment(contig, self.matches[0][1], self.matches[-1][1])
+        return Segment(contig, self.matches[0][1], self.matches[-1][1] + 1)
 
     def __getitem__(self, item):
         return self.matches[item]
@@ -630,155 +632,228 @@ class AlignedRead(Contig):
         len = min(len, self.__len__())
         return Segment(self, 0, len)
 
-# this class stores global alignment between very long sequences.
-# It only stores different parts explicitly. All the rest is expected to be the same in seq_from and seq_to
-class Correction:
-    def __init__(self, seq_from, seq_to, alignments):
-        # type: (NamedSequence, NamedSequence, List[AlignmentPiece]) -> None
-        self.seq_from = seq_from
-        self.seq_to = seq_to
-        self.alignments = alignments
-        self.scorer = Scorer()
-        
-    def mapSegmentsUp(self, segments):
-        # type: (List[Segment]) -> List[Segment]
-        left = self.mapPositionsUp([seg.left for seg in segments])
-        right = self.mapPositionsUp([seg.right for seg in segments])
-        return [Segment(self.seq_from, l, r) for l, r in zip(left, right)]
 
-    def mapSegmentsDown(self, segments):
-        # type: (Iterable[Segment]) -> List[Segment]
-        segments = list(segments)
-        left = self.mapPositionsDown([seg.left for seg in segments])
-        right = self.mapPositionsDown([seg.right for seg in segments])
-        return [Segment(self.seq_to, l, r) for l, r in zip(left, right)]
+class ReadCollection:
+    def __init__(self, reads=None):
+        # type: (Optional[Iterable[AlignedRead]]) -> None
+        self.reads = dict()  # type: Dict[str, AlignedRead]
+        if reads is not None:
+            for read in reads:
+                self.add(read)
 
-    def mapPositionsUp(self, positions, none_one_miss = False):
-        # type: (List[int], bool) -> List[Optional[int]]
-        tmp = [(pos, i) for i, pos in enumerate(positions)]
-        tmp = sorted(tmp)
-        res = [0] * len(positions)
-        cur_pos = 0
-        for al in self.alignments:
-            while cur_pos < len(tmp) and tmp[cur_pos][0] <= al.seg_to.left:
-                res[tmp[cur_pos][1]] = al.seg_from.left - (al.seg_to.left - tmp[cur_pos][0])
-                cur_pos += 1
-            for p1, p2 in al.matchingPositions(equalOnly=False):
-                while cur_pos < len(positions) and tmp[cur_pos][0] <= p2:
-                    if tmp[cur_pos][0] == p2 or not none_one_miss:
-                        res[tmp[cur_pos][1]] = p1
-                    else:
-                        res[tmp[cur_pos][1]] = None
-                    cur_pos += 1
-        while cur_pos < len(positions):
-            res[tmp[cur_pos][1]] = len(self.seq_from) - (len(self.seq_to) - tmp[cur_pos][0])
-            cur_pos += 1
-        return res
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        handler.writeTokenLine("ReadCollection")
+        handler.writeTokens(self.reads.keys())
+        handler.writeIntLine(len(list(UniqueList(self.reads.values()))))
+        for read in UniqueList(self.reads.values()):
+            read.save(handler)
 
-    def mapPositionsDown(self, positions, none_one_miss = False):
-        # type: (List[int], bool) -> List[Optional[int]]
-        tmp = [(pos, i) for i, pos in enumerate(positions)]
-        tmp = sorted(tmp)
-        res = [0] * len(positions)
-        cur_pos = 0
-        for al in self.alignments:
-            while cur_pos < len(tmp) and tmp[cur_pos][0] <= al.seg_from.left:
-                res[tmp[cur_pos][1]] = al.seg_to.left - (al.seg_from.left - tmp[cur_pos][0])
-                cur_pos += 1
-            for p1, p2 in al.matchingPositions(equalOnly=False):
-                while cur_pos < len(positions) and tmp[cur_pos][0] <= p1:
-                    if tmp[cur_pos][0] == p1 or not none_one_miss:
-                        res[tmp[cur_pos][1]] = p2
-                    else:
-                        res[tmp[cur_pos][1]] = None
-                    cur_pos += 1
-        while cur_pos < len(positions):
-            res[tmp[cur_pos][1]] = len(self.seq_to) - (len(self.seq_from) - tmp[cur_pos][0])
-            cur_pos += 1
-        return res
+    def load(self, handler, contigs):
+        # type: (TokenReader, ContigCollection) -> None
+        message = handler.readToken()
+        assert message == "ReadCollection", message
+        keys = set(handler.readTokens())
+        n = handler.readInt()
+        for i in range(n):
+            read = AlignedRead.load(handler, contigs)
+            self.add(read)
+            if read.rc.id in keys:
+                self.add(read.rc)
 
-    def continuousMapping(self, map_function, iter):
-        # type: (Callable[[List[int]], List[int]], Iterator[int]) -> Generator[int]
-        chunk = []
-        for item in iter:
-            chunk.append(item)
-            if len(chunk) > 100000:
-                for res in map_function(chunk):
-                    yield res
-                chunk = []
-        for res in map_function(chunk):
-            yield res
+    def extend(self, other_collection):
+        # type: (Iterable[AlignedRead]) -> ReadCollection
+        for read in other_collection:
+            self.add(read)
+        return self
 
-    # This method may change the order of alignments. But they will be sorted by start.
-    def composeQueryDifferences(self, als):
-        # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
-        # TODO: make parallel
-        als = sorted(als, key = lambda al: al.seg_to.left)
-        # Sorting alignments into those that intersect corrections (complex) and those that do not (easy)
-        easy = []
-        complex = []
-        cur = 0
-        for al in self.alignments:
-            while cur < len(als) and als[cur].seg_to.left < al.seg_to.left:
-                if als[cur].seg_to.right >= al.seg_to.left:
-                    complex.append(als[cur])
+    def extendClean(self, other_collection):
+        # type: (Iterable[NamedSequence]) -> ReadCollection
+        for read in other_collection:
+            if read.id not in self.reads:
+                if basic.Reverse(read.id) in self.reads:
+                    self.add(self.reads[basic.Reverse(read.id)].rc)
                 else:
-                    easy.append(als[cur])
-                cur += 1
-            while cur < len(als) and als[cur].seg_to.left < al.seg_to.right:
-                complex.append(als[cur])
-                cur += 1
-        easy.extend(als[cur:])
+                    self.addNewRead(read)
+        return self
 
-        res = []
-        # Mapping alignments that do not intersect corrections
-        new_easy_segs = self.mapSegmentsUp([al.seg_to for al in easy])
-        for seg, al in zip(new_easy_segs, easy):
-            res.append(al.changeTargetSegment(seg))
-        # Mapping alignments that intersect corrections
-        func = lambda items: self.mapPositionsUp(items, True)
-        matchings = [al.matchingSequence(True) for al in complex]
-        positions = map(lambda matching: map(lambda pair: pair[1], matching), matchings)
-        generator = self.continuousMapping(func, itertools.chain.from_iterable(positions))
-        # TODO: parallel
-        for al, matching in zip(complex, matchings):
-            new_pairs = []
-            for pos_from, pos_to in matching.matches:
-                new_pos = generator.next()
-                if new_pos is not None:
-                    new_pairs.append((pos_from, new_pos))
-            new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
-            corrected_matching = self.scorer.polyshMatching(new_matching)
-            res.append(corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from))
-        return sorted(res, key = lambda al: al.seg_to.left)
+    def addNewRead(self, rec):
+        # type: (NamedSequence) -> AlignedRead
+        new_id = str(rec.id).split()[0]
+        if new_id in self.reads:
+            return self.reads[rec.id]
+        if basic.Reverse(new_id) in self.reads:
+            self.add(self.reads[basic.Reverse(new_id)].rc)
+            return self.reads[rec.id]
+        read = AlignedRead(rec)
+        self.add(read)
+        return read
 
+    def addNewAlignment(self, rec, contig):
+        # type: (sam_parser.SAMEntryInfo, Contig) -> bool
+        if rec.is_unmapped:
+            return False
+        rname = rec.query_name.split()[0]
+        if rname.startswith("contig_"):
+            rname = rname[len("contig_"):]
+        if rname in self.reads:
+            self.reads[rname].AddSamAlignment(rec, contig)
+            return True
+        elif basic.Reverse(rname) in self.reads:
+            self.reads[basic.Reverse(rname)].rc.AddSamAlignment(rec, contig)
+            return True
+        return False
 
-    @staticmethod
-    def constructCorrection(alignments):
-        # type: (List[AlignmentPiece]) -> Correction
-        initial = alignments[0].seg_to.contig
-        alignments = sorted(alignments, key = lambda al: al.seg_to.left)
-        sb = []
-        pos = initial.left()
-        new_pos = 0
-        for al in alignments:
-            sb.append(initial.subSequence(pos, al.seg_to.left).seq)
-            new_pos += al.seg_to.left - pos
-            pos = al.seg_to.left
-            sb.append(al.seg_from.Seq())
-            new_pos += al.seg_from.__len__()
-            pos = al.seg_to.right
-        sb.append(initial.segment(alignments[-1].seg_to.right,initial.right()).Seq())
-        new_pos += initial.right() - alignments[-1].seg_to.right
-        new_seq = Contig("".join(sb), "TMP_" + initial.id)
-        new_als = []
-        pos = initial.left()
-        new_pos = 0
-        for al in alignments:
-            new_pos += al.seg_to.left - pos
-            new_seg_from = Segment(new_seq, new_pos, new_pos + al.seg_from.__len__())
-            new_als.append(al.changeQuerySegment(new_seg_from))
-            pos = al.seg_to.right
-            new_pos += al.seg_from.__len__()
-        return Correction(new_seq, initial, new_als)
+    def fillFromSam(self, sam, contigs):
+        # type: (sam_parser.Samfile, ContigCollection) -> ReadCollection
+        for rec in sam:
+            self.addNewAlignment(rec, contigs[rec.tname])
+        return self
 
+    def add(self, read):
+        # type: (AlignedRead) -> AlignedRead
+        assert read not in self.reads or read == self.reads[read.id], str(read) + " " + str(self.reads[read.id])
+        self.reads[read.id] = read
+        return read
+
+    def addAllRC(self):
+        # type: () -> ReadCollection
+        for read in self.reads.values():
+            self.add(read.rc)
+        return self
+
+    def filter(self, condition):
+        # type: (callable(AlignedRead)) -> ReadCollection
+        res = ReadCollection()
+        for read in self.reads.values():
+            if condition(read):
+                res.add(read)
+        return res
+
+    def copy(self):
+        # type: () -> ReadCollection
+        return self.filter(lambda read: True)
+
+    def remove(self, read):
+        # type: (AlignedRead) -> None
+        if read in self.reads:
+            del self.reads[read.id]
+
+    def minus(self, other):
+        # type: (ReadCollection) -> ReadCollection
+        return self.filter(lambda read: read not in other)
+
+    def minusBoth(self, other):
+        # type: (ReadCollection) -> ReadCollection
+        return self.filter(lambda read: read not in other and read.rc not in other)
+
+    def minusAll(self, others):
+        # type: (list[ReadCollection]) -> ReadCollection
+        tmp = ReadCollection()
+        for other in others:
+            tmp.extend(other)
+        return self.minus(tmp)
+
+    def cap(self, other):
+        # type: (ReadCollection) -> ReadCollection
+        return self.filter(lambda read: read in other)
+
+    def inter(self, segment):
+        # type: (Segment) -> ReadCollection
+        return self.filter(lambda read: read.inter(segment))
+
+    def noncontradicting(self, segment):
+        # type: (Segment) -> ReadCollection
+        return self.filter(lambda read: read.noncontradicting(segment))
+
+    def contain(self, segment):
+        # type: (Segment) -> ReadCollection
+        return self.filter(lambda read: read.contain(segment))
+
+    def __iter__(self):
+        # type: () -> Iterator[AlignedRead]
+        return self.reads.values().__iter__()
+
+    def __getitem__(self, read_id):
+        # type: (str) -> AlignedRead
+        return self.reads[read_id.split()[0]]
+
+    def __contains__(self, read):
+        # type: (AlignedRead) -> bool
+        return read.id in self.reads
+
+    def __len__(self):
+        return len(self.reads)
+
+    def print_fasta(self, hander):
+        # type: (BinaryIO) -> None
+        for read in self:
+            SeqIO.write(read, hander, "fasta")
+
+    def print_alignments(self, handler):
+        # type: (file) -> None
+        for read in self:
+            handler.write(read.__str__() + "\n")
+
+    def asSeqRecords(self):
+        # type: () -> Generator[SeqIO.SeqRecord]
+        for read in self.reads.values():
+            yield common.seq_records.SeqRecord(read.seq, read.id)
+
+    def loadFromFasta(self, handler):
+        # type: (BinaryIO) -> ReadCollection
+        for rec in SeqIO.parse_fasta(handler):
+            new_read = self.add(AlignedRead(rec))
+        return self
+
+    def nontontradictingCopy(self, contig):
+        res = ReadCollection()
+        for read in self.inter(contig.asSegment()):
+            add = True
+            for al in read.alignments:
+                if al.contradicting(contig.asSegment()):
+                    add = False
+            if add:
+                assert read.rc not in res
+                new_read = res.addNewRead(read)
+                for al in read.alignments:
+                    if al.seg_to.contig == contig:
+                        new_read.addAlignment(al.changeQueryContig(new_read))
+        return res
+
+    def contigsAsSegments(self, seg_dict):
+        # type: (Dict[str, Segment]) -> ReadCollection
+        for read in UniqueList(self.reads.values()):
+            read.contigsAsSegments(seg_dict)
+        return self
+
+    def changeTargets(self, contigs):
+        # type: (ContigCollection) -> ReadCollection
+        for read in self.reads.values():
+            read.changeTargets(contigs)
+
+    def cleanCopy(self, contigs, filter=lambda read: True):
+        # type: (ContigCollection, Callable[[AlignedRead], bool]) -> ReadCollection
+        res = ReadCollection()
+        for read in self.reads.values():
+            if not filter(read):
+                continue
+            if read.rc in res.reads:
+                res.add(res.reads[read.rc.id].rc)
+            else:
+                res.addNewRead(read)
+        return res
+
+    def RC(self):
+        res = ReadCollection()
+        for read in self.reads.values():
+            res.add(read.rc)
+
+    def mergeAlignments(self, other):
+        # type: (ReadCollection) -> ReadCollection
+        for read in UniqueList(self):
+            if read in other:
+                read.mergeAlignments(other.reads[read.id])
+            elif read.rc in other:
+                read.rc.mergeAlignments(other.reads[read.rc.id])
+        return self

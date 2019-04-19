@@ -6,8 +6,8 @@ from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common import basic, params
 from common.line_align import Scorer
-from common.sequences import Segment, ReadCollection
-from common.alignment_storage import AlignmentPiece, AlignedRead
+from common.sequences import Segment
+from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
