@@ -41,7 +41,7 @@ class Correction:
             while cur_pos < len(tmp) and tmp[cur_pos][0] <= al.seg_to.left:
                 res[tmp[cur_pos][1]] = al.seg_from.left - (al.seg_to.left - tmp[cur_pos][0])
                 cur_pos += 1
-            for p1, p2 in al.matchingPositions(equalOnly=False):
+            for p1, p2 in al.matchingPositions(equalOnly=True):
                 while cur_pos < len(positions) and tmp[cur_pos][0] <= p2:
                     if tmp[cur_pos][0] == p2 or not none_on_miss:
                         res[tmp[cur_pos][1]] = p1
@@ -124,6 +124,7 @@ class Correction:
             for pos_from, pos_to in matching.matches:
                 new_pos = generator.next()
                 if new_pos is not None:
+                    # print pos_to, pos_from, new_pos, al.seg_to.contig[pos_to], al.seg_from.contig[pos_from], self.seq_from[new_pos]
                     new_pairs.append((pos_from, new_pos))
             new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
             corrected_matching = self.scorer.polyshMatching(new_matching)

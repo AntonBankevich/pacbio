@@ -5,7 +5,7 @@ import traceback
 from StringIO import StringIO
 from string import ascii_lowercase, ascii_uppercase
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
@@ -35,9 +35,12 @@ class Tester:
 
     def testAll(self, fname):
         params = self.readParams(fname)
+        fail = 0
         for name, cases in params.items():
-            self.tests[name]().testAll(cases, self.aligner)
-        # self.testDotPlotModification()
+            result = self.tests[name]().testAll(cases, self.aligner)
+            if not result:
+                fail += 1
+        print fail, "tests failed"
         # self.testUniqueRegionMarking()
         # self.testReadRecruitment()
         # self.testLineCorrection()
@@ -70,39 +73,76 @@ class TestDataset:
         self.error_rate = error_rate
         self.mutation_rate = mutation_rate
         self.alphabet = dict()
+        self.matches = dict()
         for c1, c2 in zip(ascii_lowercase, ascii_uppercase):
             seq = self.generate(letter_size)
             self.alphabet[c1] = seq
-            self.alphabet[c2] = self.mutate(seq, self.mutation_rate)
+            seq, matches = self.mutate(seq, self.mutation_rate)
+            self.alphabet[c2] = seq
+            self.matches[c1] = matches
+            self.matches[c2] = [(b, a) for a, b in matches]
         self.genome = Contig(self.translate(genome), genome)
 
     def translate(self, seq):
         return "".join(map(lambda c: self.alphabet[c], seq))
 
     def addRead(self, read):
-        self.reads.append(NamedSequence(self.mutate(self.translate(read), self.error_rate), "R" + str(len(self.reads)) + "_" + read))
+        self.reads.append(NamedSequence(self.mutate(self.translate(read), self.error_rate)[0], "R" + str(len(self.reads)) + "_" + read))
 
     def addDisjointig(self, disjointig):
-        self.disjointigs.append(NamedSequence(self.mutate(self.translate(disjointig), self.mutation_rate), "D" + str(len(self.disjointigs)) + "_" + disjointig))
+        self.disjointigs.append(NamedSequence(self.mutate(self.translate(disjointig), self.mutation_rate)[0], "D" + str(len(self.disjointigs)) + "_" + disjointig))
 
     def addContig(self, contig):
-        self.contigs.append(NamedSequence(self.translate(contig), "C" + str(len(self.contigs)) + "_" + contig))
+        # type: (str) -> str
+        name = "C" + str(len(self.contigs)) + "_" + contig
+        self.contigs.append(NamedSequence(self.translate(contig), name))
+        return name
+
+    def generateReads(self, length = 5, cov = 15, circular = False):
+        genome = self.genome.id
+        if circular:
+            genome = genome + genome[0:length - 1]
+        for i in range(0, len(genome) - length + 1):
+            for j in range((cov + length - 1) / length):
+                self.addRead(genome[i:i + length])
 
     def generate(self, letter_size):
         # type: (int) -> str
         return "".join([random.choice(["A", "C", "G", "T"]) for i in range(letter_size)])
 
+    def genAll(self, aligner):
+        # type: (Aligner) -> Tuple[NewLineStorage, LineDotPlot]
+        disjointigs = DisjointigCollection()
+        for dis in self.disjointigs:
+            disjointigs.addNew(dis.seq, dis.id)
+        res = NewLineStorage(disjointigs, aligner)
+        for line in self.contigs:
+            res.addNew(line.seq, line.id)
+        dp = LineDotPlot(res, aligner)
+        dp.construct(aligner)
+        return res, dp
+
     def mutate(self, seq, rate):
-        # type: (str, float) -> str
-        res = []
-        for c in seq:
+        # type: (str, float) -> Tuple[str, List[Tuple[int, int]]]
+        res = [seq[0]]
+        matches = []
+        matches.append((0,0))
+        cur = 1
+        for i, c in enumerate(seq):
+            if i == 0 or i == len(seq) - 1:
+                continue
             if random.random() < rate:
                 vars = ["A", "C", "G", "T"]
                 vars.remove(c)
                 res.append(random.choice([random.choice(vars), "", c + c]))
+                cur += len(res[-1])
             else:
                 res.append(c)
-        return "".join(res)
+                matches.append((cur, i))
+                cur += 1
+        res.append(seq[-1])
+        matches.append((len(seq) - 1, cur))
+        return "".join(res), matches
 
     def saveStructure(self, handler):
         # type: (TokenWriter) -> None
@@ -295,28 +335,63 @@ class DotPlotConstructionTest(SimpleTest):
         save_handler = TokenWriter(save)
         dp.save(save_handler)
         tmp = save.getvalue()
-        save_str = tmp.replace(" ", "").replace("\n", "")
-        result = data.readToken()
-        if save_str != result:
+        test_result = tmp.replace(" ", "").replace("\n", "")
+        ethalon = data.readToken()
+        if test_result != ethalon:
             for dis in disjointigs:
                 print list(dp.allInter(dis.asSegment()))
-        assert save_str == result, "\n" + save_str + "\n" + result
+        assert test_result == ethalon, "\n" + test_result + "\n" + ethalon
 
 class DotPlotModificationTest(SimpleTest):
     def testManual(self):
+        self.test1()
+        self.test2()
+        self.test3()
+        self.test4()
+
+    def test1(self):
         lines = NewLineStorage(DisjointigCollection(), self.aligner)
         line1 = lines.addNew("ACGTAAAAGGGTACGT", "c1")
         line2 = lines.addNew("ACGTAAGGGGGTACGT", "c2")
         al = self.scorer.polyshAlignment(AlignmentPiece.Identical(line1.asSegment(), line2.asSegment()))
         dp = LineDotPlot(lines, self.aligner)
         dp.addAlignment(al)
-        print "before"
-        dp.printAll(sys.stdout)
-        alignment = AlignmentPiece.Identical(Contig("GC", "tmp").asSegment(), line2.segment(0, 2))
+        alignment = AlignmentPiece.Identical(Contig("AGG", "tmp").asSegment(), line2.segment(0, 3))
         line2.correctSequence([alignment])
-        print "after"
-        dp.printAll(sys.stdout)
-        Enforce start and end matches for all alignments
+        assert str(list(dp.alignmentsToFrom[line2.id][line1.id])) == "[(c1[0:16-0]->c2[0:16-0]:0.81)]"
+
+    def test2(self):
+        lines = NewLineStorage(DisjointigCollection(), self.aligner)
+        line = lines.addNew("ACGTACGTACGT", "c")
+        dp = LineDotPlot(lines, self.aligner)
+        al1 = AlignmentPiece.Identical(line.segment(0, 8), line.segment(4, 12))
+        al2 = AlignmentPiece.Identical(line.segment(0, 4), line.segment(8, 12))
+        dp.addAlignment(al1)
+        dp.addAlignment(al2)
+        alignment = AlignmentPiece.Identical(Contig("AGG", "tmp").asSegment(), line.segment(4, 7))
+        line.correctSequence([alignment])
+        assert str(list(dp.auto_alignments[
+                            "c"])) == "[(c[0:12-4]->c[4:12-0]:0.75), (c[0:4]->c[8:12-0]:1.000), (c[4:12-0]->c[0:12-4]:0.75), (c[8:12-0]->c[0:4]:1.000), (c[0:12-0]->c[0:12-0]:1.000)]"
+
+    def test3(self):
+        lines = NewLineStorage(DisjointigCollection(), self.aligner)
+        line = lines.addNew("ACGTACGTACGT", "c")
+        dp = LineDotPlot(lines, self.aligner)
+        al1 = AlignmentPiece.Identical(line.segment(0, 8), line.segment(4, 12))
+        al2 = AlignmentPiece.Identical(line.segment(0, 4), line.segment(8, 12))
+        dp.addAlignment(al1)
+        dp.addAlignment(al2)
+        alignment = AlignmentPiece.Identical(Contig("TCC", "tmp").asSegment(), line.segment(3, 6))
+        line.correctSequence([alignment])
+        assert str(list(dp.auto_alignments["c"])) == "[(c[1:12-4]->c[5:12-0]:0.86), (c[0:4]->c[8:12-0]:1.000), (c[5:12-0]->c[1:12-4]:0.86), (c[8:12-0]->c[0:4]:1.000), (c[0:12-0]->c[0:12-0]:1.000)]"
+
+    def test4(self):
+        dataset = TestDataset("abcABC")
+        name = dataset.addContig("abcAB")
+        lines, dp = dataset.genAll(self.aligner)
+        line = lines[name]
+        line.extendRight(dataset.alphabet["C"])
+        assert str(list(dp.auto_alignments[line.id])) == "[(C0_abcAB[1500:3003-0]->C0_abcAB[0:1500]:0.994), (C0_abcAB[0:1500]->C0_abcAB[1500:3003-0]:0.994), (C0_abcAB[0:3003-0]->C0_abcAB[0:3003-0]:1.000)]"
 
 
 

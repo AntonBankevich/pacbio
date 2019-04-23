@@ -135,7 +135,7 @@ class Scorer:
                 matches.append((cur_i, cur_j))
                 prev_i = cur_i
                 prev_j = cur_j
-        matches[-1] = (cur_i, cur_j)
+        matches[-1] = (alignment[0][0], alignment[0][1])
         return MatchingSequence(alignment.seq_from, alignment.seq_to, matches[::-1])
 
     def oldCompare(self, piece1, piece2):

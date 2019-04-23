@@ -20,6 +20,9 @@ class AlignmentPiece:
         if cigar == "=":
             cigar = str(len(seg_from)) + "M"
         self.cigar = cigar
+        assert len(seg_from) > 0 and len(seg_to) > 0
+        assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left]
+        assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1]
         if params.assert_pi:
             pi = self.matchingPercentIdentity()
             if pi < 0.05:
