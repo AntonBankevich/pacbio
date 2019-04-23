@@ -91,16 +91,16 @@ class NewLine(Contig):
             self.completely_resolved = SegmentStorage()
             self.disjointig_alignments = AlignmentStorage()
             self.read_alignments = AlignmentStorage()
-            self.read_listener = ReadAlignmentListener(self)
-            self.listeners = [self.initial, self.correct_segments, self.disjointig_alignments, self.read_alignments, self.read_listener] # type: List[LineListener]
+            self.listeners = [self.initial, self.correct_segments, self.disjointig_alignments, self.read_alignments] # type: List[LineListener]
             rc = NewLine(basic.RC(seq), basic.Reverse(self.id), extension_handler.rc, self) #type: NewLine
+            self.rc = rc
+            self.addListener(ReadAlignmentListener(self))
         else:
             self.initial = rc.initial.rc # type: AlignmentStorage
             self.correct_segments = rc.correct_segments.rc # type: SegmentStorage
             self.completely_resolved = rc.completely_resolved.rc # type: SegmentStorage
             self.disjointig_alignments = rc.disjointig_alignments.rc # type: AlignmentStorage
             self.read_alignments = rc.read_alignments.rc # type: AlignmentStorage
-            self.read_listener = rc.read_listener.rc # type: ReadAlignmentListener
             self.listeners = [listener.rc for listener in rc.listeners] # type: List[LineListener]
         Contig.__init__(self, seq, id, rc)
         self.rc = rc #type: NewLine
@@ -222,7 +222,7 @@ class NewLine(Contig):
 
     def addListener(self, listener):
         self.listeners.append(listener)
-        self.rc.addListener(listener.rc)
+        self.rc.listeners.append(listener.rc)
 
     def removeListener(self, listener):
         self.listeners.remove(listener)
@@ -320,6 +320,13 @@ class NewLineStorage(ContigStorage):
             line.initial.add(AlignmentPiece.Identical(line.asSegment(), contig.asSegment()))
             for seg in line.correct_segments:
                 line.completely_resolved.add(seg)
+
+    def alignDisjointigs(self):
+        for line in self:
+            line.disjointig_alignments.clean()
+        for al in self.aligner.alignClean(self.disjointigs.unique(), self):
+            line = al.seg_to.contig # type: NewLine
+            line.disjointig_alignments.add(al)
 
     # def fillFromDisjointigs(self):
     #     # type: () -> None

@@ -176,7 +176,7 @@ class Aligner:
 
     def align(self, reads, reference):
         # type: (Iterable[NamedSequence], Iterable[Contig]) -> sam_parser.Samfile
-        dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (reads, "reads.fasta")])
+        dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (list(reads), "reads.fasta")])
         contigs_file = new_files[0]
         reads_file = new_files[1]
         alignment_dir = os.path.join(dir, "alignment")
@@ -193,7 +193,8 @@ class Aligner:
     # TODO: make this method accept reference dict of dome sort
     def alignClean(self, reads, ref_storage):
         # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
-        parser = self.align(reads, ref_storage)
+        reads = list(reads)
+        parser = self.align(reads, list(ref_storage.unique()))
         read_storage = ContigStorage(reads, False)
         for rec in parser:
             if rec.is_unmapped:

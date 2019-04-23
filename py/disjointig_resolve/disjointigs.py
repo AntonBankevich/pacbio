@@ -15,7 +15,9 @@ class Disjointig(Contig):
         if rc is None:
             self.read_alignments = AlignmentStorage() # type: AlignmentStorage
             rc = Disjointig(basic.RC(seq), basic.Reverse(id), self) # type: Disjointig
+            self.rc = rc
         else:
+            self.rc = rc
             self.read_alignments = self.rc.read_alignments.rc  # type: AlignmentStorage
         Contig.__init__(self, seq, id, rc)
         self.rc = rc # type:Disjointig

@@ -84,6 +84,9 @@ class ContigStorage:
     def __iter__(self):
         return self.items.values().__iter__()
 
+    def __len__(self):
+        return len(self.items)
+
     def unique(self):
         return UniqueList(self).__iter__()
 

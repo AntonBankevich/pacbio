@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Optional, Generator
+from typing import Dict, List, Any, Optional, Generator, BinaryIO
 
 from alignment.align_tools import Aligner
 from common import basic, params
@@ -208,6 +208,7 @@ class TwoLineAlignmentStorage(LineListener):
         assert line_from.id != line_to.id and line_from.rc.id != line_to.id
         self.line_from = line_from
         self.line_to = line_to
+        self.reverse = None
         if rc is None:
             self.content = AlignmentStorage()
             if reverse is None:
@@ -218,10 +219,10 @@ class TwoLineAlignmentStorage(LineListener):
             self.content = rc.content.rc # type: AlignmentStorage
         LineListener.__init__(self, rc)
         self.rc = rc # type: TwoLineAlignmentStorage
-        if reverse is None:
+        if reverse is None and self.reverse is None:
             reverse = TwoLineAlignmentStorage(line_to, line_from, None, self)
-        self.reverse = reverse
-        self.rc.reverse = self.reverse.rc
+            self.reverse = reverse
+            self.rc.reverse = self.reverse.rc
 
     def add(self, al):
         # type: (AlignmentPiece) -> None
@@ -333,7 +334,6 @@ class DotPlot:
     def addAlignment(self, al):
         # type: (AlignmentPiece) -> None
         self.simpleAddAlignment(al)
-        self.simpleAddAlignment(al.reverse())
 
     def addRCAlignmentStorage(self, line):
         # type: (Contig) -> RCAlignmentStorage
@@ -356,6 +356,7 @@ class DotPlot:
         for al in self.rc_alignments[seg.contig.id].getAlignmentsTo(seg):
             yield al
         for storage in self.alignmentsToFrom[seg.contig.id].values():
+            print list(storage.content)
             for al in storage.getAlignmentsTo(seg):
                 yield al
 
@@ -371,9 +372,9 @@ class DotPlot:
 
     def construct(self, aligner):
         # type: (Aligner) -> None
-        sequences = UniqueList(self.lines)
-        for al in aligner.alignClean(sequences, ContigStorage(sequences)):
-            if len(al) > params.k and al.percentIdentity() > 0.8:
+        for al in aligner.alignClean(self.lines.unique(), self.lines):
+            if len(al) > params.k and al.percentIdentity() > 0.8 and (
+                    al.seg_from.contig.id < al.seg_to.contig.id or al.seg_from <= al.seg_to):
                 self.addAlignment(al)
 
     def save(self, handler):
@@ -385,9 +386,13 @@ class DotPlot:
                 continue
             for l2, als in d1.items():
                 if l1 < basic.Normalize(l2):
-                    handler.writeTokens([l1, l2])
+                    handler.writeToken(l1)
+                    handler.writeToken(l2)
+                    handler.newLine()
                     als.save(handler)
-        handler.writeTokens(["0", "0"])
+        handler.writeToken("0")
+        handler.writeToken("0")
+        handler.newLine()
         for lid in keys:
             storage = self.rc_alignments[lid]
             storage.save(handler)
@@ -397,7 +402,7 @@ class DotPlot:
 
     def load(self, handler):
         # type: (TokenReader) -> None
-        keys = handler.readTokens()
+        keys = list(handler.readTokens())
         while True:
             l1 = handler.readToken()
             l2 = handler.readToken()
@@ -424,6 +429,15 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         for line in lines.unique():
             line.addListener(self)
         self.aligner = aligner
+
+    def getAlignmentsToFrom(self, line_to, line_from):
+        # type: (NewLine, NewLine) -> Generator[AlignmentPiece]
+        if line_to == line_from:
+            return self.auto_alignments[line_to.id].__iter__()
+        elif line_to == line_from.rc:
+            return self.rc_alignments[line_to.id].__iter__()
+        elif line_from.id in self.alignmentsToFrom[line_to.id]:
+            return self.alignmentsToFrom[line_to.id][line_from.id].__iter__()
 
     def FireMergedLines(self, al1, al2):
         # type: (AlignmentPiece, AlignmentPiece) -> None
@@ -456,26 +470,15 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
-        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
-            for storage in d.values():
-                storage.fireBeforeExtendRight(line, new_seq, seq)
+        for storage in self.alignmentsToFrom[line.id].values():
+            storage.fireBeforeExtendRight(line, new_seq, seq)
         self.auto_alignments[line.id].fireBeforeExtendRight(line, new_seq, seq)
         self.rc_alignments[line.id].fireBeforeExtendRight(line, new_seq, seq)
 
-    def getAlignmentsToFrom(self, line_to, line_from):
-        # type: (NewLine, NewLine) -> Generator[AlignmentPiece]
-        if line_to == line_from:
-            return self.auto_alignments[line_to.id].__iter__()
-        elif line_to == line_from.rc:
-            return self.rc_alignments[line_to.id].__iter__()
-        elif line_from.id in self.alignmentsToFrom[line_to.id]:
-            return self.alignmentsToFrom[line_to.id][line_from.id].__iter__()
-
     def fireBeforeCutRight(self, line, new_seq, pos):
         # type: (Any, Contig, int) -> None
-        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
-            for storage in d.values():
-                storage.fireBeforeCutRight(line, new_seq, pos)
+        for storage in self.alignmentsToFrom[line.id].values():
+            storage.fireBeforeCutRight(line, new_seq, pos)
         self.auto_alignments[line.id].fireBeforeCutRight(line, new_seq, pos)
         self.rc_alignments[line.id].fireBeforeCutRight(line, new_seq, pos)
 
@@ -483,17 +486,15 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
         line = alignments.seq_to # type: NewLine
-        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
-            for storage in d.values():
-                storage.fireBeforeCorrect(alignments)
+        for storage in self.alignmentsToFrom[line.id].values():
+            storage.fireBeforeCorrect(alignments)
         self.auto_alignments[line.id].fireBeforeCorrect(alignments)
         self.rc_alignments[line.id].fireBeforeCorrect(alignments)
 
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
         # type: (NewLine, str, Optional[List[AlignmentPiece]]) -> None
-        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
-            for storage in d.values():
-                storage.fireAfterExtendRight(line, seq)
+        for storage in self.alignmentsToFrom[line.id].values():
+            storage.fireAfterExtendRight(line, seq)
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
         new_seg = line.asSegment().suffix(length=len(seq) + 1000)
@@ -504,17 +505,15 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None
-        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
-            for storage in d.values():
-                storage.fireAfterCutRight(line, pos)
+        for storage in self.alignmentsToFrom[line.id].values():
+            storage.fireAfterCutRight(line, pos)
         self.auto_alignments[line.id].fireAfterCutRight(line, pos)
         self.rc_alignments[line.id].fireAfterCutRight(line, pos)
 
     def fireAfterCorrect(self, line):
         # type: (Any) -> None
-        for d in self.alignmentsToFrom[line.id]: # type: Dict[str, TwoLineAlignmentStorage]
-            for storage in d.values():
-                storage.fireAfterCorrect(line)
+        for storage in self.alignmentsToFrom[line.id].values():
+            storage.fireAfterCorrect(line)
         self.auto_alignments[line.id].fireAfterCorrect(line)
         self.rc_alignments[line.id].fireAfterCorrect(line)
 
@@ -547,3 +546,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         del self.auto_alignments[line.id]
         del self.auto_alignments[line.rc.id]
 
+    def printAll(self, out):
+        # type: (BinaryIO) -> None
+        for line in self.lines:
+            out.write(str(list(self.allInter(line.asSegment()))) + "\n")

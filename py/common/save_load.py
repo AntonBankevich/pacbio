@@ -1,14 +1,15 @@
 import datetime
 import os
+from StringIO import StringIO
 
-from typing import BinaryIO, Iterable, Generator, Optional
+from typing import BinaryIO, Iterable, Generator, Optional, Union, IO, TextIO
 
 from common import basic
 
 
 class TokenWriter:
     def __init__(self, handler):
-        # type: (BinaryIO) -> None
+        # type: (Union[BinaryIO, StringIO]) -> None
         self.handler = handler
         self.new_line = True
 
@@ -21,8 +22,11 @@ class TokenWriter:
         self.handler.write(token)
 
     def writeInt(self, val):
-        # type: (str) -> None
+        # type: (Union[int, float]) -> None
+        if not self.new_line:
+            self.handler.write(" ")
         self.handler.write(str(val))
+        self.new_line = False
 
     def writeTokenLine(self, token):
         # type: (str) -> None
@@ -49,14 +53,14 @@ class TokenWriter:
 
 class TokenReader:
     def __init__(self, handler):
-        # type: (BinaryIO) -> None
+        # type: (Union[BinaryIO, StringIO]) -> None
         self.handler = handler
         self.line = None
         self.pos = None
 
     def readToken(self):
         # type: () -> Optional[str]
-        if self.line is None or self.pos == len(self.line):
+        while self.line is None or self.pos == len(self.line):
             self.line = self.handler.readline().split()
             self.pos = 0
         self.pos += 1

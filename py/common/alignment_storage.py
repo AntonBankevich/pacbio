@@ -25,7 +25,7 @@ class AlignmentPiece:
             if pi < 0.05:
                 print seg_from.Seq()
                 print seg_to.Seq()
-            assert pi > 0.5, str(self)
+            assert pi >= 0.5, str(self)
         if rc is None:
             self.rc = AlignmentPiece(seg_from.RC(), seg_to.RC(), easy_cigar.RCCigar(self.cigar), self)
         else:
@@ -54,8 +54,8 @@ class AlignmentPiece:
             seg_to = seg_to.RC()
             new_cigar = easy_cigar.RCCigar(new_cigar)
         piece = AlignmentPiece(seg_from, seg_to, new_cigar)
-        seg_from.contig.alignments.append(piece)
-        seg_from.contig.rc.alignments.append(piece.rc)
+        # seg_from.contig.alignments.append(piece)
+        # seg_from.contig.rc.alignments.append(piece.rc)
         return piece
 
     @staticmethod
@@ -66,7 +66,7 @@ class AlignmentPiece:
         return AlignmentPiece(seg_from, other, str(len(seg_from)) + "M")
 
     @staticmethod
-    def GlueOverlappingAlignments(als):# Glue a list of alignments such that consecutive segments overlap. Can return None
+    def GlueOverlappingAlignments(als):# Glue a list of alignments such that consecutive target segments overlap. Can return None
         # type: (List[AlignmentPiece]) -> AlignmentPiece
         contig = als[0].seg_to.contig
         als1 = [al.matchingSequence() for al in als]
@@ -85,13 +85,41 @@ class AlignmentPiece:
         return AlignmentPiece.GlueFittingAlignments(als)
 
     @staticmethod
-    def GlueFittingAlignments(als): # Glue a list of alignments with seg_from and seg_to exactly matching together
+    def MergeOverlappingAlignments(als):# Glue a list of alignments such that consecutive query and target segments overlap. Can return None
+        # type: (List[AlignmentPiece]) -> AlignmentPiece
+        als1 = [al.matchingSequence() for al in als]
+        truncated = [als[0].seg_to]
+        last = als[0].matchingSequence()
+        for al in als[1:]:
+            next = al.matchingSequence()
+            shared = list(last.common_to(next))
+            if len(shared) == 0:
+                return None
+            pos1, pos2 = shared[len(shared) / 2]
+            truncated[-1] = truncated[-1].prefix(pos=last.matches[pos1][1])
+            truncated.append(al.seg_to.suffix(pos=next.matches[pos2][1]))
+            last = next
+        als = [al.reduce(target=seg) for al, seg in zip(als, truncated)]
+        return AlignmentPiece.MergeFittingAlignments(als)
+
+    @staticmethod
+    def GlueFittingAlignments(als): # Glue a list of alignments with seg_to exactly fitting together.
         # type: (List[AlignmentPiece]) -> AlignmentPiece
         contig = als[0].seg_to.contig
         new_seq = "".join((al.seg_from.Seq() for al in als))
         new_contig = Contig(new_seq, "glued")
         new_cigar = "".join(al.cigar for al in als)
         return AlignmentPiece(new_contig.asSegment(), contig.segment(als[0].seg_to.left, als[-1].seg_to.right),
+                              new_cigar)
+
+    @staticmethod
+    def MergeFittingAlignments(als): # Glue a list of alignments with seg_from and seg_to exactly fitting together
+        # type: (List[AlignmentPiece]) -> AlignmentPiece
+        contig_from = als[0].seg_from.contig # type: Contig
+        contig_to = als[0].seg_to.contig
+        new_cigar = "".join(al.cigar for al in als)
+        return AlignmentPiece(contig_from.segment(als[0].seg_from.left, als[-1].seg_from.right),
+                              contig_to.segment(als[0].seg_to.left, als[-1].seg_to.right),
                               new_cigar)
 
     def isIdentical(self):

@@ -275,6 +275,7 @@ def _run_minimap(reference_file, reads_files, num_proc, platform, out_file):
     cmdline.extend(reads_files)
     cmdline.extend(["-p0.2", "-N1000", "-a", "-Q", "-w5", "-m100", "-g10000", "--max-chain-skip",
                     "25", "-t", str(num_proc)])
+    # cmdline.extend(["-x", "ava-pb"])
     if platform == "nano":
         cmdline.append("-k15")
     else:

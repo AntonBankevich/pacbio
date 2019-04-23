@@ -12,7 +12,7 @@ from common.sequences import Segment, Contig
 # It only stores different parts explicitly. All the rest is expected to be the same in seq_from and seq_to
 class Correction:
     def __init__(self, seq_from, seq_to, alignments):
-        # type: (NamedSequence, NamedSequence, List[AlignmentPiece]) -> None
+        # type: (Contig, Contig, List[AlignmentPiece]) -> None
         self.seq_from = seq_from
         self.seq_to = seq_to
         self.alignments = alignments
@@ -31,7 +31,7 @@ class Correction:
         right = self.mapPositionsDown([seg.right for seg in segments])
         return [Segment(self.seq_to, l, r) for l, r in zip(left, right)]
 
-    def mapPositionsUp(self, positions, none_one_miss = False):
+    def mapPositionsUp(self, positions, none_on_miss = False):
         # type: (List[int], bool) -> List[Optional[int]]
         tmp = [(pos, i) for i, pos in enumerate(positions)]
         tmp = sorted(tmp)
@@ -43,7 +43,7 @@ class Correction:
                 cur_pos += 1
             for p1, p2 in al.matchingPositions(equalOnly=False):
                 while cur_pos < len(positions) and tmp[cur_pos][0] <= p2:
-                    if tmp[cur_pos][0] == p2 or not none_one_miss:
+                    if tmp[cur_pos][0] == p2 or not none_on_miss:
                         res[tmp[cur_pos][1]] = p1
                     else:
                         res[tmp[cur_pos][1]] = None

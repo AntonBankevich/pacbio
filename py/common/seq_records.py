@@ -1,6 +1,7 @@
 from typing import Optional
 
 from common import basic
+from common.save_load import TokenWriter, TokenReader
 
 
 class NamedSequence:
@@ -29,6 +30,16 @@ class NamedSequence:
 
     def __getitem__(self, item):
         return self.seq[item]
+
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        handler.writeToken(self.seq)
+        handler.writeToken(self.id)
+
+    @staticmethod
+    def load(handler):
+        # type: (TokenReader) -> NamedSequence
+        return NamedSequence(handler.readToken(), handler.readToken())
 
 
 class SeqRecord(NamedSequence):

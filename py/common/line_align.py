@@ -89,7 +89,9 @@ class Scorer:
 
     def polyshMatching(self, alignment):
         # type: (MatchingSequence) -> MatchingSequence
-        # TODO: TEST
+        assert  len(alignment) > 0
+        if len(alignment) == 1:
+            return alignment
         cur = 0
         storage = RectStorage(alignment[0][0], alignment[-1][0])
         prev = Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius, self.scores.inf)
@@ -125,9 +127,15 @@ class Scorer:
         cur_i = alignment[-1][0]
         cur_j = alignment[-1][1]
         matches = [(cur_i, cur_j)]
+        prev_i = -1
+        prev_j = - 1
         while cur_i != alignment[0][0] or cur_j != alignment[0][1]:
             cur_i, cur_j = storage.get(cur_i).get(cur_j)
-            matches.append((cur_i, cur_j))
+            if cur_i != prev_i and cur_j != prev_j and alignment.seq_from[cur_i] == alignment.seq_to[cur_j]:
+                matches.append((cur_i, cur_j))
+                prev_i = cur_i
+                prev_j = cur_j
+        matches[-1] = (cur_i, cur_j)
         return MatchingSequence(alignment.seq_from, alignment.seq_to, matches[::-1])
 
     def oldCompare(self, piece1, piece2):

@@ -70,6 +70,7 @@ def main(args):
         print "Creating line collection"
         lines = NewLineStorage(disjointigs, aligner)
         lines.fillFromContigs(contigs)
+        lines.alignDisjointigs()
         # lines.fillFromDisjointigs()
 
         dot_plot = LineDotPlot(lines, aligner)

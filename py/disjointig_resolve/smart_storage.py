@@ -91,12 +91,9 @@ class SmartStorage(LineListener):
 
     def save(self, handler):
         # type: (TokenWriter) -> None
-        if self.isCanonical():
-            handler.writeIntLine(len(self.items))
-            for item in self.items:
-                item.save(handler)
-        else:
-            handler.writeIntLine(0)
+        handler.writeIntLine(len(self))
+        for item in self:
+            item.save(handler)
 
     def __len__(self):
         if self.isCanonical():
@@ -411,7 +408,7 @@ class AlignmentStorage(SmartStorage):
     def makeCanonical(self):
         if self.isCanonical():
             return
-        self.items = [al.rc for al in self.items[::-1]]
+        self.items = [al.rc for al in self.rc.items[::-1]]
         self.rc.items = None
         self.sorted = self.rc.sorted
 
@@ -497,7 +494,7 @@ class AlignmentStorage(SmartStorage):
         if self.isCanonical():
             for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
                 if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left <= al.seg_from.left:
-                    self.items[i] = AlignmentPiece.GlueOverlappingAlignments([al1, al])
+                    self.items[i] = AlignmentPiece.MergeOverlappingAlignments([al1, al])
                     return
             self.add(al)
 
@@ -509,7 +506,7 @@ class AlignmentStorage(SmartStorage):
         if self.isCanonical():
             for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
                 if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left >= al.seg_from.left:
-                    tmp = AlignmentPiece.GlueOverlappingAlignments([al, al1])
+                    tmp = AlignmentPiece.MergeOverlappingAlignments([al, al1])
                     if tmp is not None:
                         self.items[i] = tmp
                         return
@@ -583,10 +580,7 @@ class AlignmentStorage(SmartStorage):
     def filterByCoverage(self, mi = 0, ma = 1000000):
         # type: (int, int) -> SegmentStorage
         segs = self.calculateCoverage()
-        if mi == 0:
-            last = 0
-        else:
-            last = None
+        last = None
         contig = self[0].seg_to.contig
         res = SegmentStorage()
         for seg, cov in segs:
@@ -596,25 +590,25 @@ class AlignmentStorage(SmartStorage):
                 res.add(Segment(contig, last, seg.left))
                 last = None
         if last is not None:
-            assert mi == 0
             res.add(Segment(contig, last, len(contig)))
         return res
 
     def calculateCoverage(self):
         # type: () -> Generator[Tuple[Segment, int]]
         positions = []
-        for al in alignments:
+        for al in self:
             positions.append((al.seg_to.left, 1))
             positions.append((al.seg_to.right, -1))
         positions = sorted(positions)
         positions = [(pos, sum(delta for pos, delta in iter)) for pos, iter in
                      itertools.groupby(positions, key=lambda pos: pos[0])]
-        contig = alignments[0].seg_to.contig
+        contig = self[0].seg_to.contig
         cur = 0
         last = 0
         for pos, delta in positions:
-            if last < pos:
+            if delta != 0 and last < pos:
                 yield contig.segment(last, pos), cur
+                last = pos
             cur += delta
         if positions[-1][0] < len(contig):
             yield contig.asSegment().suffix(pos=positions[-1][0]), 0
