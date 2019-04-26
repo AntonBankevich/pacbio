@@ -34,6 +34,10 @@ class Disjointig(Contig):
         # type: (Segment) -> Generator[AlignmentPiece]
         return self.read_alignments.getAlignmentsTo(seg)
 
+    def allInter(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
+        return self.read_alignments.allInter(seg)
+
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeTokenLine(self.id)
@@ -97,7 +101,7 @@ class DisjointigCollection(ContigStorage):
     def addAlignments(self, als):
         # type: (Union[Generator[AlignmentPiece], Iterable[AlignmentPiece]]) -> None
         for al in als:
-            dt = al.seg_from.contig # type: Disjointig
+            dt = al.seg_to.contig # type: Disjointig
             dt.addAlignment(al)
 
     def save(self, handler):

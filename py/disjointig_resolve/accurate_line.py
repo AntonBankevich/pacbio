@@ -140,6 +140,32 @@ class NewLine(Contig):
                     yield al
                     readRes.append(al)
 
+    def getRelevantAlignmentsFor(self, seg):
+        # type: (Segment) -> Generator[AlignmentPiece]
+        result = []
+        for alDL in self.disjointig_alignments.allInter(seg):
+            reduced = alDL.reduce(target=seg)
+            if len(reduced.seg_to) < params.k:
+                continue
+            dt = alDL.seg_from.contig # type: Disjointig
+            for alRD in dt.allInter(reduced.seg_from):
+                al = alRD.compose(alDL)
+                if len(al.seg_to) >= params.k:
+                    result.append(al)
+        result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
+        for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig): # type: AlignedRead, Generator[AlignmentPiece]
+            readRes = []
+            for al in iter:
+                found = False
+                for al1 in readRes:
+                    inter = al.matchingSequence(True).inter(al1.matchingSequence(True))
+                    if len(inter.matches) != 0:
+                        found = True
+                        break
+                if not found:
+                    yield al
+                    readRes.append(al)
+
     def position(self, pos):
         # type: (int) -> LinePosition
         return LinePosition(self, pos)

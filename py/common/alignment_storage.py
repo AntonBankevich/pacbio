@@ -318,18 +318,18 @@ class AlignmentPiece:
     # composes alignments A->B and B->C into alignment A->C
     def compose(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
-        return self.matchingSequence(False).compose(other.matchingSequence(False)).asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
+        return self.matchingSequence().compose(other.matchingSequence()).asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
 
     # composes alignments A->B and A->C into alignment B->C
     def composeTargetDifference(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
-        return self.matchingSequence(False).composeDifference(other.matchingSequence(False)).\
+        return self.matchingSequence().composeDifference(other.matchingSequence()).\
             asAlignmentPiece(self.seg_to.contig, other.seg_to.contig)
 
     # composes alignments A->B and C->B into alignment A->C
     def composeQueryDifference(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
-        return self.matchingSequence(False).compose(other.matchingSequence(False).reverse()).\
+        return self.matchingSequence(False).compose(other.matchingSequence().reverse()).\
             asAlignmentPiece(self.seg_from.contig, other.seg_from.contig)
 
     def reverse(self):
@@ -445,7 +445,7 @@ class MatchingSequence:
         while cur_self < len(self) and cur_other < len(other):
             if self.matches[cur_self] < other.matches[cur_other]:
                 cur_self += 1
-            elif self.matches[cur_self] < other.matches[cur_other]:
+            elif self.matches[cur_self] > other.matches[cur_other]:
                 cur_other += 1
             else:
                 matches.append(self.matches[cur_self])

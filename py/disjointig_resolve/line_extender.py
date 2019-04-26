@@ -339,7 +339,7 @@ class LineExtender:
             if not ok:
                 next_start = min(next_start, al.seg_to.left + k / 2)
         res = self.Record(resolved, next_start, correct, good_reads)
-        als = line.getPotentialAlignmentsTo(focus)
+        als = line.getRelevantAlignmentsFor(focus)
         als = filter(lambda al: al.seg_from.left > k / 2 + 20, als)
         res.addAll(als)
         res.updateGood()

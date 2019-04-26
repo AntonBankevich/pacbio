@@ -49,12 +49,6 @@ class Contig(NamedSequence):
         seq = handler.readToken()
         return Contig(seq, id)
 
-    def __str__(self):
-        return str(self.id) + "(" + str(self.__len__()) + ")"
-
-    def __repr__(self):
-        return self.__str__()
-
     def print_fasta(self, handler):
         # type: (file) -> None
         SeqIO.write(self, handler, "fasta")

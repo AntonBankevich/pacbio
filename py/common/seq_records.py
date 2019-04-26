@@ -41,6 +41,12 @@ class NamedSequence:
         # type: (TokenReader) -> NamedSequence
         return NamedSequence(handler.readToken(), handler.readToken())
 
+    def __str__(self):
+        return str(self.id) + "(" + str(self.__len__()) + ")"
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class SeqRecord(NamedSequence):
     def __init__(self, seq, id, qual = None, info = None):

@@ -120,7 +120,7 @@ class Line(Contig):
             if self.chain[-1].seg_from.left >= pos:
                 self.chain.pop()
             else:
-                matchingSequence = self.chain[-1].matchingSequence(False).reduceQuery(0, pos)
+                matchingSequence = self.chain[-1].matchingSequence().reduceQuery(0, pos)
                 self.chain[-1] = matchingSequence.asAlignmentPiece(self, self.chain[-1].seg_to.contig)
         self.rc.chain = [al.rc for al in self.chain[::-1]]
 

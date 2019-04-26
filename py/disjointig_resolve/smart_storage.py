@@ -144,7 +144,7 @@ class SegmentStorage(SmartStorage):
             sign = "+"
         else:
             sign = "-"
-        return "Storage" + sign + ":" + str(list(self))
+        return "ReadStorage" + sign + ":" + str(list(self))
 
     def add(self, seg):
         if self.isCanonical():
@@ -318,6 +318,8 @@ class SegmentStorage(SmartStorage):
 
     def reverse(self):
         # type: () -> SegmentStorage
+        if len(self) == 0:
+            return SegmentStorage()
         if self.isCanonical():
             self.sort()
             res = SegmentStorage()
@@ -579,6 +581,8 @@ class AlignmentStorage(SmartStorage):
 
     def filterByCoverage(self, mi = 0, ma = 1000000):
         # type: (int, int) -> SegmentStorage
+        if len(self) == 0:
+            return SegmentStorage()
         segs = self.calculateCoverage()
         last = None
         contig = self[0].seg_to.contig
@@ -612,5 +616,12 @@ class AlignmentStorage(SmartStorage):
             cur += delta
         if positions[-1][0] < len(contig):
             yield contig.asSegment().suffix(pos=positions[-1][0]), 0
+
+    def __str__(self):
+        if self.isCanonical():
+            sign = "+"
+        else:
+            sign = "-"
+        return "AlignmentStorage" + sign  + str(list(self))
 
 

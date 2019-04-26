@@ -1,9 +1,16 @@
-7
+10
+UniqueRegionMarkingTest 3
+List abcdefgh 32 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fgha fgha fgha fgha ghab ghab ghab ghab habc habc habc habc 1 abcdefgh 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:4400-0]]
+List abcdefghcdeijk 56 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fghc fghc fghc fghc ghcd ghcd ghcd ghcd hcde hcde hcde hcde cdei cdei cdei cdei deij deij deij deij eijk eijk eijk eijk ijka ijka ijka ijka jkab jkab jkab jkab kabc kabc kabc kabc 1 abcdefghcdeijk 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:1338],C0_abcdefgh[2500:4400-0]]
+List abcdefghcdeijkeflmn 76 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fghc fghc fghc fghc ghcd ghcd ghcd ghcd hcde hcde hcde hcde cdei cdei cdei cdei deij deij deij deij eijk eijk eijk eijk ijke ijke ijke ijke jkef jkef jkef jkef kefl kefl kefl kefl eflm eflm eflm eflm flmn flmn flmn flmn lmna lmna lmna lmna mnab mnab mnab mnab nabc nabc nabc nabc 1 abcdefghcdeijkeflmn 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:1341],C0_abcdefgh[3050:4400-0]]
+
+PotentialReadsTest 0
+
 DotPlotModificationTest 0
 
 DotPlotConstructionTest 2
-List abcdefgh 0 1 abcdeab 0 ListD0_abcdeab0001D0_abcdeab24993497D0_abcdeab01001195M1D64M1D404M1I142M1D101M1D91M
-List abcdefgh 0 3 abc abc bce 0 ListD0_abcD2_bceD1_abcD0_abcD1_abc1D1_abc01498D0_abc01500196M1I64M1D138M1D242M1D22M1I142M1D390M1D134M1I167MD0_abcD2_bce1D2_bce0998D0_abc5011500164M1I141M1D106M1D419M1I96M1D70MD1_abcD2_bce1D2_bce0998D1_abc5001498141M1I270M1D284M1I231M1D70M00000000
+List abcdefgh 0 1 abcdeab 0 ListD0_abcdeab0001D0_abcdeab27433837D0_abcdeab01098113M1D6M1D132M1D98M1D483M1I47M1D214M
+List abcdefgh 0 3 abc abc bce 0 ListD0_abcD2_bceD1_abcD0_abcD1_abc1D1_abc01642D0_abc016463M1D11M1I44M1D63M1I115M1D311M1I24M1D261M1I227M1D149M1D4M1D5M1D227M1D91M1I102MD0_abcD2_bce1D2_bce01097D0_abc5491646286M1I52M1D387M1D75M1I193M1I14M1D87MD1_abcD2_bce1D2_bce01097D1_abc549164224M1I314M1D173M1I151M1I4M1I4M1I51M1D76M1I99M1I107M1D87M00000000
 
 AlignmentPolishingTest 0
 
