@@ -4,289 +4,12 @@ from alignment.align_tools import Aligner
 from common import basic, params
 from common.alignment_storage import AlignmentPiece
 from disjointig_resolve.correction import Correction
-from disjointig_resolve.accurate_line import NewLineStorage, NewLine, LineStorageListener
+from disjointig_resolve.accurate_line import NewLine
+from disjointig_resolve.line_alignments import AutoAlignmentStorage, RCAlignmentStorage, TwoLineAlignmentStorage
+from disjointig_resolve.line_storage import NewLineStorage, LineStorageListener
 from disjointig_resolve.smart_storage import LineListener, AlignmentStorage
 from common.save_load import TokenWriter, TokenReader
-from common.sequences import Segment, UniqueList, Contig, ContigStorage
-
-
-# Unlike all other storages AutoAlignmentStorage stores only half of the alignments. The other half are the reversals of the stored half.
-# Also identical alignment can not be stored here but is returned as a part of iteration (see __iter__)
-class AutoAlignmentStorage(LineListener):
-
-    def __init__(self, line, rc = None):
-        # type: (Contig, Optional[AutoAlignmentStorage]) -> None
-        self.line = line
-        if rc is None:
-            self.content = AlignmentStorage()
-            rc = AutoAlignmentStorage(line.rc, self)
-            rc.content = self.content.rc
-        LineListener.__init__(self, rc)
-        self.rc = rc # type: AutoAlignmentStorage
-        self.state = 1 # from precedes to
-
-    def makeCanonical(self, al):
-        if (self.state == 1) == (al.seg_from.left < al.seg_from.right):
-            return al
-        else:
-            return al.reverse()
-
-    def isCanonical(self, al):
-        return (self.state == 1) == (al.seg_from.left < al.seg_from.right)
-
-    def add(self, al):
-        # type: (AlignmentPiece) -> None
-        if al.isIdentical():
-            return
-        self.content.add(self.makeCanonical(al))
-
-    def addAndMergeRight(self, al):
-        if al.isIdentical():
-            return
-        if self.isCanonical(al):
-            self.content.addAndMergeRight(al)
-        else:
-            self.content.addAndMergeLeft(al.reverse())
-
-    def __iter__(self):
-        # type: () -> Generator[AlignmentPiece]
-        for al in self.content:
-            yield al
-        for al in self.content:
-            yield al.reverse()
-        yield AlignmentPiece.Identical(self.line.asSegment())
-
-    def getAlignmentsTo(self, seg):
-        # type: (Segment) -> Generator[AlignmentPiece]
-        for al in self:
-            if al.seg_to.contains(seg):
-                yield al
-
-    def allInter(self, seg):
-        for al in self:
-            if al.seg_to.inter(seg):
-                yield al
-
-    def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, Contig, str) -> None
-        self.content.fireBeforeExtendRight(line, new_seq, seq)
-        self.reverse()
-        self.content.fireBeforeExtendRight(line, new_seq, seq)
-
-    def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, Contig, int) -> None
-        self.content.fireBeforeCutRight(line, new_seq, pos)
-        self.reverse()
-        self.content.fireBeforeCutRight(line, new_seq, pos)
-    # alignments from new sequence to new sequence
-
-    def fireBeforeCorrect(self, alignments):
-        # type: (Correction) -> None
-        self.content.fireBeforeCorrect(alignments)
-        self.reverse()
-        self.content.fireBeforeCorrect(alignments)
-
-    def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
-        self.content.fireAfterExtendRight(line, seq)
-        self.reverse()
-        self.content.fireAfterExtendRight(line, seq)
-
-    def fireAfterCutRight(self, line, pos):
-        # type: (Any, int) -> None
-        self.content.fireAfterCutRight(line, pos)
-        self.reverse()
-        self.content.fireAfterCutRight(line, pos)
-
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
-        self.content.fireAfterCorrect(line)
-        self.reverse()
-        self.content.fireAfterCorrect(line)
-
-    def reverse(self):
-        self.state = -self.state
-        self.content = self.content.reverse()
-        self.rc.content = self.content.rc
-
-    def save(self, handler):
-        # type: (TokenWriter) -> None
-        self.content.save(handler)
-
-    def load(self, handler):
-        # type: (TokenReader) -> None
-        self.content.load(handler, self.line, self.line)
-
-
-class RCAlignmentStorage(LineListener):
-
-    def __init__(self, line, rc = None):
-        # type: (Contig, Optional[RCAlignmentStorage]) -> None
-        self.line = line
-        if rc is None:
-            self.content = AlignmentStorage()
-            rc = RCAlignmentStorage(line.rc, self)
-            rc.content = self.content.rc
-        LineListener.__init__(self, rc)
-        self.rc = rc # type: AutoAlignmentStorage
-
-    def __iter__(self):
-        # type: () -> Generator[AlignmentPiece]
-        return self.content.__iter__()
-
-    def getAlignmentsTo(self, seg):
-        # type: (Segment) -> Generator[AlignmentPiece]
-        return self.content.getAlignmentsTo(seg)
-
-    def allInter(self, seg):
-        return self.content.allInter(seg)
-
-    def add(self, alignment):
-        self.content.add(alignment)
-        self.content.add(alignment.reverse().rc)
-
-    def addAndMergeRight(self, al):
-        # type: (AlignmentPiece) -> None
-        self.content.addAndMergeRight(al)
-        self.content.addAndMergeLeft(al.reverse().rc)
-
-    def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, Contig, str) -> None
-        self.content.fireBeforeExtendRight(line, new_seq, seq)
-        self.reverse()
-        self.content.fireBeforeExtendRight(line, new_seq, seq)
-
-    def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, Contig, int) -> None
-        self.content.fireBeforeCutRight(line, new_seq, pos)
-        self.reverse()
-        self.content.fireBeforeCutRight(line, new_seq, pos)
-    # alignments from new sequence to new sequence
-
-    def fireBeforeCorrect(self, alignments):
-        # type: (Correction) -> None
-        self.content.fireBeforeCorrect(alignments)
-        self.reverse()
-        self.content.fireBeforeCorrect(alignments)
-
-    def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
-        self.content.fireAfterExtendRight(line, seq)
-        self.reverse()
-        self.content.fireAfterExtendRight(line, seq)
-
-    def fireAfterCutRight(self, line, pos):
-        # type: (Any, int) -> None
-        self.content.fireAfterCutRight(line, pos)
-        self.reverse()
-        self.content.fireAfterCutRight(line, pos)
-
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
-        self.content.fireAfterCorrect(line)
-        self.reverse()
-        self.content.fireAfterCorrect(line)
-    # This is CRAAAZY!!! But correct.
-
-    def reverse(self):
-        self.rc.content = self.content.reverse()
-        self.content = self.rc.content.rc
-
-    def save(self, handler):
-        # type: (TokenWriter) -> None
-        self.content.save(handler)
-
-    def load(self, handler):
-        # type: (TokenReader) -> None
-        self.content.load(handler, self.line, self.line)
-
-
-class TwoLineAlignmentStorage(LineListener):
-
-    def __init__(self, line_from, line_to, rc = None, reverse = None):
-        # type: (Contig, Contig, Optional[TwoLineAlignmentStorage], TwoLineAlignmentStorage) -> None
-        assert line_from.id != line_to.id and line_from.rc.id != line_to.id
-        self.line_from = line_from
-        self.line_to = line_to
-        self.reverse = None
-        if rc is None:
-            self.content = AlignmentStorage()
-            if reverse is None:
-                rc = TwoLineAlignmentStorage(line_from.rc, line_to.rc, self, reverse)
-            else:
-                rc = TwoLineAlignmentStorage(line_from.rc, line_to.rc, self, reverse.rc)
-        else:
-            self.content = rc.content.rc # type: AlignmentStorage
-        LineListener.__init__(self, rc)
-        self.rc = rc # type: TwoLineAlignmentStorage
-        if reverse is None and self.reverse is None:
-            reverse = TwoLineAlignmentStorage(line_to, line_from, None, self)
-            self.reverse = reverse
-            self.rc.reverse = self.reverse.rc
-
-    def add(self, al):
-        # type: (AlignmentPiece) -> None
-        self.content.add(al)
-        reverse = al.reverse()
-        self.reverse.content.add(reverse)
-
-    def __iter__(self):
-        # type: () -> Generator[AlignmentPiece]
-        return self.content.__iter__()
-
-    def getAlignmentsTo(self, seg):
-        # type: (Segment) -> Generator[AlignmentPiece]
-        return self.content.getAlignmentsTo(seg)
-
-    def allInter(self, seg):
-        return self.content.allInter(seg)
-
-    def normalizeReverse(self):
-        self.reverse.content = self.content.reverse()
-
-    def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, Contig, str) -> None
-        self.content.fireBeforeExtendRight(line, new_seq, seq)
-        self.normalizeReverse()
-
-    def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, Contig, int) -> None
-        self.content.fireBeforeCutRight(line, new_seq, pos)
-        self.normalizeReverse()
-    # alignments from new sequence to new sequence
-
-    def fireBeforeCorrect(self, alignments):
-        # type: (Correction) -> None
-        self.content.fireBeforeCorrect(alignments)
-        self.normalizeReverse()
-
-    def fireAfterExtendRight(self, line, seq, relevant_als = None):
-        # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
-        self.content.fireAfterExtendRight(line, seq)
-        self.normalizeReverse()
-
-    def fireAfterCutRight(self, line, pos):
-        # type: (Any, int) -> None
-        self.content.fireAfterCutRight(line, pos)
-        self.normalizeReverse()
-
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
-        self.content.fireAfterCorrect(line)
-        self.normalizeReverse()
-
-    def addAndMergeRight(self, al):
-        self.content.addAndMergeRight(al)
-        self.normalizeReverse()
-
-    def save(self, handler):
-        # type: (TokenWriter) -> None
-        self.content.save(handler)
-
-    def load(self, handler, lines):
-        # type: (TokenReader, Any) -> None
-        self.content.load(handler, lines, lines)
-        self.normalizeReverse()
+from common.sequences import Segment, Contig, ContigStorage
 
 
 class DotPlot:
@@ -316,7 +39,7 @@ class DotPlot:
         self.alignmentsToFrom[line1.rc.id][line2.rc.id] = storage.rc.reverse
         return storage
 
-    def simpleAddAlignment(self, al):
+    def addAlignment(self, al):
         # type: (AlignmentPiece) -> None
         to_line = al.seg_to.contig # type: NewLine
         from_line = al.seg_from.contig # type: NewLine
@@ -327,13 +50,9 @@ class DotPlot:
         elif to_line == from_line.rc:
             self.rc_alignments[to_id].add(al)
         else:
-            if from_id not in self.alignmentsToFrom[from_id]:
+            if from_id not in self.alignmentsToFrom[to_id]:
                 self.addTwoLineStorage(from_line, to_line)
             self.alignmentsToFrom[to_id][from_id].add(al)
-
-    def addAlignment(self, al):
-        # type: (AlignmentPiece) -> None
-        self.simpleAddAlignment(al)
 
     def addRCAlignmentStorage(self, line):
         # type: (Contig) -> RCAlignmentStorage
@@ -356,7 +75,6 @@ class DotPlot:
         for al in self.rc_alignments[seg.contig.id].getAlignmentsTo(seg):
             yield al
         for storage in self.alignmentsToFrom[seg.contig.id].values():
-            print list(storage.content)
             for al in storage.getAlignmentsTo(seg):
                 yield al
 
@@ -373,6 +91,7 @@ class DotPlot:
     def construct(self, aligner):
         # type: (Aligner) -> None
         for al in aligner.alignClean(self.lines.unique(), self.lines):
+            # print al, len(al) > params.k, al.percentIdentity() > 0.8, al.seg_from.contig.id < al.seg_to.contig.id, al.seg_from <= al.seg_to
             if len(al) > params.k and al.percentIdentity() > 0.8 and (
                     al.seg_from.contig.id < al.seg_to.contig.id or al.seg_from <= al.seg_to):
                 self.addAlignment(al)
@@ -432,39 +151,43 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
 
     def getAlignmentsToFrom(self, line_to, line_from):
         # type: (NewLine, NewLine) -> Generator[AlignmentPiece]
+        content = []
         if line_to == line_from:
-            return self.auto_alignments[line_to.id].__iter__()
+            content = self.auto_alignments[line_to.id]
         elif line_to == line_from.rc:
-            return self.rc_alignments[line_to.id].__iter__()
+            content = self.rc_alignments[line_to.id]
         elif line_from.id in self.alignmentsToFrom[line_to.id]:
-            return self.alignmentsToFrom[line_to.id][line_from.id].__iter__()
+            content = self.alignmentsToFrom[line_to.id][line_from.id]
+        for al in content:
+            yield al
 
     def FireMergedLines(self, al1, al2):
         # type: (AlignmentPiece, AlignmentPiece) -> None
         new_line = al1.seg_to.contig
-        line1 = al1.seg_from.contig.id
-        line2 = al2.seg_from.contig.id
+        line1 = al1.seg_from.contig
+        line2 = al2.seg_from.contig
         self.addLine(new_line)
-        auto_alignments = self.auto_alignments[new_line.id]
-        for al in self.auto_alignments[line1]:
-            auto_alignments.add(al1.composeTargetDifference(al.compose(al1)))
-        for al in self.auto_alignments[line2]:
-            auto_alignments.add(al2.composeTargetDifference(al.compose(al2)))
-        rc_alignments = self.rc_alignments[new_line.id]
-        for al in self.rc_alignments[line1]:
-            rc_alignments.add(al1.rc.composeTargetDifference(al.compose(al1)))
-        for al in self.rc_alignments[line2]:
-            rc_alignments.add(al2.rc.composeTargetDifference(al.compose(al2)))
-        for al in self.getAlignmentsToFrom(line1, line2):
-            auto_alignments.add(al2.composeTargetDifference(al.compose(al1)))
-        for al in self.getAlignmentsToFrom(line1, line2.rc):
-            rc_alignments.add(al2.rc.composeTargetDifference(al.compose(al1)))
+        auto1 = AutoAlignmentStorage(new_line).addAll([al1.composeTargetDifference(al.compose(al1)) for al in self.auto_alignments[line1.id]])
+        auto2 = AutoAlignmentStorage(new_line).addAll([al2.composeTargetDifference(al.compose(al2)) for al in self.auto_alignments[line2.id]])
+        auto3 = AutoAlignmentStorage(new_line).addAll([al2.composeTargetDifference(al.compose(al1)) for al in self.getAlignmentsToFrom(line1, line2)])
+        self.auto_alignments[new_line.id].addAll(auto1.merge(auto3).merge(auto2).content)
+        rc1 = RCAlignmentStorage(new_line).addAll([al1.rc.composeTargetDifference(al.compose(al1)) for al in self.rc_alignments[line1.id]])
+        rc2 = RCAlignmentStorage(new_line).addAll([al2.rc.composeTargetDifference(al.compose(al2)) for al in self.rc_alignments[line2.id]])
+        rc3 = RCAlignmentStorage(new_line).addAll([al2.rc.composeTargetDifference(al.compose(al1)) for al in self.getAlignmentsToFrom(line1, line2.rc)])
+        self.rc_alignments[new_line.id].addAll(rc1.merge(rc3).merge(rc2))
+        common = set(self.alignmentsToFrom[line1.id].keys()).intersection(set(self.alignmentsToFrom[line2.id].keys()))
         for storage in self.alignmentsToFrom[line1.id].values():
-            for al in storage:
-                self.addAlignment(al.compose(al1))
+            if storage.line_from.id not in common and storage.line_from != line2:
+                self.addTwoLineStorage(storage.line_from, new_line).addAll([al.compose(al1) for al in storage])
         for storage in self.alignmentsToFrom[line2.id].values():
-            for al in storage:
-                self.addAlignment(al.compose(al2))
+            if storage.line_from.id not in common and storage.line_from != line1:
+                self.addTwoLineStorage(storage.line_from, new_line).addAll([al.compose(al2) for al in storage])
+        for c in common:
+            storage1 = self.alignmentsToFrom[line1.id][c]
+            storage2 = self.alignmentsToFrom[line2.id][c]
+            als1 = AlignmentStorage().addAll([al.compose(al1) for al in storage1])
+            als2 = AlignmentStorage().addAll([al.compose(al2) for al in storage2])
+            self.addTwoLineStorage(storage1.line_from, new_line).addAll(als1.merge(als2))
         self.removeLine(al1.seg_from.contig)
         self.removeLine(al2.seg_from.contig)
 

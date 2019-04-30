@@ -265,6 +265,7 @@ class SegmentStorage(SmartStorage):
         new_storge.addAll(self)
         new_storge.addAll(other)
         new_storge.mergeSegments(inter_size)
+        return new_storge
 
     def subStorage(self, seg, inter_size = 0):
         # type: (Segment, int) -> SegmentStorage
@@ -521,29 +522,30 @@ class AlignmentStorage(SmartStorage):
         # type: (AlignmentStorage) -> AlignmentStorage
         left_items = [(al, -1) for al in self.items]
         right_items = [(al, 1) for al in other.items]
-        new_items = left_items + right_items
-        right_items = sorted(other.items, key = lambda al: (al.seg_to.contig.id, al.seg_from.contig.id, al.seg_from.left))
-        new_items = sorted(self.items, key = lambda (al, side): (al.seg_to.contig.id, al.seg_from.contig.id, al.seg_from.left))
-        res = []
-        for (c_to, c_from), it in itertools.groupby(self.items, lambda al: (al.seg_to.contig, al.seg_from.contig)):
+        new_items = sorted(left_items + right_items, key = lambda (al, side): (al.seg_to.contig.id, al.seg_from.contig.id, al.seg_from.left))
+        new_storge = AlignmentStorage()
+        for (c_to, c_from), it in itertools.groupby(new_items, lambda al: (al[0].seg_to.contig, al[0].seg_from.contig)):
             al_sides = list(it)
             als_left = [al for al, side in al_sides if side == -1] # type: List[AlignmentPiece]
             als_left = sorted(als_left, key = lambda al: al.seg_from.right)
             als_right = [al for al, side in al_sides if side == 1] # type: List[AlignmentPiece]
+            als_right = sorted(als_right, key = lambda al: al.seg_from.left)
             curr = len(als_right)
+            merged = []
             for al in als_left:
-                while curr > 0 and (als_right[curr - 1] is not None or als_right[curr - 1].seg_from.left > al.seg_from.right):
+                while curr > 0 and ((als_right[curr - 1] is None or als_right[curr - 1].seg_from.left > al.seg_from.right)):
                     curr -= 1
                 for j in range(curr): # type: int
                     if als_right[j] is not None and al.canMergeTo(als_right[j]):
-                        tmp = AlignmentPiece.GlueOverlappingAlignments([al, als_right[j]])
+                        tmp = AlignmentPiece.MergeOverlappingAlignments([al, als_right[j]])
                         if tmp is not None:
                             al = tmp
                             als_right[j] = None
                             break
-                res.append(al)
-        new_storge = AlignmentStorage()
-        new_storge.addAll(res)
+                merged.append(al)
+            new_storge.addAll(merged)
+            new_storge.addAll([al for al in als_right if al is not None])
+        return new_storge
 
     def subStorage(self, query = None, target = None, inter_size = 0):
         # type: (Optional[Segment], Optional[Segment], int) -> AlignmentStorage

@@ -109,15 +109,15 @@ class Polisher:
         # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
         w = 400
         r = 50
-        first = seg.left / w * w
-        last = min(seg.right + w - 1, len(seg.contig)) / w * w
+        first = seg.left / w
+        last = min(seg.right + w - 1, len(seg.contig)) / w
         segs = []
         for i in range(first, last + 1):
             segs.append(Segment(seg.contig, max(0, i * w - r), min(len(seg.contig), (i + 1) * w + r)))
         als_by_segment = [[] for i in range(last - first + 1)]
         for al in als:
-            l = al.seg_to.left / w * w
-            r = al.seg_to.right / w * w + 1
+            l = al.seg_to.left / w
+            r = al.seg_to.right / w + 1
             for i in range(max(0, l - first - 1), min(last - first + 1, r - first + 2)):
                 if al.seg_to.inter(segs[i]):
                     als_by_segment[i].append(al)
@@ -145,7 +145,8 @@ class Polisher:
         base = Contig(start + seg.Seq() + end, "base")
         polished = Contig(self.polish(reads, base), "polished")
         al = self.aligner.alignClean([polished], ContigStorage([base])).next()
-        return al.reduce(target=base.segment(len(start), len(base) - len(end))).changeTargetSegment(seg)
+        mapping = AlignmentPiece.Identical(base.segment(len(start), len(base) - len(end)), seg)
+        return al.compose(mapping)
 
     def polishEnd(self, als, min_cov = 4):
         # type: (List[AlignmentPiece], int) -> Tuple[Contig, List[AlignmentPiece]]

@@ -86,7 +86,7 @@ class DirDistributor:
             content_files.append(os.path.join(dir, f_name))
         hash_file = os.path.join(dir, "hashs.txt")
         hashs = list(self.calculateHash(content))
-        if os.path.isfile(hash_file) and self.compareHash(open(hash_file, "r"), hashs):
+        if os.path.isfile(hash_file) and self.compareHash(open(hash_file, "r"), hashs) and not params.redo_alignments:
             return dir, content_files, True
         self.printHash(open(hash_file, "w"), hashs)
         for reads, f_name in content:
@@ -202,7 +202,8 @@ class Aligner:
             rname = rec.query_name
             seq_from = read_storage[rname]
             seq_to = ref_storage[rec.tname]
-            yield AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
+            for al in AlignmentPiece.FromSamRecord(seq_from, seq_to, rec).split():
+                yield al
 
 
     # def matchingAlignment(self, seqs, contig):

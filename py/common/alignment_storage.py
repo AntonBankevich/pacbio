@@ -74,7 +74,7 @@ class AlignmentPiece:
         contig = als[0].seg_to.contig
         als1 = [al.matchingSequence() for al in als]
         truncated = [als[0].seg_to]
-        last = als[0].matchingSequence()
+        last = als[0].matchingSequence() # type: MatchingSequence
         for al in als[1:]:
             next = al.matchingSequence()
             shared = list(last.common_to(next))
@@ -255,6 +255,7 @@ class AlignmentPiece:
         return float(res) / all
 
     def matchingSequence(self, equalOnly=True):
+        # type: (bool) -> MatchingSequence
         return MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq,
                                 list(self.matchingPositions(equalOnly)))
 
@@ -336,6 +337,22 @@ class AlignmentPiece:
         # type: () -> AlignmentPiece
         return AlignmentPiece(self.seg_to, self.seg_from, easy_cigar.ReverseCigar(self.cigar))
 
+    def split(self):
+        res = []
+        for a, b in self.matchingPositions(True):
+            if len(res) > 0:
+                prev = res[max(0, len(res) - 10)]
+                if prev[0] < a - 100 or prev[1] < b - 100:
+                    yield MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq, res).asAlignmentPiece(
+                        self.seg_from.contig, self.seg_to.contig)
+                    res = []
+            res.append((a, b))
+        if res[0] == self.seg_from.left:
+            yield self
+        else:
+            yield MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq, res).asAlignmentPiece(
+                self.seg_from.contig, self.seg_to.contig)
+
 
 class MatchingSequence:
     def __init__(self, seq_from, seq_to, matchingPositions):
@@ -364,7 +381,7 @@ class MatchingSequence:
 
     def common_to(self, other):
         # type: (MatchingSequence) -> Generator[Tuple[int, int]]
-        assert self.seq_from == other.seq_from
+        assert self.seq_to == other.seq_to
         cur_self = 0
         cur_other = 0
         while cur_self < len(self) and cur_other < len(other):
@@ -528,7 +545,7 @@ class AlignedRead(Contig):
             al.save(handler)
 
     @staticmethod
-    def load(handler, collection):
+    def loadRead(handler, collection):
         # type: (TokenReader, Any) -> AlignedRead
         id = handler.readToken()
         seq = handler.readToken()
@@ -687,7 +704,7 @@ class ReadCollection:
         keys = set(handler.readTokens())
         n = handler.readInt()
         for i in range(n):
-            read = AlignedRead.load(handler, contigs)
+            read = AlignedRead.loadRead(handler, contigs)
             self.add(read)
             if read.rc.id in keys:
                 self.add(read.rc)
@@ -743,7 +760,7 @@ class ReadCollection:
 
     def add(self, read):
         # type: (AlignedRead) -> AlignedRead
-        assert read not in self.reads or read == self.reads[read.id], str(read) + " " + str(self.reads[read.id])
+        assert read.id not in self.reads or read == self.reads[read.id], str(read) + " " + str(self.reads[read.id])
         self.reads[read.id] = read
         return read
 

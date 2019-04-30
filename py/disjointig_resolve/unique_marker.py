@@ -2,7 +2,8 @@ from typing import Generator, Iterable, List, Tuple
 
 from common import params
 from common.sequences import Segment
-from disjointig_resolve.accurate_line import NewLine, NewLineStorage
+from disjointig_resolve.accurate_line import NewLine
+from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage

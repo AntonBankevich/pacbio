@@ -15,10 +15,13 @@ from common.line_align import Scorer
 from common.save_load import TokenReader, TokenWriter
 from common.seq_records import NamedSequence
 from common.sequences import Contig
-from disjointig_resolve.accurate_line import NewLine, NewLineStorage
+from disjointig_resolve.accurate_line import NewLine
+from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import DotPlot, LineDotPlot
+from disjointig_resolve.knotter import LineKnotter
+from disjointig_resolve.line_extender import LineExtender
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 from disjointig_resolve.unique_marker import UniqueMarker
 
@@ -34,6 +37,7 @@ class Tester:
             if inspect.isclass(obj) and name.endswith("Test"):
                 testList.append(obj)
         self.tests = dict([(c.__name__, c) for c in testList])
+        params.redo_alignments = True
 
     def testAll(self, fname):
         params = self.readParams(fname)
@@ -43,13 +47,9 @@ class Tester:
             if not result:
                 fail += 1
         print fail, "tests failed"
-        # self.testUniqueRegionMarking()
-        # self.testReadRecruitment()
-        # self.testLineCorrection()
         # self.testLineExtension()
         # self.testLineMerging()
         # self.testLineKnotting()
-        # self.testPotentialReadsConstruction()
         # self.testExtensionConsensus()
         # self.testSaves()
 
@@ -89,7 +89,9 @@ class TestDataset:
         return "".join(map(lambda c: self.alphabet[c], seq))
 
     def addRead(self, read_seq):
-        self.reads.append(NamedSequence(self.mutate(self.translate(read_seq), self.error_rate)[0], "R" + str(len(self.reads)) + "_" + read_seq))
+        name = "R" + str(len(self.reads)) + "_" + read_seq
+        self.reads.append(NamedSequence(self.mutate(self.translate(read_seq), self.error_rate)[0], name))
+        return name
 
     def addDisjointig(self, disjointig_seq):
         # type: (str) -> str
@@ -418,12 +420,8 @@ class PotentialReadsTest(SimpleTest):
         line = lines[name]
         assert str(list(line.getRelevantAlignmentsFor(line.asSegment()))) == "[(R0_abcd[0:2196-4]->C0_abcdefgh[0:2195]:0.96), (R1_bcde[0:2202-0]->C0_abcdefgh[550:2750]:0.96), (R2_cdef[0:2187-0]->C0_abcdefgh[1100:3300]:0.96), (R3_defg[1:2189-0]->C0_abcdefgh[1651:3850]:0.97), (R4_efgh[0:2204-0]->C0_abcdefgh[2200:4400-0]:0.97), (R5_fgha[0:1644]->C0_abcdefgh[2750:4400-0]:0.96), (R5_fgha[1645:2200-0]->C0_abcdefgh[1:550]:0.95), (R6_ghab[1099:2198-0]->C0_abcdefgh[0:1100]:0.97), (R6_ghab[0:1099]->C0_abcdefgh[3300:4400-0]:0.97), (R7_habc[550:2192-8]->C0_abcdefgh[0:1643]:0.96), (R7_habc[0:550]->C0_abcdefgh[3850:4400-0]:0.97)]", str(list(line.getRelevantAlignmentsFor(line.asSegment())))
 
-class UniqueRegionMarkingTest(SimpleTest):
-    # def testManual(self):
-        # self.test1()
-        # self.test2()
-        # self.test3()
 
+class UniqueRegionMarkingTest(SimpleTest):
     def testCase(self, instance):
         data = TokenReader(StringIO(" ".join(instance)))
         dataset = TestDataset.loadStructure(data)
@@ -435,38 +433,64 @@ class UniqueRegionMarkingTest(SimpleTest):
         self.assertResult(str(line.correct_segments), ethalon1)
         self.assertResult(str(line.completely_resolved), ethalon2)
 
-    def test1(self):
-        dataset = TestDataset("abcdefgh")
-        dataset.addDisjointig("abcdefgh")
-        name = dataset.addContig("abcdefgh")
-        dataset.generateReads(4, 15, True)
-        dataset.saveStructure(TokenWriter(sys.stdout))
+
+class ReadRecruitmentTest(SimpleTest):
+    def testManual(self):
+        dataset = TestDataset("abcdefghijklmCDEFGHInopqr")
+        dname = dataset.addDisjointig("abcdefghijklmCDEFGHInopqr".upper())
+        name1 = dataset.addContig("abcde")
+        name2 = dataset.addContig("klmCDE")
+        dataset.generateReads(4, 5, True)
+        # dataset.saveStructure(TokenWriter(sys.stdout))
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker().markAllUnique(lines, dp)
-        assert str(lines[name].correct_segments) == "ReadStorage+:[C0_abcdefgh[0:4400-0]]", str(lines[name].correct_segments)
-        assert str(lines[name].completely_resolved) == "ReadStorage+:[C0_abcdefgh[0:4400-0]]", str(lines[name].completely_resolved)
+        # UniqueMarker().markAllUnique(lines, dp)
+        line1 = lines[name1]
+        line1.correct_segments.add(line1.asSegment())
+        line1.completely_resolved.add(line1.asSegment())
+        line2 = lines[name2]
+        line2.correct_segments.add(line2.asSegment())
+        line2.completely_resolved.add(line2.asSegment())
+        extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
+        res = extender.attemptCleanResolution(line1.asSegment())
+        assert str(res[0][1]) == "[(R2_bcde[0:2200-0]->C0_abcde[550:2750-0]:0.97), (R3_bcde[4:2192-0]->C0_abcde[553:2750-0]:0.96), (R4_cdef[0:1657]->C0_abcde[1100:2750-0]:0.96), (R5_cdef[0:1656]->C0_abcde[1100:2750-0]:0.96)]"
+        assert str(res[1][1]) == "[(R24_mCDE[0:2201-0]->C1_klmCDE[1100:3298-0]:0.97), (R25_mCDE[0:2194-0]->C1_klmCDE[1100:3298-0]:0.96), (R27_CDEF[0:1658]->C1_klmCDE[1651:3298-0]:0.96)]"
 
-    def test2(self):
-        dataset = TestDataset("abcdefghcdeijk")
-        dataset.addDisjointig("abcdefghcdeijk")
-        name = dataset.addContig("abcdefgh")
-        dataset.generateReads(4, 15, True)
-        dataset.saveStructure(TokenWriter(sys.stdout))
+
+class KnottingTest(SimpleTest):
+    def testManual(self):
+        dataset = TestDataset("abcdefgabhiDEFjkl")
+        dname = dataset.addDisjointig("abcdefgabhiCDEjkl".upper())
+        dataset.generateReads(5, 15, True)
+        read1 = dataset.addRead("cdefg")
+        read2 = dataset.addRead("cdefg")
+        name1 = dataset.addContig("abcde")
+        name2 = dataset.addContig("efgabhi")
         lines, dp, reads = dataset.genAll(self.aligner)
+        read1 = reads[read1]
+        read2 = reads[read2]
+        line1 = lines[name1]
         UniqueMarker().markAllUnique(lines, dp)
-        assert str(lines[name].correct_segments) == "ReadStorage+:[C0_abcdefgh[0:4400-0]]", str(lines[name].correct_segments)
-        assert str(lines[name].completely_resolved) == "ReadStorage+:[C0_abcdefgh[0:1341], C0_abcdefgh[2500:4400-0]]", str(lines[name].completely_resolved)
+        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor))
+        res = knotter.tryKnotRight(line1)
+        assert res is not None
+        assert str(list(dp.allInter(res.asSegment()))) == "[((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]"
 
-    def test3(self):
-        dataset = TestDataset("abcdefghcdeijkeflmn")
-        dataset.addDisjointig("abcdefghcdeijkeflmn")
-        name = dataset.addContig("abcdefgh")
-        dataset.generateReads(4, 15, True)
-        dataset.saveStructure(TokenWriter(sys.stdout))
+class LineExtendingTest(SimpleTest):
+    def testManual(self):
+        dataset = TestDataset("abcdefghijklmCDEFGHInopqr")
+        dname = dataset.addDisjointig("abcdefghijklmCDEFGHInopqr".upper())
+        name1 = dataset.addContig("abcde")
+        name2 = dataset.addContig("klmCDE")
+        dataset.generateReads(4, 5, True)
+        # dataset.saveStructure(TokenWriter(sys.stdout))
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker().markAllUnique(lines, dp)
-        assert str(lines[name].correct_segments) == "ReadStorage+:[C0_abcdefgh[0:1650], C0_abcdefgh[1651:4400-0]]"
-        assert str(lines[name].completely_resolved) == "ReadStorage+:[C0_abcdefgh[0:1350], C0_abcdefgh[3050:4400-0]]"
-
-
+        # UniqueMarker().markAllUnique(lines, dp)
+        line1 = lines[name1]
+        line1.correct_segments.add(line1.asSegment())
+        line1.completely_resolved.add(line1.asSegment())
+        line2 = lines[name2]
+        line2.correct_segments.add(line2.asSegment())
+        line2.completely_resolved.add(line2.asSegment())
+        extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
+        print extender.tryExtend(line1)
 # LAUNCH TANYA!!!

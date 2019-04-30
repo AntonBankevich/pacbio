@@ -1,5 +1,6 @@
 clean = False
 reliable_coverage = 10
+redo_alignments = False
 radius = 8
 alignment_correction_radius = 4
 full_stats = False
@@ -10,6 +11,7 @@ min_allowed_Pacbio_PI = 0.7
 max_jump = 6000
 assert_pi = True
 k = 500
+l = 1500
 
 class Scores:
     ins_score = 8

@@ -16,7 +16,7 @@ from disjointig_resolve.line_extender import LineExtender
 from common.save_load import TokenReader, SaveHandler
 from common.sequences import ContigCollection
 from common.alignment_storage import ReadCollection
-from disjointig_resolve.accurate_line import NewLineStorage
+from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params
@@ -78,8 +78,8 @@ def main(args):
 
         UniqueMarker().markAllUnique(lines, dot_plot)
 
-    save_handler = SaveHandler(params.save_dir)
     print "Resolving"
+    save_handler = SaveHandler(params.save_dir)
     knotter = LineKnotter(lines, Polisher(aligner, aligner.dir_distributor))
     extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     cnt = 0
@@ -89,8 +89,6 @@ def main(args):
             extended = extender.tryExtend(line)
             if extended:
                 cnt += 1
-                stop = False
-                knotter.tryKnotRight(line)
             if cnt > 20:
                 cnt = 0
                 saveAll(save_handler.getWriter(), params, aligner, contigs, reads, disjointigs, lines, dot_plot)

@@ -1,11 +1,11 @@
 import itertools
 
-from typing import Optional, Iterable, List, Iterator, BinaryIO, Dict, Any, Generator, Tuple
+from typing import Optional, Iterable, List, Any, Generator
 
 from alignment.align_tools import Aligner
-from common import basic, SeqIO, params
+from common import basic, params
 from common.save_load import TokenWriter, TokenReader
-from common.sequences import Segment, UniqueList, ContigCollection, Contig, Contig, ContigStorage
+from common.sequences import Segment, ContigCollection, Contig
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
@@ -83,7 +83,7 @@ class NewLine(Contig):
         # type: (str, str, ExtensionHandler, Optional[NewLine]) -> None
         self.extensionHandler = extension_handler
         self.seq = seq
-        self.id = id
+        self.id = id # type: str
         if rc is None:
             # TODO: move all these to separate classes
             self.initial = AlignmentStorage()
@@ -122,10 +122,14 @@ class NewLine(Contig):
     def getPotentialAlignmentsTo(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
         result = []
+        print seg
+        print self.disjointig_alignments
         for alDL in self.disjointig_alignments.getAlignmentsTo(seg):
             reduced = alDL.reduce(target=seg)
+            print alDL, reduced
             dt = alDL.seg_from.contig # type: Disjointig
             for alRD in dt.getAlignmentsTo(reduced.seg_from):
+                print "oppa", alRD, alRD.compose(alDL)
                 result.append(alRD.compose(alDL))
         result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
         for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig):
@@ -145,8 +149,6 @@ class NewLine(Contig):
         result = []
         for alDL in self.disjointig_alignments.allInter(seg):
             reduced = alDL.reduce(target=seg)
-            if len(reduced.seg_to) < params.k:
-                continue
             dt = alDL.seg_from.contig # type: Disjointig
             for alRD in dt.allInter(reduced.seg_from):
                 al = alRD.compose(alDL)
@@ -292,146 +294,17 @@ class NewLine(Contig):
         self.read_alignments.removeInter(seg)
 
 
-class LineStorageListener:
-    def __init__(self):
-        pass
-
-    def FireMergedLines(self, al1, al2):
-        # type: (AlignmentPiece, AlignmentPiece) -> None
-        pass
-
-class NewLineStorage(ContigStorage):
-    def __init__(self, disjointigs, aligner):
-        # type: (DisjointigCollection, Aligner) -> None
-        ContigStorage.__init__(self, [], False)
-        self.disjointigs = disjointigs
-        self.aligner = aligner
-        self.items = dict() # type: Dict[str, NewLine]
-        self.cnt = 1
-        self.listeners = [] # type: List[LineStorageListener]
-
-    def __iter__(self):
-        # type: () -> Iterator[NewLine]
-        return self.items.values().__iter__()
-
-    def __getitem__(self, item):
-        # type: (str) -> NewLine
-        return self.items[item]
-
-    def addListener(self, listener):
-        self.listeners.append(listener)
-
-    def removeListener(self, listener):
-        self.listeners.remove(listener)
-
-    def notifyMergedLines(self, al1, al2):
-        # type: (AlignmentPiece, AlignmentPiece) -> None
-        for listener in self.listeners:
-            listener.FireMergedLines(al1, al2)
-
-    def addNew(self, seq, name = None):
-        # type: (str, Optional[str]) -> NewLine
-        if name is None:
-            name = str(self.cnt)
-            self.cnt += 1
-        new_line = NewLine(seq, name, ExtensionHandler(self.disjointigs, self.aligner))
-        self.items[name] = new_line
-        self.items[new_line.rc.id] = new_line.rc
-        return new_line
-
-    def fillFromContigs(self, contigs):
-        # type: (Iterable[Contig]) -> None
-        for contig in UniqueList(contigs):
-            line = self.addNew(contig.seq)
-            line.initial.add(AlignmentPiece.Identical(line.asSegment(), contig.asSegment()))
-            for seg in line.correct_segments:
-                line.completely_resolved.add(seg)
-
-    def alignDisjointigs(self):
-        for line in self:
-            line.disjointig_alignments.clean()
-        for al in self.aligner.alignClean(self.disjointigs.unique(), self):
-            line = al.seg_to.contig # type: NewLine
-            line.disjointig_alignments.add(al)
-
-    # def fillFromDisjointigs(self):
-    #     # type: () -> None
-    #     for seg in UniqueMarker(self.disjointigs).findAllUnique(self.disjointigs):
-    #         line = self.addNew(seg.Seq())
-    #         line.initial.add(AlignmentPiece.Identical(line.asSegment(), seg))
-    #     #TODO Filter all lines already present in the collection
-
-    def mergeLines(self, alignment, k):
-        # type: (AlignmentPiece, int) -> NewLine
-        line1 = alignment.seg_from.contig #type: NewLine
-        line2 = alignment.seg_to.contig #type: NewLine
-
-        new_line1_seq = Contig(line1.asSegment().prefix(pos=alignment.seg_from.left) + alignment.seg_to.Seq(), "corrected")
-        alignment = alignment.changeTargetSegment(new_line1_seq.asSegment().suffix(length = alignment.seg_to.__len__()))
-        line1.correctSequence([alignment])
-
-        # Now lines have exact match
-        seq = line1.asSegment().prefix(pos = alignment.seg_from.left) + line2.asSegment().suffix(pos = alignment.seg_to.left)
-        name = "(" + line1.id + "," + line2.id + ")"
-        line = self.addNew(seq, name)
-        al1 = AlignmentPiece.Identical(line1.asSegment(), line.asSegment().prefix(length=len(line1)))
-        al2 = AlignmentPiece.Identical(line2.asSegment(), line.asSegment().suffix(length=len(line2)))
-
-        line.initial.addAll(line1.initial.targetAsSegment(al1.seg_to).merge(line2.initial.targetAsSegment(al2.seg_to)))
-        line.correct_segments.addAll(line1.correct_segments.contigAsSegment(al1.seg_to).
-                                     merge(line2.correct_segments.contigAsSegment(al2.seg_to)))
-        line.correct_segments.addAll(line1.completely_resolved.contigAsSegment(al1.seg_to).
-                                     merge(line2.completely_resolved.contigAsSegment(al2.seg_to), k))
-        line.disjointig_alignments.addAll(line1.disjointig_alignments.targetAsSegment(al1.seg_to).
-                                          merge(line2.disjointig_alignments.targetAsSegment(al2.seg_to)))
-        line.read_alignments.addAll(line1.read_alignments.targetAsSegment(al1.seg_to).
-                                          merge(line2.read_alignments.targetAsSegment(al2.seg_to)))
-        self.notifyMergedLines(al1, al2)
-        del self.items[line1.id]
-        del self.items[line2.id]
-        return line
-
-    def printToFile(self, handler):
-        # type: (BinaryIO) -> None
-        for line in self.items:
-            handler.write(line.__str__() + "\n")
-
-    def printToFasta(self, handler):
-        # type: (BinaryIO) -> None
-        for line in UniqueList(self.items.values()):
-            SeqIO.write(line, handler, "fasta")
-
-    def save(self, handler):
-        # type: (TokenWriter) -> None
-        handler.writeTokenLine(str(self.cnt))
-        line_ids = map(lambda line: line.id, UniqueList(self.items.values()))
-        handler.writeTokens(line_ids)
-        for line_id in line_ids:
-            line = self.items[line_id]
-            handler.writeTokenLine(line.seq)
-        for line_id in line_ids:
-            line = self.items[line_id]
-            line.save(handler)
-
-    def load(self, handler, reads, contigs):
-        # type: (TokenReader, ReadCollection, ContigCollection) -> None
-        self.cnt = int(handler.readToken())
-        keys = handler.readTokens()
-        for key in keys:
-            self.addNew(handler.readToken(), key)
-        for key in keys:
-            line = self.items[key]
-            line.loadLine(handler, self.disjointigs, reads, contigs)
-
 class LinePosition(LineListener):
     def __init__(self, line, pos, rc=None):
         # type: (NewLine, int, Optional[LinePosition]) -> None
         self.line = line
         self.pos = pos
-        line.addListener(self)
         if rc is None:
-            rc = LinePosition(line.rc, len(line) - 1 - pos)
+            rc = LinePosition(line.rc, len(line) - 1 - pos, self)
+            self.rc = rc
+            line.addListener(self)
         LineListener.__init__(self, rc)
+        self.rc = rc # type: LinePosition
 
     def suffix(self):
         return self.line.suffix(self.pos)

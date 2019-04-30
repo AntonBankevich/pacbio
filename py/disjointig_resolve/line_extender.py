@@ -14,9 +14,6 @@ from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineKnotter
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 
-k = 1000
-l = 1500
-
 # class LineCorrector:
 #     def __init__(self):
 #         self.alignments = [] # type: List[AlignmentPiece]
@@ -81,24 +78,24 @@ class LineExtender:
 
     def tryExtend(self, line):
         # type: (NewLine) -> int
-        line.completely_resolved.mergeSegments(k)
+        line.completely_resolved.mergeSegments(params.k)
         bound = LinePosition(line, line.left())
         new_recruits = 0
         while True:
-            seg_to_resolve = line.completely_resolved.find(bound.suffix(), k)
+            seg_to_resolve = line.completely_resolved.find(bound.suffix(), params.k)
             if seg_to_resolve is None:
                 break
             result = self.attemptCleanResolution(seg_to_resolve)
-            total = sum([num for seg, num in result])
+            total = sum([len(arr) for seg, arr in result])
             new_recruits += total
             if total == 0:
-                bound = seg_to_resolve.right - k + 1
+                bound = seg_to_resolve.right - params.k + 1
                 continue
-            to_correct = [seg for seg, num in result if num > 0]
+            to_correct = [seg for seg, arr in result]
             self.updateAllStructures(to_correct)
             if seg_to_resolve.right > len(line) - 2000:
                 if self.attemptExtend(line):
-                    if self.knotter.tryKnotRight(line):
+                    if self.knotter.tryKnotRight(line) is not None:
                         return new_recruits
                 self.updateAllStructures([line.asSegment().suffix(pos=seg_to_resolve.right)])
         return new_recruits
@@ -124,7 +121,7 @@ class LineExtender:
             line.completely_resolved.add(rec.resolved)
             for seg in rec.old_resolved:
                 line.completely_resolved.add(seg)
-            line.completely_resolved.mergeSegments(k)
+            line.completely_resolved.mergeSegments(params.k)
 
     def collectRecords(self, corrected):
         records = dict()  # type: Dict[Segment, LineExtender.Record]
@@ -160,10 +157,11 @@ class LineExtender:
         return corrected
 
     def attemptCleanResolution(self, resolved):
-        # type: (Segment) -> List[Tuple[Segment, int]]
+        # type: (Segment) -> List[Tuple[Segment, List[AlignmentPiece]]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
-        resolved = resolved.suffix(length = min(len(resolved), k))
-        line_alignments = filter(lambda al: len(al.seg_to) >= k, self.dot_plot.getAlignmentsTo(resolved)) # type: List[AlignmentPiece]
+        resolved = resolved.suffix(length = min(len(resolved), params.k * 2))
+        line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k / 2,
+                                 self.dot_plot.allInter(resolved)) # type: List[AlignmentPiece]
         line_alignments = [al.reduce(target=resolved) for al in line_alignments]
         read_alignments = [] # type: List[Tuple[AlignmentPiece, Segment]]
         correct_segments = []
@@ -171,14 +169,21 @@ class LineExtender:
             line = ltl.seg_from.contig # type: NewLine
             correct_segments.append(line.correct_segments.find(ltl.seg_from))
             assert correct_segments[-1] is not None and correct_segments[-1].contains(ltl.seg_from)
-            read_alignments.extend(zip(line.getPotentialAlignmentsTo(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
-        read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.name)
+            read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
+        read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.id)
         # removing all reads that are already sorted to one of the contigs
-        alignments_by_read = itertools.groupby(lambda al: al.seg_from.contig.name, read_alignments)
-        new_recruits = 0
+        alignments_by_read = itertools.groupby(read_alignments, lambda al: al[0].seg_from.contig.id)
+        new_recruits = []
         # TODO: parallel
         for name, it in alignments_by_read:
             als = list(it) # type: List[Tuple[AlignmentPiece, Segment]]
+            ok = False
+            for al in als:
+                if al[0].seg_to.interSize(resolved) >= params.k:
+                    ok = True
+                    break
+            if not ok:
+                continue
             read = als[0][0].seg_from.contig # type: AlignedRead
             skip = False
             for al1 in als:
@@ -190,16 +195,16 @@ class LineExtender:
                     break
             if skip:
                 continue
-            winner = self.tournament(als) #type: AlignmentPiece
+            winner, seg = self.tournament(als) #type: AlignmentPiece, Segment
             if winner is not None:
                 line = winner.seg_to.contig # type: NewLine
                 line.addReadAlignment(winner)
-                if line == resolved.contig:
-                    new_recruits += 1
-        return new_recruits
+                new_recruits.append((seg, winner))
+        new_recruits = sorted(new_recruits, key = lambda rec: (rec[0].contig.id, rec[0].left, rec[0].right))
+        return [(seg, [al for seg, al in it]) for seg, it in itertools.groupby(new_recruits, key = lambda rec: rec[0])]
 
     def fight(self, c1, c2):
-        # type: (Tuple[AlignmentPiece, Segment], Tuple[AlignmentPiece, Segment]) -> Optional[AlignmentPiece]
+        # type: (Tuple[AlignmentPiece, Segment], Tuple[AlignmentPiece, Segment]) -> Optional[Tuple[AlignmentPiece, Segment]]
         assert c1[0].seg_from.contig == c2[0].seg_from.contig
         s1, s2, s12 = self.scorer.scoreInCorrectSegments(c1[0], c1[1], c2[0], c2[1])
         if s12 is None:
@@ -217,11 +222,12 @@ class LineExtender:
         if winner is None:
             print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner"
         else:
-            print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c2
+            print c1, c2, s1, s2, s12
+            print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", winner
         return winner
 
     def tournament(self, candidates):
-        # type: (list[Tuple[AlignmentPiece, Segment]]) -> Optional[AlignmentPiece]
+        # type: (list[Tuple[AlignmentPiece, Segment]]) -> Tuple[Optional[AlignmentPiece], Optional[Segment]]]
         best = None
         for candidate in candidates:
             if best is None:
@@ -229,14 +235,14 @@ class LineExtender:
             else:
                 best = self.fight(candidate, best)
         if best is None:
-            return None
+            return None, None
         if len(candidates) > 2:
             for candidate in candidates:
                 if candidate == best:
                     continue
                 fight_results = self.fight(candidate, best)
                 if fight_results is None or fight_results != best:
-                    return None
+                    return None, None
         return best
 
     def attemptExtend(self, line):
@@ -318,7 +324,7 @@ class LineExtender:
                     yield al
 
         def updateGood(self):
-            while len(self.reads) > 0 and self.reads[-1].seg_to.left <= self.resolved.right - k:
+            while len(self.reads) > 0 and self.reads[-1].seg_to.left <= self.resolved.right - params.k:
                 self.good_reads.add(self.reads.pop().seg_from.contig.id)
 
         def pop(self):
@@ -328,7 +334,7 @@ class LineExtender:
     def createRecord(self, resolved, next_start, correct, good_reads):
         # type: (Segment, int, Segment, Set[str]) -> Record
         line = resolved.contig # type: NewLine
-        focus = line.segment(resolved.right - k, correct.right)
+        focus = line.segment(resolved.right - params.k, correct.right)
         for al in self.dot_plot.allInter(focus):
             line1 = al.seg_from.contig # type: NewLine
             ok = False
@@ -337,10 +343,10 @@ class LineExtender:
                     ok = True
                     next_start = min(next_start, al.matchingSequence(True).mapDown(seg.right))
             if not ok:
-                next_start = min(next_start, al.seg_to.left + k / 2)
+                next_start = min(next_start, al.seg_to.left + params.k / 2)
         res = self.Record(resolved, next_start, correct, good_reads)
         als = line.getRelevantAlignmentsFor(focus)
-        als = filter(lambda al: al.seg_from.left > k / 2 + 20, als)
+        als = filter(lambda al: al.seg_from.left > params.l / 2 + 20, als)
         res.addAll(als)
         res.updateGood()
         return res
@@ -351,9 +357,9 @@ class LineExtender:
             reads = rec.get(num = 5)
             if reads[-1].seg_to.left - reads[0].seg_to.left > 50:
                 rec.pop()
-        bound = min(rec.correct.right, rec.next_resolved_start + k)
+        bound = min(rec.correct.right, rec.next_resolved_start + params.k)
         if len(rec.get(5)) >= 5:
-            bound = min(bound, rec.get(1)[0].seg_to.left + k / 2)
+            bound = min(bound, rec.get(1)[0].seg_to.left + params.k / 2)
         if bound > rec.resolved.right:
             rec.resolved = rec.resolved.contig.segment(rec.resolved.left, bound)
             rec.updateGood()
@@ -370,13 +376,13 @@ class LineExtender:
             if al.seg_to.left > left:
                 right = al.seg_to.left
                 break
-            if al.seg_from.left > k / 2 and len(al.seg_to) > l:
+            if al.seg_from.left > params.k / 2 and len(al.seg_to) > params.l:
                 return False
-            if al.seg_from.left > k / 2 and len(al.seg_from.contig) - al.seg_from.right > k / 2 and len(al.seg_to) < l:
+            if al.seg_from.left > params.k / 2 and len(al.seg_from.contig) - al.seg_from.right > params.k / 2 and len(al.seg_to) < params.l:
                 left = al.seg_to.right
-        left = left - k / 2
-        right = min(right + k / 2, rec.correct.right)
-        if right - left >= k:
+        left = left - params.k / 2
+        right = min(right + params.k / 2, rec.correct.right)
+        if right - left >= params.k:
             rec.setResolved(rec.line.segment(left, right))
             return True
         return False

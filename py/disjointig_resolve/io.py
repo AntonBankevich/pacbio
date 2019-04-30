@@ -4,7 +4,7 @@ from alignment.align_tools import Aligner
 from common.save_load import TokenReader, TokenWriter
 from common.sequences import ContigCollection
 from common.alignment_storage import ReadCollection
-from disjointig_resolve.accurate_line import NewLineStorage
+from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.cl_params import Params
