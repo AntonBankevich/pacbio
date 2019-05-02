@@ -1,6 +1,6 @@
 import itertools
 
-from typing import Optional, Iterator, List, Any, Iterable, Generator, Tuple
+from typing import Optional, Iterator, List, Any, Iterable, Generator, Tuple, Callable
 
 from common.alignment_storage import AlignmentPiece
 from disjointig_resolve.correction import Correction
@@ -187,7 +187,7 @@ class SegmentStorage(SmartStorage):
                     return True
             return False
         else:
-            return self.rc.isIn(seg.RC())
+            return self.rc.inter(seg.RC(), min_size)
 
     # Merge all segments that have intersection of at least inter_size and remove all subsegments
     # After this operation segment ordering is the same when we sort by left bound as if we sort by right bounds
@@ -210,13 +210,17 @@ class SegmentStorage(SmartStorage):
     def reduce(self, seg):
         # type: (Segment) -> SegmentStorage
         if self.isCanonical():
-            res = []
+            res = SegmentStorage()
             for seg1 in self.items:
                 if seg.inter(seg1):
-                    res.append(seg.cap(seg1))
+                    res.add(seg.cap(seg1))
             return res
         else:
             return self.rc.reduce(seg.RC())
+
+    def filter(self, f):
+        # type: (Callable[[Segment], bool]) -> SegmentStorage
+        return SegmentStorage().addAll([seg for seg in self if f(seg)])
 
     def makeCanonical(self):
         if self.isCanonical():
@@ -315,7 +319,7 @@ class SegmentStorage(SmartStorage):
 
     def filterBySize(self, min = 0, max = 10000000000):
         # type: (int, int) -> SegmentStorage
-        return SegmentStorage().addAll([seg for seg in self if min <= len(seg) < max])
+        return self.filter(lambda seg: min <= len(seg) <= max)
 
     def reverse(self):
         # type: () -> SegmentStorage
@@ -366,17 +370,6 @@ class SegmentStorage(SmartStorage):
         for seg1 in self:
             if seg1.inter(seg):
                 yield seg1
-
-    def __eq__(self, other):
-        # type: (SegmentStorage) -> bool
-        if len(self) != len(other):
-            return False
-        self.sort()
-        other.sort()
-        for seg1, seg2 in zip(self, other):
-            if seg1 != seg2:
-                return False
-        return True
 
 
 class AlignmentStorage(SmartStorage):

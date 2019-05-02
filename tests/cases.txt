@@ -1,6 +1,6 @@
-13
+1
+StructureUpdatingTest 0
 KnottingTest 0
-LineExtendingTest 0
 ReadRecruitmentTest 0
 
 UniqueRegionMarkingTest 3

@@ -475,22 +475,43 @@ class KnottingTest(SimpleTest):
         assert res is not None
         assert str(list(dp.allInter(res.asSegment()))) == "[((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]"
 
-class LineExtendingTest(SimpleTest):
+class StructureUpdatingTest(SimpleTest):
     def testManual(self):
+        self.test1()
+        self.test2()
+
+    def test1(self):
         dataset = TestDataset("abcdefghijklmCDEFGHInopqr")
         dname = dataset.addDisjointig("abcdefghijklmCDEFGHInopqr".upper())
         name1 = dataset.addContig("abcde")
         name2 = dataset.addContig("klmCDE")
-        dataset.generateReads(4, 5, True)
-        # dataset.saveStructure(TokenWriter(sys.stdout))
+        dataset.generateReads(4, 20, True)
         lines, dp, reads = dataset.genAll(self.aligner)
-        # UniqueMarker().markAllUnique(lines, dp)
+        UniqueMarker().markAllUnique(lines, dp)
         line1 = lines[name1]
-        line1.correct_segments.add(line1.asSegment())
-        line1.completely_resolved.add(line1.asSegment())
         line2 = lines[name2]
-        line2.correct_segments.add(line2.asSegment())
-        line2.completely_resolved.add(line2.asSegment())
+        print line1.correct_segments, line1.completely_resolved
+        print line2.correct_segments, line2.completely_resolved
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
-        print extender.tryExtend(line1)
+        extender.updateAllStructures(list(line1.correct_segments))
+        print line1.correct_segments, line1.completely_resolved
+        print line2.correct_segments, line2.completely_resolved
+
+    def test2(self):
+        dataset = TestDataset("abcdefgcijklmCDEFGHInopqr")
+        dname = dataset.addDisjointig("abcdefgcijklmCDEFGHInopqr".upper())
+        name1 = dataset.addContig("abcde")
+        name2 = dataset.addContig("klmCDE")
+        dataset.generateReads(4, 20, True)
+        lines, dp, reads = dataset.genAll(self.aligner)
+        UniqueMarker().markAllUnique(lines, dp)
+        line1 = lines[name1]
+        line2 = lines[name2]
+        print line1.correct_segments, line1.completely_resolved
+        print line2.correct_segments, line2.completely_resolved
+        extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
+        extender.updateAllStructures(list(line1.correct_segments))
+        print line1.correct_segments, line1.completely_resolved
+        print line2.correct_segments, line2.completely_resolved
+
 # LAUNCH TANYA!!!

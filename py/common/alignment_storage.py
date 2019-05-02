@@ -32,7 +32,7 @@ class AlignmentPiece:
         if rc is None:
             self.rc = AlignmentPiece(seg_from.RC(), seg_to.RC(), easy_cigar.RCCigar(self.cigar), self)
         else:
-            self.rc = rc
+            self.rc = rc # type: AlignmentPiece
 
     @staticmethod
     def FromSamRecord(seq_from, seq_to, rec):
@@ -414,6 +414,11 @@ class MatchingSequence:
                 if pos1 >= pos:
                     return pos2
             return None
+
+    def mapSegDown(self, contig, seg):
+        left = self.mapDown(seg.left)
+        right = self.mapDown(seg.right - 1)
+        return Segment(contig, left, right + 1)
 
     def mapUp(self, pos, roundDown = True):
         # type: (int, bool) -> Optional[int]
