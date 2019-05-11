@@ -219,7 +219,7 @@ class Scorer:
 
     def cutHomo(self, m1, m2):
         # type: (MatchingSequence, MatchingSequence) -> Tuple[MatchingSequence, MatchingSequence]
-        if len(list(m1.common_from(m2).next())):
+        if len(list(m1.common_from(m2))) == 0:
             print m1.matches
             print m2.matches
             return None, None
