@@ -11,7 +11,7 @@ from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
-from disjointig_resolve.knotter import LineKnotter
+from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 
 # class LineCorrector:
@@ -68,7 +68,7 @@ from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 # The results of its work is reflected in lines themselves as they grow and knot to each other
 class LineExtender:
     def __init__(self, aligner, knotter, disjointigs, dot_plot):
-        # type: (Aligner, LineKnotter, DisjointigCollection, LineDotPlot) -> None
+        # type: (Aligner, LineMerger, DisjointigCollection, LineDotPlot) -> None
         self.aligner = aligner
         self.polisher = Polisher(aligner, aligner.dir_distributor)
         self.knotter = knotter
@@ -81,7 +81,7 @@ class LineExtender:
         line.completely_resolved.mergeSegments(params.k)
         bound = LinePosition(line, line.left())
         new_recruits = 0
-        new_line = self.knotter.tryKnotRight(line)
+        new_line = self.knotter.tryMergeRight(line)
         if new_line is not None:
             self.updateAllStructures(list(new_line.completely_resolved))
             return 1
@@ -96,7 +96,7 @@ class LineExtender:
                 bound = LinePosition(line, seg_to_resolve.right - params.k + 1)
                 continue
             self.updateAllStructures([seg for seg, arr in result])
-            new_line = self.knotter.tryKnotRight(line)
+            new_line = self.knotter.tryMergeRight(line)
             if new_line is not None:
                 self.updateAllStructures(list(new_line.completely_resolved))
                 return new_recruits + 1

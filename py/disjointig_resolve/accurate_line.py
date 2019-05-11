@@ -41,6 +41,18 @@ class ReadAlignmentListener(LineListener):
         # type: (Any) -> None
         self.refreshReadAlignments()
 
+class Knot:
+    def __init__(self, line_left, line_right, gap, gap_seq = "", rc = None):
+        # type: (NewLine, NewLine, int, str, Knot) -> None
+        assert gap <= 0 or len(gap_seq) > 0
+        self.line_left = line_left
+        self.line_right = line_right
+        self.gap = gap
+        self.gap_seq = gap_seq
+        if rc is None:
+            rc = Knot(line_right.rc, line_left.rc, gap, basic.RC(gap_seq), self)
+        self.rc = rc
+
 # This class supports alignment of reads and disjointigs to extended sequences
 class ExtensionHandler(LineListener):
     def __init__(self, disjointigs, aligner):
@@ -90,6 +102,7 @@ class NewLine(Contig):
             self.listeners = [listener.rc for listener in rc.listeners] # type: List[LineListener]
         Contig.__init__(self, seq, id, rc)
         self.rc = rc #type: NewLine
+        self.knot = None
 
     def updateCorrectSegments(self, seg, threshold = params.reliable_coverage):
         # type: (Segment, int) -> None
@@ -282,6 +295,10 @@ class NewLine(Contig):
     def cleanReadAlignments(self):
         for read in self.read_alignments:
             read.seg_from.contig.removeContig(self)
+
+    def tie(self, other, gap, gap_seq):
+        self.knot = Knot(self, other, gap, gap_seq)
+        self.rc.knot = self.knot.rc
 
 
 class LinePosition(LineListener):

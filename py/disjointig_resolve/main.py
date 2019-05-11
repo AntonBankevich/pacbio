@@ -11,14 +11,14 @@ from alignment.align_tools import Aligner, DirDistributor
 from alignment.polishing import Polisher
 from common import basic
 from disjointig_resolve.dot_plot import LineDotPlot
-from disjointig_resolve.knotter import LineKnotter
+from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.tests import Tester
 from disjointig_resolve.line_extender import LineExtender
 from common.save_load import TokenReader, SaveHandler
 from common.sequences import ContigCollection
 from common.alignment_storage import ReadCollection
 from disjointig_resolve.line_storage import NewLineStorage
-from disjointig_resolve.io import loadAll, saveAll
+from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params
 
@@ -50,7 +50,7 @@ def main(args):
     if params.load_from is not None:
         print "Loading initial state from saves"
         params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(params.load_from, "r")))
-        knotter = LineKnotter(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
+        knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     else:
         aligner = Aligner(DirDistributor(params.alignmentDir()))
@@ -80,7 +80,7 @@ def main(args):
         dot_plot.construct(aligner)
 
         UniqueMarker().markAllUnique(lines, dot_plot)
-        knotter = LineKnotter(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
+        knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
 

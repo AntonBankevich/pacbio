@@ -11,7 +11,7 @@ from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.line_storage import NewLineStorage
 
 
-class LineKnotter:
+class LineMerger:
     def __init__(self, storage, polisher, dot_plot):
         # type: (NewLineStorage, Polisher, LineDotPlot) -> None
         self.storage = storage
@@ -32,13 +32,13 @@ class LineKnotter:
             return str([self.other, self.gap, self.al1, self.al2])
 
     # Find connection of line to any other line using reads. Line is supposed to contain or precede the other line.
-    def tryKnotRight(self, line):
+    def tryMergeRight(self, line):
         # type: (NewLine) -> Optional[NewLine]
         assert line.read_alignments.checkLine(line), str(line.read_alignments)
         if line.circular:
             return None
         read_alignments = line.read_alignments.allInter(line.asSegment().suffix(length=1000))
-        candidates = [] # type: List[LineKnotter.Record]
+        candidates = [] # type: List[LineMerger.Record]
         for al1 in read_alignments:
             read = al1.seg_from.contig # type: AlignedRead
             for al2 in read.alignments:
@@ -50,7 +50,7 @@ class LineKnotter:
         #             (al2.seg_from.contig, gap, read, al1, al2)
         candidates = sorted(candidates, key = lambda rec: rec.other.id)
         final_candidates = []
-        for other_line, iter in itertools.groupby(candidates, lambda rec: rec.other): # type: NewLine, Iterator[LineKnotter.Record]
+        for other_line, iter in itertools.groupby(candidates, lambda rec: rec.other): # type: NewLine, Iterator[LineMerger.Record]
             recs = list(iter)
             if (recs[-1].gap - recs[0].gap) > min(100, abs(recs[-1].gap) / 8):
                 print "\n".join(map(str, candidates))
@@ -94,7 +94,5 @@ class LineKnotter:
             new_line.correctSequence([correction])
             new_line.updateCorrectSegments(new_line.segment(pref, len(new_line) - suff).expand(100))
             return new_line
-
-
 
 

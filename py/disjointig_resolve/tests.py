@@ -22,7 +22,7 @@ from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import DotPlot, LineDotPlot
-from disjointig_resolve.knotter import LineKnotter
+from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.line_extender import LineExtender
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 from disjointig_resolve.unique_marker import UniqueMarker
@@ -494,8 +494,8 @@ class KnottingTest(SimpleTest):
         read2 = reads[read2]
         line1 = lines[name1]
         UniqueMarker().markAllUnique(lines, dp)
-        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
-        res = knotter.tryKnotRight(line1)
+        knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
+        res = knotter.tryMergeRight(line1)
         assert res is not None
         assert str(list(dp.allInter(res.asSegment()))) == "[((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]"
 
@@ -550,7 +550,7 @@ class LineExtensionTest(SimpleTest):
             dataset.addContig(s)
         lines, dp, reads = dataset.genAll(self.aligner)
         UniqueMarker().markAllUnique(lines, dp)
-        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
+        knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         extender = LineExtender(self.aligner, knotter, lines.disjointigs, dp)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
         while True:
@@ -584,7 +584,7 @@ class LineExtensionTest(SimpleTest):
         UniqueMarker().markAllUnique(lines, dp)
         line1 = lines[name1]
         line2 = lines[name2]
-        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
+        knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         extender = LineExtender(self.aligner, knotter, lines.disjointigs, dp)
         print "New iteration results"
         print dataset.translateBack(line1, self.aligner), dataset.translateBack(line2, self.aligner)
