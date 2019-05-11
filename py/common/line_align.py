@@ -158,6 +158,9 @@ class Scorer:
 
     def scoreCommon(self, piece1, piece2):
         matches1, matches2 = self.cutHomo(piece1.matchingSequence(), piece2.matchingSequence())
+        if matches1 is None:
+            print piece1, piece2
+            assert False
         composite = matches1.composeDifference(matches2)
         matches1 = matches1.reduceTarget(composite.matches[0][0], composite.matches[-1][0] + 1)
         matches2 = matches2.reduceTarget(composite.matches[0][1], composite.matches[-1][1] + 1)
@@ -216,6 +219,10 @@ class Scorer:
 
     def cutHomo(self, m1, m2):
         # type: (MatchingSequence, MatchingSequence) -> Tuple[MatchingSequence, MatchingSequence]
+        if len(list(m1.common_from(m2).next())):
+            print m1.matches
+            print m2.matches
+            return None, None
         a, b =  m1.common_from(m2).next()
         # print m1[a], m2[b]
         for a, b in m1.common_from(m2):

@@ -230,11 +230,9 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         for storage in self.alignmentsToFrom[line.id].values():
             storage.fireAfterExtendRight(line, seq)
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
-        print "AE", list(self.auto_alignments[line.id].content)
-        print list(self.auto_alignments[line.id])
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
         new_seg = line.asSegment().suffix(length=len(seq) + 1000)
-        print "Aligning new extension"
+        # print "Aligning new extension"
         for al in self.aligner.alignClean([new_seg.asContig()], self.lines):
             al = al.queryAsSegment(new_seg)
             self.addAndMergeRight(al)
