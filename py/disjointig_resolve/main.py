@@ -1,3 +1,4 @@
+import itertools
 import os
 import shutil
 import sys
@@ -49,6 +50,8 @@ def main(args):
     if params.load_from is not None:
         print "Loading initial state from saves"
         params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(params.load_from, "r")))
+        knotter = LineKnotter(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
+        extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     else:
         aligner = Aligner(DirDistributor(params.alignmentDir()))
 
@@ -77,18 +80,23 @@ def main(args):
         dot_plot.construct(aligner)
 
         UniqueMarker().markAllUnique(lines, dot_plot)
+        knotter = LineKnotter(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
+        extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
+        extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
 
     print "Resolving"
     save_handler = SaveHandler(params.save_dir)
-    knotter = LineKnotter(lines, Polisher(aligner, aligner.dir_distributor))
-    extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     cnt = 0
     while True:
         stop = True
-        for line in lines:
+        for line_id in list(lines.items.keys()):
+            if line_id not in lines.items:
+                continue
+            line = lines[line_id]
             extended = extender.tryExtend(line)
             if extended:
                 cnt += 1
+                stop = False
             if cnt > 20:
                 cnt = 0
                 saveAll(save_handler.getWriter(), params, aligner, contigs, reads, disjointigs, lines, dot_plot)

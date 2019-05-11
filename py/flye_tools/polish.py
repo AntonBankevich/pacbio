@@ -10,6 +10,7 @@ import logging
 import random
 import subprocess
 import os
+import sys
 from collections import defaultdict
 from threading import Thread
 
@@ -69,7 +70,7 @@ def _run_polish_bin(bubbles_in, subs_matrix, hopo_matrix,
     cmdline = [POLISH_BIN, "-t", str(num_threads), bubbles_in, subs_matrix,
                hopo_matrix, consensus_out]
     try:
-        subprocess.check_call(cmdline)
+        subprocess.check_call(cmdline, stdout = open("/dev/null", "w"), stderr = open("/dev/null", "w"))
     except subprocess.CalledProcessError as e:
         if e.returncode == -9:
             logger.error("Looks like the system ran out of memory")

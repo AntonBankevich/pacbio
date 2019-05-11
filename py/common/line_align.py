@@ -98,6 +98,8 @@ class Scorer:
         storage.set(alignment[0][0], Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius))
         for j in range(alignment[0][1], alignment[1][1] + params.alignment_correction_radius + 1):
             prev.set(j, (j - alignment[0][1]) * self.scores.del_score)
+            if j > alignment[0][1]:
+                storage.get(alignment[0][0]).set(j, (alignment[0][0], j - 1))
         for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
             j_min = max(alignment[cur][1] - params.alignment_correction_radius, alignment[0][1])
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
@@ -155,8 +157,7 @@ class Scorer:
         return self.scoreCommon(piece1, piece2)
 
     def scoreCommon(self, piece1, piece2):
-        matches1 = piece1.matchingSequence()
-        matches2 = piece2.matchingSequence()
+        matches1, matches2 = self.cutHomo(piece1.matchingSequence(), piece2.matchingSequence())
         composite = matches1.composeDifference(matches2)
         matches1 = matches1.reduceTarget(composite.matches[0][0], composite.matches[-1][0] + 1)
         matches2 = matches2.reduceTarget(composite.matches[0][1], composite.matches[-1][1] + 1)
@@ -192,6 +193,17 @@ class Scorer:
         # On this segment both alignments go to correct sequences. We place larger weight on differences in this segment.
         seg = al1.reduce(target=seg1).seg_from.cap(al2.reduce(target=seg2).seg_from)
         correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
+        # print correct_scores
+        # seg1 = seg
+        # for i in range((len(seg1) + 49) / 60):
+        #     seg = seg1.contig.segment(seg1.left + i * 60, min(seg1.right, seg1.left + (i + 1) * 60))
+        #     correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
+        #     print correct_scores
+        #     print "\n".join(al1.reduce(query=seg).asMatchingStrings())
+        #     print "\n".join(al2.reduce(query=seg).asMatchingStrings())
+        #     difference = al2.reduce(query=seg).composeTargetDifference(al1.reduce(query=seg))
+        #     print "\n".join(difference.asMatchingStrings())
+        # sys.exit(0)
         if correct_scores[0] > correct_scores[1]:
             p = p1 - p2
         else:
@@ -202,6 +214,29 @@ class Scorer:
         print (p1, p2), full_scores, correct_scores, (s1, s2, s12)
         return s1, s2, s12
 
+    def cutHomo(self, m1, m2):
+        # type: (MatchingSequence, MatchingSequence) -> Tuple[MatchingSequence, MatchingSequence]
+        a, b =  m1.common_from(m2).next()
+        # print m1[a], m2[b]
+        for a, b in m1.common_from(m2):
+            p1 = m1[a][1]
+            p2 = m2[b][1]
+            p = m1[a][0]
+            if m1.seq_to[p1 + 1] != m1.seq_to[p1] and m2.seq_to[p2 + 1] != m2.seq_to[p2] and m1.seq_from[p] != m1.seq_from[p + 1]:
+                # print p1 - m1[0][1], p2 - m2[0][1], p - m1[0][0]
+                m1.matches = m1.matches[a:]
+                m2.matches = m2.matches[b:]
+                break
+        for a, b in list(m1.common_from(m2))[::-1]:
+            p1 = m1[a][1]
+            p2 = m2[b][1]
+            p = m1[a][0]
+            if m1.seq_to[p1 - 1] != m1.seq_to[p1] and m2.seq_to[p2 - 1] != m2.seq_to[p2] and m1.seq_from[p] != m1.seq_from[p - 1]:
+                # print m1[-1][1] - p1, m2[-1][1] - p2, m1[-1][0] - p
+                m1.matches = m1.matches[:a + 1]
+                m2.matches = m2.matches[:b + 1]
+                break
+        return m1, m2
 
 
 class Storage:

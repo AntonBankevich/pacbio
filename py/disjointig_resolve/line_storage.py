@@ -14,7 +14,7 @@ from disjointig_resolve.smart_storage import AlignmentStorage
 class NewLineStorage(ContigStorage):
     def __init__(self, disjointigs, aligner):
         # type: (DisjointigCollection, Aligner) -> None
-        ContigStorage.__init__(self, [], False)
+        ContigStorage.__init__(self, [], True)
         self.disjointigs = disjointigs
         self.aligner = aligner
         self.items = dict() # type: Dict[str, NewLine]
@@ -46,8 +46,7 @@ class NewLineStorage(ContigStorage):
             name = str(self.cnt)
             self.cnt += 1
         new_line = NewLine(seq, name, ExtensionHandler(self.disjointigs, self.aligner))
-        self.items[name] = new_line
-        self.items[new_line.rc.id] = new_line.rc
+        self.add(new_line)
         return new_line
 
     def fillFromContigs(self, contigs):
@@ -82,12 +81,16 @@ class NewLineStorage(ContigStorage):
         al_storage = AlignmentStorage()
         al_storage.add(alignment)
         storage = TwoLineAlignmentStorage(line1, line2)
+        line2.addListener(storage)
+        line1.addListener(storage.reverse)
         storage.add(alignment)
         if alignment.seg_from.right < len(line1):
             line1.cutRight(alignment.seg_from.right)
         if alignment.seg_to.left > 0:
             line2.rc.cutRight(len(line2) - alignment.seg_to.left)
         alignment = list(storage.content)[0] # type: AlignmentPiece
+        line2.removeListener(storage)
+        line1.removeListener(storage.reverse)
 
         # Making sure line sequences match on the overlap
         new_seq = Contig(line1.asSegment().prefix(pos=alignment.seg_from.left).Seq() + line2.seq, "new_seq")
@@ -108,12 +111,16 @@ class NewLineStorage(ContigStorage):
         line.initial.addAll(line1.initial.targetAsSegment(al1.seg_to).merge(line2.initial.targetAsSegment(al2.seg_to)))
         line.correct_segments.addAll(line1.correct_segments.contigAsSegment(al1.seg_to).
                                      merge(line2.correct_segments.contigAsSegment(al2.seg_to)))
-        line.correct_segments.addAll(line1.completely_resolved.contigAsSegment(al1.seg_to).
+        line.completely_resolved.addAll(line1.completely_resolved.contigAsSegment(al1.seg_to).
                                      merge(line2.completely_resolved.contigAsSegment(al2.seg_to), k))
         line.disjointig_alignments.addAll(line1.disjointig_alignments.targetAsSegment(al1.seg_to).
                                           merge(line2.disjointig_alignments.targetAsSegment(al2.seg_to)))
-        line.read_alignments.addAll(line1.read_alignments.targetAsSegment(al1.seg_to).
-                                          merge(line2.read_alignments.targetAsSegment(al2.seg_to)))
+        for al in line1.read_alignments.targetAsSegment(al1.seg_to).merge(line2.read_alignments.targetAsSegment(al2.seg_to)):
+            line.addReadAlignment(al)
+        line1.cleanReadAlignments()
+        line2.cleanReadAlignments()
+
+
         # print line1.read_alignments
         # print line2.read_alignments
         # print line.read_alignments

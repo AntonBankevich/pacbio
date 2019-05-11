@@ -56,7 +56,7 @@ class Disjointig(Contig):
 
 class DisjointigCollection(ContigStorage):
     def __init__(self):
-        ContigStorage.__init__(self, [], False)
+        ContigStorage.__init__(self, [], True)
         self.items = self.items # type: Dict[str, Disjointig]
         self.cnt = 1
 
@@ -74,8 +74,7 @@ class DisjointigCollection(ContigStorage):
             name = "D" + str(self.cnt)
             self.cnt += 1
         new_disjointig = Disjointig(seq, name)
-        self.items[name] = new_disjointig
-        self.items[new_disjointig.rc.id] = new_disjointig.rc
+        self.add(new_disjointig)
         return new_disjointig
 
     def loadFromFasta(self, handler, save_names = False, int_ids = False, filter = lambda rec: True):

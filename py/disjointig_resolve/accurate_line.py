@@ -29,21 +29,6 @@ class ReadAlignmentListener(LineListener):
             read = al.seg_from.contig  # type: AlignedRead
             read.addAlignment(al)
 
-    def fireBeforeExtendRight(self, line, new_seq, seq):
-        # type: (Any, Contig, str) -> None
-        assert self.line == line, str((line.id, self.line.id))
-        self.refreshReadAlignments()
-
-    def fireBeforeCutRight(self, line, new_seq, pos):
-        # type: (Any, Contig, int) -> None
-        assert self.line == line, str((line.id, self.line.id))
-        self.refreshReadAlignments()
-
-    # alignments from new sequence to new sequence
-    def fireBeforeCorrect(self, alignments):
-        # type: (Correction) -> None
-        self.refreshReadAlignments()
-
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
         # type: (Any, str, Optional[List[AlignmentPiece]]) -> None
         self.refreshReadAlignments()
@@ -68,11 +53,11 @@ class ExtensionHandler(LineListener):
         # type: (NewLine, str, Optional[List[AlignmentPiece]]) -> None
         line = line # type: NewLine
         if relevant_als is not None:
-            line.removeInter(line.suffix(1000 + len(seq))) # alignments of all reads to the end of line are manually removed
-            for al in relevant_als:
-                line.addReadAlignment(al.changeTargetContig(line)) # and then substituted with precalculated alignments to extendedd sequence
+            tmp = line.read_alignments.merge(AlignmentStorage().addAll(relevant_als).targetAsSegment(line.asSegment()))
+            line.read_alignments.clean()
+            line.read_alignments.addAll(tmp)
         new_seg = line.asSegment().suffix(length = len(seq) + 1000)
-        for al in self.aligner.alignClean(new_seg.asContig(), self.disjointigs):
+        for al in self.aligner.alignClean([new_seg.asContig()], self.disjointigs):
             al = al.reverse().targetAsSegment(new_seg)
             line.disjointig_alignments.addAndMergeRight(al)
 
@@ -84,6 +69,7 @@ class NewLine(Contig):
         self.extensionHandler = extension_handler
         self.seq = seq
         self.id = id # type: str
+        self.circular = False
         if rc is None:
             # TODO: move all these to separate classes
             self.initial = AlignmentStorage()
@@ -91,7 +77,7 @@ class NewLine(Contig):
             self.completely_resolved = SegmentStorage()
             self.disjointig_alignments = AlignmentStorage()
             self.read_alignments = AlignmentStorage()
-            self.listeners = [self.initial, self.correct_segments, self.disjointig_alignments, self.read_alignments] # type: List[LineListener]
+            self.listeners = [self.initial, self.correct_segments, self.completely_resolved, self.disjointig_alignments, self.read_alignments, extension_handler] # type: List[LineListener]
             rc = NewLine(basic.RC(seq), basic.Reverse(self.id), extension_handler.rc, self) #type: NewLine
             self.rc = rc
             self.addListener(ReadAlignmentListener(self))
@@ -122,14 +108,10 @@ class NewLine(Contig):
     def getPotentialAlignmentsTo(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
         result = []
-        print seg
-        print self.disjointig_alignments
         for alDL in self.disjointig_alignments.getAlignmentsTo(seg):
             reduced = alDL.reduce(target=seg)
-            print alDL, reduced
             dt = alDL.seg_from.contig # type: Disjointig
             for alRD in dt.getAlignmentsTo(reduced.seg_from):
-                print "oppa", alRD, alRD.compose(alDL)
                 result.append(alRD.compose(alDL))
         result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
         for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig):
@@ -176,7 +158,7 @@ class NewLine(Contig):
         # type: (str, List[AlignmentPiece]) -> None
         if relevant_als is None:
             relevant_als = []
-        new_seq = Contig(self.seq + seq, "TMP_" + self.id)
+        new_seq = Contig(self.seq + seq, "TMP2_" + self.id)
         self.notifyBeforeExtendRight(new_seq, seq)
         self.seq = self.seq + seq
         self.rc.seq = basic.RC(seq) + self.rc.seq
@@ -198,7 +180,7 @@ class NewLine(Contig):
         cut_length = len(self) - pos
         if cut_length == 0:
             return
-        new_seq = Contig(self.seq[:pos], "TMP_" + self.id)
+        new_seq = Contig(self.seq[:pos], "TMP3_" + self.id)
         self.notifyBeforeCutRight(new_seq, pos)
         self.seq = self.seq[:-cut_length]
         self.rc.seq = self.rc.seq[cut_length:]
@@ -292,6 +274,14 @@ class NewLine(Contig):
             read = al.seg_from.contig # type: AlignedRead
             read.alignments.remove(al)
         self.read_alignments.removeInter(seg)
+
+    def setCircular(self):
+        self.circular = True
+        self.rc.circular = True
+
+    def cleanReadAlignments(self):
+        for read in self.read_alignments:
+            read.seg_from.contig.removeContig(self)
 
 
 class LinePosition(LineListener):

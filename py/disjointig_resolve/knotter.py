@@ -3,17 +3,20 @@ import itertools
 from typing import Iterator, Tuple, Optional, List
 
 from alignment.polishing import Polisher
+from common import params
 from common.alignment_storage import AlignedRead, AlignmentPiece
 from common.line_align import Scorer
 from disjointig_resolve.accurate_line import NewLine
+from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.line_storage import NewLineStorage
 
 
 class LineKnotter:
-    def __init__(self, storage, polisher):
-        # type: (NewLineStorage, Polisher) -> None
+    def __init__(self, storage, polisher, dot_plot):
+        # type: (NewLineStorage, Polisher, LineDotPlot) -> None
         self.storage = storage
         self.polisher = polisher
+        self.dot_plot = dot_plot
 
     class Record:
         def __init__(self, al1, al2):
@@ -31,6 +34,9 @@ class LineKnotter:
     # Find connection of line to any other line using reads. Line is supposed to contain or precede the other line.
     def tryKnotRight(self, line):
         # type: (NewLine) -> Optional[NewLine]
+        assert line.read_alignments.checkLine(line), str(line.read_alignments)
+        if line.circular:
+            return None
         read_alignments = line.read_alignments.allInter(line.asSegment().suffix(length=1000))
         candidates = [] # type: List[LineKnotter.Record]
         for al1 in read_alignments:
@@ -64,11 +70,25 @@ class LineKnotter:
             return None
         else:
             print "Merging", line, "with", final[1], "with gap", final[0]
+            other = final[1]
+            assert line != other.rc
             line_alignment = final[2][0].al1.composeTargetDifference(final[2][0].al2)
+            print "Alignment:", line_alignment
+            tmp = None
+            for al in self.dot_plot.getAlignmentsToFrom(other, line):
+                if len(list(al.matchingSequence().common(line_alignment.matchingSequence()))) > 0:
+                    tmp = al
+                    break
+            assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)
-            new_line = self.storage.mergeLines(line_alignment, 500)
+            if line == other:
+                line.cutRight(line.correct_segments[-1].right)
+                line.rc.cutRight(line.rc.correct_segments[-1].right)
+                line.setCircular()
+                return None
+            new_line = self.storage.mergeLines(line_alignment, params.k)
             seg = new_line.segment(pref, len(new_line) - suff)
             correction = self.polisher.polishSegment(seg, list(new_line.read_alignments.allInter(seg)))
             new_line.correctSequence([correction])

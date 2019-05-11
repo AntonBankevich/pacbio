@@ -21,15 +21,15 @@ class Correction:
     def mapSegmentsUp(self, segments):
         # type: (List[Segment]) -> List[Segment]
         left = self.mapPositionsUp([seg.left for seg in segments])
-        right = self.mapPositionsUp([seg.right for seg in segments])
-        return [Segment(self.seq_from, l, r) for l, r in zip(left, right)]
+        right = self.mapPositionsUp([seg.right - 1 for seg in segments])
+        return [Segment(self.seq_from, l, r + 1) for l, r in zip(left, right)]
 
     def mapSegmentsDown(self, segments):
         # type: (Iterable[Segment]) -> List[Segment]
         segments = list(segments)
         left = self.mapPositionsDown([seg.left for seg in segments])
-        right = self.mapPositionsDown([seg.right for seg in segments])
-        return [Segment(self.seq_to, l, r) for l, r in zip(left, right)]
+        right = self.mapPositionsDown([seg.right - 1 for seg in segments])
+        return [Segment(self.seq_to, l, r + 1) for l, r in zip(left, right)]
 
     def mapPositionsUp(self, positions, none_on_miss = False):
         # type: (List[int], bool) -> List[Optional[int]]
@@ -149,7 +149,7 @@ class Correction:
             pos = al.seg_to.right
         sb.append(initial.segment(alignments[-1].seg_to.right,initial.right()).Seq())
         new_pos += initial.right() - alignments[-1].seg_to.right
-        new_seq = Contig("".join(sb), "TMP_" + initial.id)
+        new_seq = Contig("".join(sb), "TMP1_" + initial.id)
         new_als = []
         pos = initial.left()
         new_pos = 0

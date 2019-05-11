@@ -1,3 +1,4 @@
+import itertools
 import random
 import sys
 import inspect
@@ -5,16 +6,17 @@ import traceback
 from StringIO import StringIO
 from string import ascii_lowercase, ascii_uppercase
 
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Callable
 
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common import params
 from common.alignment_storage import AlignmentPiece, ReadCollection
+from common.basic import OStreamWrapper
 from common.line_align import Scorer
 from common.save_load import TokenReader, TokenWriter
 from common.seq_records import NamedSequence
-from common.sequences import Contig
+from common.sequences import Contig, ContigStorage
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.correction import Correction
@@ -74,19 +76,19 @@ class TestDataset:
         self.letter_size = letter_size
         self.error_rate = error_rate
         self.mutation_rate = mutation_rate
-        self.alphabet = dict()
+        self.alphabet = ContigStorage()
         self.matches = dict()
         for c1, c2 in zip(ascii_lowercase, ascii_uppercase):
             seq = self.generate(self.letter_size)
-            self.alphabet[c1] = seq
+            self.alphabet.add(Contig(seq, c1))
             seq, matches = self.mutate(seq, self.mutation_rate)
-            self.alphabet[c2] = seq
+            self.alphabet.add(Contig(seq, c2))
             self.matches[c1] = matches
             self.matches[c2] = [(b, a) for a, b in matches]
         self.genome = Contig(self.translate(genome), genome)
 
     def translate(self, seq):
-        return "".join(map(lambda c: self.alphabet[c], seq))
+        return "".join(map(lambda c: self.alphabet[c].seq, seq))
 
     def addRead(self, read_seq):
         name = "R" + str(len(self.reads)) + "_" + read_seq
@@ -111,7 +113,6 @@ class TestDataset:
         for i in range(0, len(genome) - length + 1):
             for j in range((cov + length - 1) / length):
                 self.addRead(genome[i:i + length])
-
 
     def generate(self, letter_size):
         # type: (int) -> str
@@ -182,6 +183,17 @@ class TestDataset:
             res.addContig(handler.readToken())
         return res
 
+    def translateBack(self, contig, aligner):
+        # type: (Contig, Aligner) -> str
+        res = []
+        for al in sorted(aligner.alignClean([contig], self.alphabet), key = lambda al: al.seg_from.left):
+            if len(res) > 0 and al.seg_from.interSize(res[-1].seg_from) > self.letter_size / 2:
+                if al.percentIdentity() > res[-1].percentIdentity():
+                    res[-1] = al
+            else:
+                res.append(al)
+        return "".join([al.seg_to.contig.id for al in res])
+
 
 class SimpleTest:
     def __init__(self):
@@ -215,12 +227,24 @@ class SimpleTest:
                 print "Message:", message
             return False
 
+    # def runTestSilently(self, testf):
+    #     # type: (Callable[[], None]) -> None
+    #     tmp1 = sys.stdout # type: OStreamWrapper
+    #     tmp2 = sys.stderr # type: OStreamWrapper
+    #     tmp1.block()
+    #     tmp2.block()
+    #     testf()
+    #     tmp1.release()
+    #     tmp2.release()
+
+
     def assertResult(self, res, ethalon):
         # type: (str, str) -> None
         assert res.replace(" ", "") == ethalon, res.replace(" ", "")
         pass
 
     def testCase(self, instance):
+        # type: (list[str]) -> None
         pass
 
     def testManual(self):
@@ -406,7 +430,7 @@ class DotPlotModificationTest(SimpleTest):
         name = dataset.addContig("abcAB")
         lines, dp, reads = dataset.genAll(self.aligner)
         line = lines[name]
-        line.extendRight(dataset.alphabet["C"])
+        line.extendRight(dataset.alphabet["C"].seq)
         assert str(list(dp.auto_alignments[line.id])) == "[(C0_abcAB[1650:3302-0]->C0_abcAB[0:1650]:0.995), (C0_abcAB[0:1650]->C0_abcAB[1650:3302-0]:0.995), (C0_abcAB[0:3302-0]->C0_abcAB[0:3302-0]:1.000)]"
 
 
@@ -470,7 +494,7 @@ class KnottingTest(SimpleTest):
         read2 = reads[read2]
         line1 = lines[name1]
         UniqueMarker().markAllUnique(lines, dp)
-        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor))
+        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         res = knotter.tryKnotRight(line1)
         assert res is not None
         assert str(list(dp.allInter(res.asSegment()))) == "[((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]"
@@ -490,12 +514,12 @@ class StructureUpdatingTest(SimpleTest):
         UniqueMarker().markAllUnique(lines, dp)
         line1 = lines[name1]
         line2 = lines[name2]
-        print line1.correct_segments, line1.completely_resolved
-        print line2.correct_segments, line2.completely_resolved
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         extender.updateAllStructures(list(line1.correct_segments))
-        print line1.correct_segments, line1.completely_resolved
-        print line2.correct_segments, line2.completely_resolved
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2198]]"
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2193]]", str(line1.completely_resolved)
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2743]]"
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2743]]"
 
     def test2(self):
         dataset = TestDataset("abcdefgcijklmCDEFGHInopqr")
@@ -507,11 +531,77 @@ class StructureUpdatingTest(SimpleTest):
         UniqueMarker().markAllUnique(lines, dp)
         line1 = lines[name1]
         line2 = lines[name2]
-        print line1.correct_segments, line1.completely_resolved
-        print line2.correct_segments, line2.completely_resolved
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
-        extender.updateAllStructures(list(line1.correct_segments))
-        print line1.correct_segments, line1.completely_resolved
-        print line2.correct_segments, line2.completely_resolved
+        extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
+        # extender.updateAllStructures(list(line1.correct_segments))
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2198]]"
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:1350], C0_abcde[1400:2193]]"
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2743]]"
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:1899], C1_klmCDE[1951:2743]]"
+
+
+class LineExtensionTest(SimpleTest):
+    def testCase(self, instance):
+        # type: (list[str]) -> None
+        dataset = TestDataset(instance[0], mutation_rate=0.01)
+        dname = dataset.addDisjointig(instance[0] + instance[0].upper())
+        dataset.generateReads(int(instance[1]), 25, True)
+        for s in instance[2:]:
+            dataset.addContig(s)
+        lines, dp, reads = dataset.genAll(self.aligner)
+        UniqueMarker().markAllUnique(lines, dp)
+        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
+        extender = LineExtender(self.aligner, knotter, lines.disjointigs, dp)
+        extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
+        while True:
+            stop = True
+            for line_id in list(lines.items.keys()):
+                if line_id not in lines.items:
+                    continue
+                line = lines[line_id]
+                dp.printAll(sys.stdout)
+                extended = extender.tryExtend(line)
+                if extended:
+                    stop = False
+            if stop:
+                break
+        print " ".join([str(dataset.translateBack(line, self.aligner)) for line in lines.unique()])
+        print [line.circular for line in lines.unique()]
+        for line in lines.unique():
+            assert line.circular, str(line) + " " + dataset.translateBack(line, self.aligner)
+
+    def testManual(self):
+        pass
+        # self.test1()
+
+    def test1(self):
+        dataset = TestDataset("abcdefghijklmCDEFGHInopqr", mutation_rate=0.01)
+        dname = dataset.addDisjointig("abcdefghijklmCDEFGHInopqrabcd".upper())
+        name1 = dataset.addContig("abcde")
+        name2 = dataset.addContig("klmCDE")
+        dataset.generateReads(5, 25, True)
+        lines, dp, reads = dataset.genAll(self.aligner)
+        UniqueMarker().markAllUnique(lines, dp)
+        line1 = lines[name1]
+        line2 = lines[name2]
+        knotter = LineKnotter(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
+        extender = LineExtender(self.aligner, knotter, lines.disjointigs, dp)
+        print "New iteration results"
+        print dataset.translateBack(line1, self.aligner), dataset.translateBack(line2, self.aligner)
+        extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
+        while True:
+            stop = True
+            for line_id in list(lines.items.keys()):
+                if line_id not in lines.items:
+                    continue
+                line = lines[line_id]
+                dp.printAll(sys.stdout)
+                extended = extender.tryExtend(line)
+                if extended:
+                    stop = False
+            if stop:
+                break
+        print " ".join([str(dataset.translateBack(line, self.aligner)) for line in lines.unique()])
+        print [line.circular for line in lines.unique()]
 
 # LAUNCH TANYA!!!

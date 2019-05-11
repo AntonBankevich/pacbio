@@ -64,10 +64,11 @@ class ContigStorage:
                 self.add(item)
 
     def add(self, item):
-        # type: (Contig) -> None
+        # type: (Contig) -> Contig
         self.items[item.id] = item
         if self.add_rc:
             self.items[item.rc.id] = item.rc
+        return item
 
     def __getitem__(self, item):
         # type: (str) -> Optional[Contig]

@@ -2,6 +2,7 @@ import itertools
 
 from typing import Optional, Iterator, List, Any, Iterable, Generator, Tuple, Callable
 
+from common import params
 from common.alignment_storage import AlignmentPiece
 from disjointig_resolve.correction import Correction
 from common.save_load import TokenWriter, TokenReader
@@ -125,6 +126,7 @@ class SegmentStorage(SmartStorage):
     def __getitem__(self, item):
         # type: (int) -> Segment
         if self.isCanonical():
+            self.sort()
             return self.items[item]
         else:
             return self.rc.__getitem__(-1 - item).RC()
@@ -225,7 +227,7 @@ class SegmentStorage(SmartStorage):
     def makeCanonical(self):
         if self.isCanonical():
             return
-        self.items = [seg.RC() for seg in self.items[::-1]]
+        self.items = [seg.RC() for seg in self.rc.items[::-1]]
         self.rc.items = None
         self.sorted = self.rc.sorted
 
@@ -347,7 +349,7 @@ class SegmentStorage(SmartStorage):
             res.addAll(map(lambda seg1: seg1.contigAsSegment(seg), self))
             return res
         else:
-            return self.rc.contigAsSegment(seg.RC())
+            return self.rc.contigAsSegment(seg.RC()).rc
 
     def load(self, handler, contig):
         # type: (TokenReader, NamedSequence) -> None
@@ -383,6 +385,12 @@ class AlignmentStorage(SmartStorage):
         self.items = items # type: List[AlignmentPiece]
         self.rc = rc # type: AlignmentStorage
         self.key = lambda al: (al.seg_to.left, al.seg_to.right, al.seg_from.contig.id)
+
+    def checkLine(self, line):
+        for al in self:
+            if al.seg_to.contig != line:
+                return False
+        return True
 
     def __getitem__(self, item):
         # type: (int) -> AlignmentPiece
@@ -423,7 +431,7 @@ class AlignmentStorage(SmartStorage):
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
         # type: (accurate_line.NewLine, str, Optional[List[AlignmentPiece]]) -> None
         self.makeCanonical()
-        self.items = [al.targetAsSegment(Segment(line, 0, len(line))) for al in self.items]
+        self.items = [al.targetAsSegment(line.asSegment()) for al in self.items]
 
     def fireBeforeCutRight(self, line, new_seq, pos):
         # type: (accurate_line.NewLine, Contig, int) -> None
@@ -432,7 +440,7 @@ class AlignmentStorage(SmartStorage):
         for al in self.items: # type: AlignmentPiece
             if al.seg_to.right <= pos:
                 new_items.append(al.changeTargetContig(new_seq))
-            elif al.seg_to.left <= pos:
+            elif al.seg_to.left <= pos - params.k:
                 new_items.append(al.reduce(target=Segment(line, line.left(), pos)).changeTargetContig(new_seq))
         self.items = new_items # type: List[Segment]
 
@@ -447,13 +455,12 @@ class AlignmentStorage(SmartStorage):
         self.makeCanonical()
         self.items = correction.composeQueryDifferences(self.items) # type: List[AlignmentPiece]
 
-
     def fireAfterCorrect(self, line):
         # type: (accurate_line.NewLine) -> None
         self.makeCanonical()
         self.items = [al.targetAsSegment(Segment(line, line.left(), line.right())) for al in self.items] # type: List[AlignmentPiece]
 
-    # Optimize? We are only interested with some of the last alignments.
+    # Optimize? We are only interested in some of the last alignments.
     def allInter(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
         for al in self: # type: AlignmentPiece
@@ -490,8 +497,10 @@ class AlignmentStorage(SmartStorage):
         if self.isCanonical():
             for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
                 if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left <= al.seg_from.left:
-                    self.items[i] = AlignmentPiece.MergeOverlappingAlignments([al1, al])
-                    return
+                    tmp = AlignmentPiece.MergeOverlappingAlignments([al1, al])
+                    if tmp is not None:
+                        self.items[i] = tmp
+                        return
             self.add(al)
 
         else:
@@ -513,8 +522,8 @@ class AlignmentStorage(SmartStorage):
     # This works in square time in worst case bu should work fast if alignments are to left and right sides of the contig
     def merge(self, other):
         # type: (AlignmentStorage) -> AlignmentStorage
-        left_items = [(al, -1) for al in self.items]
-        right_items = [(al, 1) for al in other.items]
+        left_items = [(al, -1) for al in self]
+        right_items = [(al, 1) for al in other]
         new_items = sorted(left_items + right_items, key = lambda (al, side): (al.seg_to.contig.id, al.seg_from.contig.id, al.seg_from.left))
         new_storge = AlignmentStorage()
         for (c_to, c_from), it in itertools.groupby(new_items, lambda al: (al[0].seg_to.contig, al[0].seg_from.contig)):
@@ -525,13 +534,19 @@ class AlignmentStorage(SmartStorage):
             als_right = sorted(als_right, key = lambda al: al.seg_from.left)
             curr = len(als_right)
             merged = []
+            # print "Merging alignments from", c_from.id, "to", c_to.id
+            # print als_left
+            # print als_right
             for al in als_left:
                 while curr > 0 and ((als_right[curr - 1] is None or als_right[curr - 1].seg_from.left > al.seg_from.right)):
                     curr -= 1
                 for j in range(curr): # type: int
+                    # print "Attempting to merge", al, als_right[j]
                     if als_right[j] is not None and al.canMergeTo(als_right[j]):
+                        # print "Passed first test"
                         tmp = AlignmentPiece.MergeOverlappingAlignments([al, als_right[j]])
                         if tmp is not None:
+                            # print "Passed second test", tmp
                             al = tmp
                             als_right[j] = None
                             break
@@ -563,7 +578,7 @@ class AlignmentStorage(SmartStorage):
             res.addAll(map(lambda al: al.targetAsSegment(seg), self))
             return res
         else:
-            return self.rc.targetAsSegment(seg.RC())
+            return self.rc.targetAsSegment(seg.RC()).rc
 
     def queryAsSegment(self, seg):
         # type: (Segment) -> AlignmentStorage

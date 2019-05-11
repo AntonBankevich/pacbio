@@ -184,9 +184,10 @@ class Aligner:
         basic.ensure_dir_existance(dir)
         basic.ensure_dir_existance(alignment_dir)
         if same and not params.clean and os.path.exists(alignment_file):
-            print "Alignment reused:", alignment_file
+            # print "Alignment reused:", alignment_file
+            pass
         else:
-            print "Performing alignment:", alignment_file
+            # print "Performing alignment:", alignment_file
             make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
@@ -194,6 +195,8 @@ class Aligner:
     def alignClean(self, reads, ref_storage):
         # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
         reads = list(reads)
+        # print "Aligning", reads
+        # print list(ref_storage)
         parser = self.align(reads, list(ref_storage.unique()))
         read_storage = ContigStorage(reads, False)
         for rec in parser:

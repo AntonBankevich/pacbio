@@ -141,13 +141,18 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
 
     def __init__(self, lines, aligner):
         # type: (NewLineStorage, Aligner) -> None
-        DotPlot.__init__(self, lines)
         LineListener.__init__(self, self)
+        DotPlot.__init__(self, lines)
         self.lines = lines # type: NewLineStorage
         self.lines.addListener(self)
-        for line in lines.unique():
-            line.addListener(self)
+        # for line in lines.unique():
+        #     line.addListener(self)
         self.aligner = aligner
+
+    def addLine(self, line):
+        # type: (NewLine) -> None
+        DotPlot.addLine(self, line)
+        line.addListener(self)
 
     def getAlignmentsToFrom(self, line_to, line_from):
         # type: (NewLine, NewLine) -> Generator[AlignmentPiece]
@@ -163,12 +168,17 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
 
     def FireMergedLines(self, al1, al2):
         # type: (AlignmentPiece, AlignmentPiece) -> None
+        print "Fire merged lines", al1, al2
         new_line = al1.seg_to.contig
         line1 = al1.seg_from.contig
         line2 = al2.seg_from.contig
+        print list(self.allInter(line1.asSegment()))
+        print list(self.allInter(line2.asSegment()))
         self.addLine(new_line)
-        auto1 = AutoAlignmentStorage(new_line).addAll([al1.composeTargetDifference(al.compose(al1)) for al in self.auto_alignments[line1.id]])
-        auto2 = AutoAlignmentStorage(new_line).addAll([al2.composeTargetDifference(al.compose(al2)) for al in self.auto_alignments[line2.id]])
+        self.auto_alignments[line1.id].setState(-1)
+        self.auto_alignments[line2.id].setState(-1)
+        auto1 = AutoAlignmentStorage(new_line).addAll([al1.composeTargetDifference(al.compose(al1)) for al in self.auto_alignments[line1.id].content])
+        auto2 = AutoAlignmentStorage(new_line).addAll([al2.composeTargetDifference(al.compose(al2)) for al in self.auto_alignments[line2.id].content])
         auto3 = AutoAlignmentStorage(new_line).addAll([al2.composeTargetDifference(al.compose(al1)) for al in self.getAlignmentsToFrom(line1, line2)])
         self.auto_alignments[new_line.id].addAll(auto1.merge(auto3).merge(auto2).content)
         rc1 = RCAlignmentStorage(new_line).addAll([al1.rc.composeTargetDifference(al.compose(al1)) for al in self.rc_alignments[line1.id]])
@@ -190,6 +200,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
             self.addTwoLineStorage(storage1.line_from, new_line).addAll(als1.merge(als2))
         self.removeLine(al1.seg_from.contig)
         self.removeLine(al2.seg_from.contig)
+        print list(self.allInter(new_line.asSegment()))
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
@@ -219,11 +230,15 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         for storage in self.alignmentsToFrom[line.id].values():
             storage.fireAfterExtendRight(line, seq)
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
+        print "AE", list(self.auto_alignments[line.id].content)
+        print list(self.auto_alignments[line.id])
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
         new_seg = line.asSegment().suffix(length=len(seq) + 1000)
+        print "Aligning new extension"
         for al in self.aligner.alignClean([new_seg.asContig()], self.lines):
             al = al.queryAsSegment(new_seg)
             self.addAndMergeRight(al)
+
 
 
     def fireAfterCutRight(self, line, pos):
@@ -258,6 +273,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         del self.alignmentsToFrom[line.rc.id]
         self.deleteRCAlignmentStorage(line)
         self.deleteSelfAlignmentStorage(line)
+        line.removeListener(self)
 
     def deleteRCAlignmentStorage(self, line):
         # type: (NewLine) -> None

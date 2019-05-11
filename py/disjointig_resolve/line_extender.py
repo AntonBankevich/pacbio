@@ -81,6 +81,10 @@ class LineExtender:
         line.completely_resolved.mergeSegments(params.k)
         bound = LinePosition(line, line.left())
         new_recruits = 0
+        new_line = self.knotter.tryKnotRight(line)
+        if new_line is not None:
+            self.updateAllStructures(list(new_line.completely_resolved))
+            return 1
         while True:
             seg_to_resolve = line.completely_resolved.find(bound.suffix(), params.k)
             if seg_to_resolve is None:
@@ -92,15 +96,15 @@ class LineExtender:
                 bound = LinePosition(line, seg_to_resolve.right - params.k + 1)
                 continue
             self.updateAllStructures([seg for seg, arr in result])
-            if seg_to_resolve.right > len(line) - 1000:
-                if self.attemptExtend(line):
-                    self.updateAllStructures([seg_to_resolve])
-                    if self.knotter.tryKnotRight(line) is not None:
-                        return new_recruits
+            new_line = self.knotter.tryKnotRight(line)
+            if new_line is not None:
+                self.updateAllStructures(list(new_line.completely_resolved))
+                return new_recruits + 1
         return new_recruits
 
     # input: a collection of segments that had reads recruited to.
     def updateAllStructures(self, interesting_segments):
+        # type: (Iterable[Segment]) -> None
         # Correct read sequences, update correct segment storages. Return segments that were corrected.
         corrected = self.correctSequences(interesting_segments)
         # Collect all relevant contig segments, collect all reads that align to relevant segments. Mark resolved bound for each read.
@@ -116,12 +120,10 @@ class LineExtender:
             for rec in records:
                 if self.attemptProlongResolved(rec):
                     ok = True
-                    print "prolonged"
             if not ok:
                 for rec in records:
                     if self.attemptJump(rec):
                         ok = True
-                        print "jumped"
         for rec in records:
             line = rec.resolved.contig  # type: NewLine
             line.completely_resolved.add(rec.resolved)
@@ -149,6 +151,7 @@ class LineExtender:
         return records
 
     def correctSequences(self, interesting_segments):
+        # type: (Iterable[Segment]) -> List[Segment]
         to_correct = []
         for seg in interesting_segments:
             line = seg.contig # type: NewLine
@@ -164,37 +167,62 @@ class LineExtender:
         for line_id, it in itertools.groupby(to_correct,
                                           key=lambda seg: basic.Normalize(seg.contig.id)):  # type: NewLine, Iterable[Segment]
             line = None # type: NewLine
-            to_polysh = []
+            forward = SegmentStorage()
+            backward = SegmentStorage()
             for seg in it:
                 if seg.contig.id != line_id:
-                    to_polysh.append(seg.RC())
+                    backward.add(seg)
                     line = seg.contig.rc
                 else:
-                    to_polysh.append(seg)
+                    forward.add(seg)
                     line = seg.contig
+            to_polysh = SegmentStorage()
+            to_polysh.addAll(forward).addAll(backward.rc)
+            line.addListener(to_polysh)
+            line.addListener(forward)
+            line.rc.addListener(backward)
+            if to_polysh[-1].RC().left < 200:
+                l = to_polysh[-1].right
+                if self.attemptExtend(line):
+                    to_polysh.add(line.asSegment().suffix(pos=l))
+                    forward.add(line.asSegment().suffix(pos=l))
+            if to_polysh[0].left < 200:
+                l = to_polysh[0].RC().right
+                if self.attemptExtend(line.rc):
+                    to_polysh.rc.add(line.rc.asSegment().suffix(pos=l))
+                    backward.add(line.rc.asSegment().suffix(pos=l))
+            to_polysh.mergeSegments()
+            forward.mergeSegments()
+            backward.mergeSegments()
+            line.removeListener(to_polysh)
             new_segments = self.polyshSegments(line, to_polysh)
-            corrected.extend(new_segments)
+            line.removeListener(forward)
+            line.rc.removeListener(backward)
+            corrected.extend(forward)
+            corrected.extend(backward)
             self.updateCorrectSegments(line)
         return corrected
 
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, List[AlignmentPiece]]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
-        print resolved
         resolved = resolved.suffix(length = min(len(resolved), params.k * 2))
+        # print "Seg_to_resolve:", resolved
         line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k / 2,
                                  self.dot_plot.allInter(resolved)) # type: List[AlignmentPiece]
+        # print "Line alignments:", line_alignments
+        line_alignments = [al for al in line_alignments if al.rc.seg_to.left > 20 or al.seg_from.left > 20 or al.isIdentical()]
         line_alignments = [al.reduce(target=resolved) for al in line_alignments]
         read_alignments = [] # type: List[Tuple[AlignmentPiece, Segment]]
         correct_segments = []
         for ltl in line_alignments:
             line = ltl.seg_from.contig # type: NewLine
-            correct_segments.append(line.correct_segments.find(ltl.seg_from))
-            assert correct_segments[-1] is not None and correct_segments[-1].contains(ltl.seg_from)
-            read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
-        print list(self.dot_plot.allInter(resolved))
-        print line_alignments
-        print read_alignments
+            new_copy = line.correct_segments.find(ltl.seg_from)
+            if new_copy is not None and new_copy.contains(ltl.seg_from):
+                correct_segments.append(new_copy)
+                read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
+            else:
+                print ltl, new_copy, line.correct_segments
         read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.id)
         # removing all reads that are already sorted to one of the contigs
         alignments_by_read = itertools.groupby(read_alignments, lambda al: al[0].seg_from.contig.id)
@@ -202,25 +230,25 @@ class LineExtender:
         # TODO: parallel
         for name, it in alignments_by_read:
             als = list(it) # type: List[Tuple[AlignmentPiece, Segment]]
-            print als
+            read = als[0][0].seg_from.contig # type: AlignedRead
+            # print read, als
             ok = False
             for al in als:
                 if al[0].seg_to.interSize(resolved) >= params.k:
                     ok = True
                     break
-            print ok
             if not ok:
+                # print "No resolved inter"
                 continue
-            read = als[0][0].seg_from.contig # type: AlignedRead
             skip = False
             for al1 in als:
                 for al2 in read.alignments:
                     if al1[0].seg_to.inter(al2.seg_to):
+                        # print "Resolved inter", al1, al2
                         skip = True
                         break
                 if skip:
                     break
-            print skip
             if skip:
                 continue
             winner, seg = self.tournament(als) #type: AlignmentPiece, Segment
@@ -229,6 +257,8 @@ class LineExtender:
                 line.addReadAlignment(winner)
                 new_recruits.append((seg, winner))
         new_recruits = sorted(new_recruits, key = lambda rec: (rec[0].contig.id, rec[0].left, rec[0].right))
+        # print "New recruits:"
+        # print new_recruits
         return [(seg, [al for seg, al in it]) for seg, it in itertools.groupby(new_recruits, key = lambda rec: rec[0])]
 
     def fight(self, c1, c2):
@@ -241,7 +271,7 @@ class LineExtender:
             else:
                 winner = c1
         else:
-            if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or abs(s1 - s2) < s12 * 0.65:
+            if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or abs(s1 - s2) < s12 * 0.5:
                 winner = None
             elif s1 > s2:
                 winner = c2
@@ -250,12 +280,11 @@ class LineExtender:
         if winner is None:
             print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner"
         else:
-            print c1, c2, s1, s2, s12
             print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", winner
         return winner
 
     def tournament(self, candidates):
-        # type: (list[Tuple[AlignmentPiece, Segment]]) -> Tuple[Optional[AlignmentPiece], Optional[Segment]]]
+        # type: (list[Tuple[AlignmentPiece, Segment]]) -> Tuple[Optional[AlignmentPiece], Optional[Segment]]
         best = None
         for candidate in candidates:
             if best is None:
@@ -275,19 +304,21 @@ class LineExtender:
 
     def attemptExtend(self, line):
         # type: (NewLine) -> bool
-        new_contig, relevant_als = self.polisher.polishEnd(list(line.read_alignments.allInter(line.suffix(1000))))
+        new_contig, relevant_als = self.polisher.polishEnd(list(line.read_alignments.allInter(line.asSegment().suffix(length=1000))))
         if len(new_contig) == len(line):
             return False
         assert line.seq == new_contig.prefix(len=len(line)).Seq()
+        print "Extending", line, "for", len(new_contig) - len(line)
         line.extendRight(new_contig.suffix(pos = len(line)).Seq(), relevant_als)
         return True
 
     def polyshSegments(self, line, to_polysh):
-        # type: (NewLine, List[Segment]) -> List[Segment]
+        # type: (NewLine, Iterable[Segment]) -> List[Segment]
         segs = SegmentStorage()
         corrections = AlignmentStorage()
         line.addListener(segs)
         segs.addAll(to_polysh)
+        segs.mergeSegments()
         segs.sort()
         for seg in segs:
             corrections.add(self.polisher.polishSegment(seg, list(line.read_alignments.allInter(seg))))
@@ -357,7 +388,8 @@ class LineExtender:
             res = []
             while len(res) < num and len(self.reads) > 0 and self.reads[-1].seg_to.left < right:
                 al = self.reads.pop()
-                if al.seg_from.contig.id not in self.good_reads or al.seg_from.right > self.read_bounds[al.seg_from.contig.id]:
+                necessary_contig_support = min(len(al.seg_from.contig), al.seg_from.left + params.k * 3 / 2)
+                if al.seg_from.contig.id not in self.good_reads or necessary_contig_support > self.read_bounds[al.seg_from.contig.id]:
                     popped.append(al)
                     if len(al.seg_to) >= min_inter:
                         res.append(al)
@@ -366,17 +398,20 @@ class LineExtender:
 
         def __iter__(self):
             for al in self.reads[::-1]:
-                if al.seg_from.contig.id not in self.good_reads:
+                necessary_contig_support = min(len(al.seg_from.contig), al.seg_from.left + params.k * 3 / 2)
+                if al.seg_from.contig.id not in self.good_reads or necessary_contig_support > self.read_bounds[al.seg_from.contig.id]:
                     yield al
 
         def updateGood(self):
             self.sort()
             while len(self.reads) > 0 and self.reads[-1].seg_to.left <= self.resolved.right - params.k:
-                self.good_reads.add(self.reads.pop().seg_from.contig.id)
+                al = self.reads.pop()
+                if al.seg_to.interSize(self.resolved) >= params.k:
+                    self.good_reads.add(al.seg_from.contig.id)
             while len(self.potential_good) > 0 and self.potential_good[-1].seg_to.left <= self.resolved.right - params.k:
-                self.good_reads.add(self.potential_good.pop().seg_from.contig.id)
-
-        Remove all reads that align before current resolved segment
+                al = self.potential_good.pop()
+                if al.seg_to.interSize(self.resolved) >= params.k:
+                    self.good_reads.add(al.seg_from.contig.id)
 
         def pop(self):
             return self.reads.pop()
@@ -423,45 +458,64 @@ class LineExtender:
 
     def attemptProlongResolved(self, rec):
         # type: (Record) -> bool
-        bound = min(rec.correct.right, rec.next_resolved_start + params.k, self.findResolvedBound(rec, params.k) + params.k / 2)
+        res = self.findAndFilterResolvedBound(rec, params.k)
+        if res is None:
+            return False
+        rec.resolved = rec.resolved.contig.segment(rec.resolved.left, res)
+        rec.updateGood()
+        return True
+
+    def findAndFilterResolvedBound(self, rec, sz):
+        bound = min(rec.correct.right, rec.next_resolved_start + sz,
+                    self.findResolvedBound(rec, sz) + params.k / 2)
+        res = None
         if bound > rec.resolved.right:
-            candidate = self.segmentsWithGoodCopies(rec.line.segment(rec.resolved.right - params.k, bound), params.k)[0]
-            if candidate.right > rec.resolved.right:
-                rec.resolved = rec.resolved.contig.segment(rec.resolved.left, candidate.right)
-                rec.updateGood()
-                return True
-        return False
+            print "Prolonging resolved"
+            candidates = self.segmentsWithGoodCopies(rec.line.segment(rec.resolved.right - sz, bound), sz)
+            for candidate in candidates:
+                if candidate.left == rec.resolved.right - params.k and candidate.right > rec.resolved.right:
+                    res = candidate.right
+        return res
 
     # TODO: filter chimeric reads
     def attemptJump(self, rec):
         # type: (Record) -> bool
-        bound = min(rec.correct.right, rec.next_resolved_start + params.k, self.findResolvedBound(rec, params.l) + params.k / 2)
+        bound = self.findAndFilterResolvedBound(rec, params.l)
         bad_segments = SegmentStorage()
         for al in rec:
             if al.seg_to.left > bound:
                 break
             if al.seg_from.left > params.k / 2 and al.rc.seg_from.left > params.k / 2:
                 bad_segments.add(al.seg_to)
+        for al in self.dot_plot.allInter(rec.line.segment(rec.resolved.right - params.k, bound)):
+            if al.seg_from.left > params.k / 2 and al.rc.seg_from.left > params.k / 2:
+                bad_segments.add(al.seg_to)
+
         bad_segments.mergeSegments()
         good_segments = bad_segments.reverse().reduce(rec.line.segment(rec.resolved.right - params.k, bound))
         for seg in good_segments:
             for seg1 in self.segmentsWithGoodCopies(seg.expand(params.k / 2), params.k):
-                if len(seg) >= params.k and seg.right > rec.resolved.right:
+                if len(seg1) >= params.k and seg1.right > rec.resolved.right:
                     rec.setResolved(seg1)
                     return True
         return False
 
     def segmentsWithGoodCopies(self, seg, inter_size):
         # type: (Segment, int) -> List[Segment]
-        als = self.dot_plot.allInter(seg)
+        print "Filtering good", seg
+        print self.dot_plot.auto_alignments[seg.contig.id].content
+        als = [al for al in self.dot_plot.allInter(seg) if al.seg_from.left > 20 or al.rc.seg_to.left > 20 or al.isIdentical()]
         segs = SegmentStorage()
         for al in als:
             if len(al.seg_to) >= inter_size:
                 line = al.seg_from.contig # type: NewLine
-                correct = line.correct_segments.reverse().reduce(al.seg_from)
+                incorrect = line.correct_segments.reverse().reduce(al.seg_from)
                 matching = al.matchingSequence()
-                for seg1 in correct:
+                # print line, incorrect
+                for seg1 in incorrect:
                     segs.add(matching.mapSegDown(seg.contig, seg1))
+                    # print "incorrect", segs
         segs.mergeSegments()
+        # print segs
         return list(segs.reverse().reduce(seg).filterBySize(min=inter_size))
 

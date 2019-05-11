@@ -99,15 +99,27 @@ def merge(*iterables):
 class OStreamWrapper:
     def __init__(self, *streams):
         self.streams = list(streams)
+        self.active = True
+
+    def fileno(self):
+        return 1
 
     def write(self, string):
-        for stream in self.streams:
-            stream.write(string)
+        if self.active:
+            for stream in self.streams:
+                stream.write(string)
 
     def writelines(self, lines):
-        for line in lines:
-            for stream in self.streams:
-                stream.write(line)
+        if self.active:
+            for line in lines:
+                for stream in self.streams:
+                    stream.write(line)
+
+    def block(self):
+        self.active = False
+
+    def release(self):
+        self.active = True
 
     def flush(self):
         for stream in self.streams:

@@ -66,6 +66,7 @@ class AlignmentPiece:
         # type: (Segment, Optional[Segment]) -> AlignmentPiece
         if other is None:
             other = seg_from
+        assert len(seg_from) == len(other)
         return AlignmentPiece(seg_from, other, str(len(seg_from)) + "M")
 
     @staticmethod
@@ -90,12 +91,11 @@ class AlignmentPiece:
     @staticmethod
     def MergeOverlappingAlignments(als):# Glue a list of alignments such that consecutive query and target segments overlap. Can return None
         # type: (List[AlignmentPiece]) -> AlignmentPiece
-        als1 = [al.matchingSequence() for al in als]
         truncated = [als[0].seg_to]
         last = als[0].matchingSequence()
         for al in als[1:]:
             next = al.matchingSequence()
-            shared = list(last.common_to(next))
+            shared = list(last.common(next))
             if len(shared) == 0:
                 return None
             pos1, pos2 = shared[len(shared) / 2]
@@ -111,19 +111,26 @@ class AlignmentPiece:
         contig = als[0].seg_to.contig
         new_seq = "".join((al.seg_from.Seq() for al in als))
         new_contig = Contig(new_seq, "glued")
-        new_cigar = "".join(al.cigar for al in als)
+        new_cigar = [als[0].cigar]
+        for al1, al2 in zip(als[:-1], als[1:]): #type: AlignmentPiece, AlignmentPiece
+            if al1.seg_to.right < al2.seg_to.left:
+                new_cigar.append(str(al2.seg_to.left - al1.seg_to.right) + "I")
+            new_cigar.append(al2.cigar)
         return AlignmentPiece(new_contig.asSegment(), contig.segment(als[0].seg_to.left, als[-1].seg_to.right),
-                              new_cigar)
+                              "".join(new_cigar))
 
     @staticmethod
     def MergeFittingAlignments(als): # Glue a list of alignments with seg_from and seg_to exactly fitting together
         # type: (List[AlignmentPiece]) -> AlignmentPiece
         contig_from = als[0].seg_from.contig # type: Contig
         contig_to = als[0].seg_to.contig
-        new_cigar = "".join(al.cigar for al in als)
+        new_cigar = [als[0].cigar]
+        for al1, al2 in zip(als[:-1], als[1:]): #type: AlignmentPiece, AlignmentPiece
+            new_cigar.append(al1.generateBufferCigar(al2))
+            new_cigar.append(al2.cigar)
         return AlignmentPiece(contig_from.segment(als[0].seg_from.left, als[-1].seg_from.right),
                               contig_to.segment(als[0].seg_to.left, als[-1].seg_to.right),
-                              new_cigar)
+                              "".join(new_cigar))
 
     def isIdentical(self):
         return self.seg_from == self.seg_to
@@ -182,6 +189,11 @@ class AlignmentPiece:
 
     # TODO: do not use this
     def mergeDistant(self, other):
+        ins = self.generateBufferCigar(other)
+        return AlignmentPiece(self.seg_from.merge(other.seg_from), self.seg_to.merge(other.seg_to),
+                              self.cigar + ins + other.cigar)
+
+    def generateBufferCigar(self, other):
         ins = ""
         if not self.connects(other):
             d = (other.seg_from.left - self.seg_from.right, other.seg_to.left - self.seg_to.right)
@@ -192,8 +204,7 @@ class AlignmentPiece:
                 ins += str(d[0] - d[1]) + "I"
             elif d[1] > d[0]:
                 ins += str(d[1] - d[0]) + "D"
-        return AlignmentPiece(self.seg_from.merge(other.seg_from), self.seg_to.merge(other.seg_to),
-                              self.cigar + ins + other.cigar)
+        return ins
 
     def __eq__(self, other):
         return self.seg_from == other.seg_from and self.seg_to == other.seg_to and self.cigar == other.cigar
@@ -394,6 +405,16 @@ class MatchingSequence:
                 cur_self += 1
                 cur_other += 1
 
+    def common(self, other):
+        # type: (MatchingSequence) -> Generator[Tuple[int, int]]
+        assert self.seq_to == other.seq_to
+        assert self.seq_from == other.seq_from
+        cur_self = 0
+        cur_other = 0
+        for i, j in self.common_to(other):
+            if self.matches[i][0] == other.matches[j][0]:
+                yield (i, j)
+
     def reduceTarget(self, left, right):
         return MatchingSequence(self.seq_from, self.seq_to,
                                 filter(lambda match: left <= match[1] < right, self.matches))
@@ -408,16 +429,19 @@ class MatchingSequence:
             for pos1, pos2 in self.matches[::-1]:
                 if pos1 <= pos:
                     return pos2
-            return None
         else:
             for pos1, pos2 in self.matches:
                 if pos1 >= pos:
                     return pos2
-            return None
+        return None
 
-    def mapSegDown(self, contig, seg):
-        left = self.mapDown(seg.left)
-        right = self.mapDown(seg.right - 1)
+    def mapSegDown(self, contig, seg, mapIn = True):
+        if mapIn:
+            left = self.mapDown(seg.left, roundDown=False)
+            right = self.mapDown(seg.right - 1)
+        else:
+            left = self.mapDown(seg.left)
+            right = self.mapDown(seg.right - 1, roundDown=False)
         return Segment(contig, left, right + 1)
 
     def mapUp(self, pos, roundDown = True):
@@ -537,6 +561,11 @@ class AlignedRead(Contig):
         Contig.__init__(self, rec.seq, rec.id, rc)
         self.rc = rc  # type: AlignedRead
 
+    @staticmethod
+    def new(seq, id):
+        # type: (str, str) -> AlignedRead
+        return AlignedRead(NamedSequence(seq, id))
+
     def __len__(self):
         # type: () -> int
         return len(self.seq)
@@ -569,7 +598,9 @@ class AlignedRead(Contig):
 
     def AddSamAlignment(self, rec, contig):
         # type: (sam_parser.SAMEntryInfo, Contig) -> AlignmentPiece
-        return AlignmentPiece.FromSamRecord(self, contig, rec)
+        res = AlignmentPiece.FromSamRecord(self, contig, rec)
+        self.addAlignment(res)
+        return res
 
     def addAlignment(self, al):
         # type: (AlignmentPiece) -> None
