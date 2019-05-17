@@ -12,6 +12,7 @@ max_jump = 6000
 assert_pi = True
 k = 500
 l = 1500
+threads = 16
 
 class Scores:
     ins_score = 8
@@ -21,5 +22,4 @@ class Scores:
     switch_core = 1
     center_score = 20
     inf = 10000000
-
 

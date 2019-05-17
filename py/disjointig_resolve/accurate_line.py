@@ -1,4 +1,5 @@
 import itertools
+import multiprocessing
 
 from typing import Optional, Iterable, List, Any, Generator
 
@@ -68,7 +69,7 @@ class ExtensionHandler(LineListener):
             tmp = line.read_alignments.merge(AlignmentStorage().addAll(relevant_als).targetAsSegment(line.asSegment()))
             line.read_alignments.clean()
             line.read_alignments.addAll(tmp)
-        new_seg = line.asSegment().suffix(length = len(seq) + 1000)
+        new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + 1000))
         for al in self.aligner.alignClean([new_seg.asContig()], self.disjointigs):
             al = al.reverse().targetAsSegment(new_seg)
             line.disjointig_alignments.addAndMergeRight(al)
@@ -82,6 +83,7 @@ class NewLine(Contig):
         self.seq = seq
         self.id = id # type: str
         self.circular = False
+        self.name_printer = None
         if rc is None:
             # TODO: move all these to separate classes
             self.initial = AlignmentStorage()
@@ -169,6 +171,7 @@ class NewLine(Contig):
 
     def extendRight(self, seq, relevant_als = None):
         # type: (str, List[AlignmentPiece]) -> None
+        assert self.knot is None
         if relevant_als is None:
             relevant_als = []
         new_seq = Contig(self.seq + seq, "TMP2_" + self.id)
@@ -275,6 +278,15 @@ class NewLine(Contig):
             read.addAlignment(al)
 
     def __str__(self):
+        if self.name_printer is not None:
+            return self.name_printer(self)
+        points = [self.left()]
+        points.extend(self.initial)
+        points.append(self.right())
+        points = map(str, points)
+        return "Line:" + str(self.id) + ":" + "[" + ":".join(points) +"]"
+
+    def __repr__(self):
         points = [self.left()]
         points.extend(self.initial)
         points.append(self.right())

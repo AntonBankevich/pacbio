@@ -1,9 +1,11 @@
 1
 LineExtensionTest 1
-List abcdefghijklmCDEFGHInopqr 5 abcde klmCDE
+List aaabacadaeafagahaiaj 5 b
+List abcdefghijaklmnopaqrstuvwxyz 5 b
+List abcdefghCDEFij 5 ab gh
+List abcdefaghCDEFij 5 ab gh
 List abcdefghijaklmnEFGHIopaqr 5 abcde klmnEF
 List abcdefghijaklDEFGmnopaqrsDeFgHtuvwxyz 5 abcde klmnEF
-List abcdefghijaklmnopaqrstuvwxyz 5 a
 
 StructureUpdatingTest 0
 KnottingTest 0

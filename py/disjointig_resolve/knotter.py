@@ -35,7 +35,7 @@ class LineMerger:
     def tryMergeRight(self, line):
         # type: (NewLine) -> Optional[NewLine]
         assert line.read_alignments.checkLine(line), str(line.read_alignments)
-        if line.circular:
+        if line.circular or line.knot is not None:
             return None
         read_alignments = line.read_alignments.allInter(line.asSegment().suffix(length=1000))
         candidates = [] # type: List[LineMerger.Record]
@@ -72,6 +72,7 @@ class LineMerger:
             print "Merging", line, "with", final[1], "with gap", final[0]
             other = final[1]
             assert line != other.rc
+            assert other.rc.knot is None
             line_alignment = final[2][0].al1.composeTargetDifference(final[2][0].al2)
             print "Alignment:", line_alignment
             tmp = None
@@ -86,8 +87,10 @@ class LineMerger:
             if line == other:
                 line.cutRight(line.correct_segments[-1].right)
                 line.rc.cutRight(line.rc.correct_segments[-1].right)
+                line.tie(line, 0, "")
                 line.setCircular()
-                return None
+                print line, "is circular"
+                return line
             new_line = self.storage.mergeLines(line_alignment, params.k)
             seg = new_line.segment(pref, len(new_line) - suff)
             correction = self.polisher.polishSegment(seg, list(new_line.read_alignments.allInter(seg)))

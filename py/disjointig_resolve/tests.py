@@ -124,6 +124,7 @@ class TestDataset:
         for dis in self.disjointigs:
             disjointigs.addNew(dis.seq, dis.id)
         lines = NewLineStorage(disjointigs, aligner)
+        lines.name_printer = lambda line: line.id + "_" + self.translateBack(line, aligner)
         for line in self.contigs:
             lines.addNew(line.seq, line.id)
         dp = LineDotPlot(lines, aligner)

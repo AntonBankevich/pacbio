@@ -20,6 +20,7 @@ class NewLineStorage(ContigStorage):
         self.items = dict() # type: Dict[str, NewLine]
         self.cnt = 1
         self.listeners = [] # type: List[LineStorageListener]
+        self.name_printer = None
 
     def __iter__(self):
         # type: () -> Iterator[NewLine]
@@ -47,6 +48,8 @@ class NewLineStorage(ContigStorage):
             self.cnt += 1
         new_line = NewLine(seq, name, ExtensionHandler(self.disjointigs, self.aligner))
         self.add(new_line)
+        new_line.name_printer = self.name_printer
+        new_line.rc.name_printer = self.name_printer
         return new_line
 
     def fillFromContigs(self, contigs):

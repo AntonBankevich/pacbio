@@ -231,7 +231,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
             storage.fireAfterExtendRight(line, seq)
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
-        new_seg = line.asSegment().suffix(length=len(seq) + 1000)
+        new_seg = line.asSegment().suffix(length=min(len(line), len(seq) + 1000))
         # print "Aligning new extension"
         for al in self.aligner.alignClean([new_seg.asContig()], self.lines):
             al = al.queryAsSegment(new_seg)
@@ -260,6 +260,8 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         elif al.seg_to.contig == al.seg_from.contig.rc:
             self.rc_alignments[al.seg_to.contig.id].addAndMergeRight(al)
         else:
+            if al.seg_from.contig.id not in self.alignmentsToFrom[al.seg_to.contig.id]:
+                self.addTwoLineStorage(al.seg_to.contig, al.seg_from.contig)
             self.alignmentsToFrom[al.seg_to.contig.id][al.seg_from.contig.id].addAndMergeRight(al)
 
     def removeLine(self, line):

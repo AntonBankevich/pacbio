@@ -101,7 +101,8 @@ class DisjointigCollection(ContigStorage):
         # type: (Union[Generator[AlignmentPiece], Iterable[AlignmentPiece]]) -> None
         for al in als:
             dt = al.seg_to.contig # type: Disjointig
-            dt.addAlignment(al)
+            if al.seg_from.left < 500 and al.rc.seg_from.left < 500:
+                dt.addAlignment(al)
 
     def save(self, handler):
         # type: (TokenWriter) -> None

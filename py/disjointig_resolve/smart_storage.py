@@ -202,7 +202,7 @@ class SegmentStorage(SmartStorage):
             res = [self.items[0]]  # type: List[Segment]
             for seg in self.items[1:]:  # type: Segment
                 if seg.left <= res[-1].right - inter_size or seg.right <= res[-1].right:
-                    res[-1].right = max(res[-1].right, seg.right)
+                    res[-1] = Segment(res[-1].contig, res[-1].left, max(res[-1].right, seg.right))
                 else:
                     res.append(seg)
             self.items = res
@@ -218,7 +218,7 @@ class SegmentStorage(SmartStorage):
                     res.add(seg.cap(seg1))
             return res
         else:
-            return self.rc.reduce(seg.RC())
+            return self.rc.reduce(seg.RC()).rc
 
     def filter(self, f):
         # type: (Callable[[Segment], bool]) -> SegmentStorage

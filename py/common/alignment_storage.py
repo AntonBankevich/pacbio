@@ -1,4 +1,5 @@
 import itertools
+import traceback
 
 from typing import Generator, Tuple, Optional, Any, List, Dict, Callable, Iterator, Iterable, BinaryIO
 
@@ -21,8 +22,8 @@ class AlignmentPiece:
             cigar = str(len(seg_from)) + "M"
         self.cigar = cigar
         assert len(seg_from) > 0 and len(seg_to) > 0
-        assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left]
-        assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1]
+        assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left], str(self) + " " + self.seg_from.contig[self.seg_from.left]+ " " + self.seg_to.contig[self.seg_to.left]
+        assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1], str(self) + " " + self.seg_from.contig[self.seg_from.right - 1]+ " " + self.seg_to.contig[self.seg_to.right - 1]
         if params.assert_pi:
             pi = self.matchingPercentIdentity()
             if pi < 0.05:
@@ -33,6 +34,10 @@ class AlignmentPiece:
             self.rc = AlignmentPiece(seg_from.RC(), seg_to.RC(), easy_cigar.RCCigar(self.cigar), self)
         else:
             self.rc = rc # type: AlignmentPiece
+        # if seg_from.left == 6448 and seg_from.right == 9134 - 492 and seg_to.left == 2597 and seg_to.right == 4798:
+        #     print self
+        #     print self.reverse()
+        #     traceback.print_stack()
 
     @staticmethod
     def FromSamRecord(seq_from, seq_to, rec):
@@ -197,7 +202,7 @@ class AlignmentPiece:
         ins = ""
         if not self.connects(other):
             d = (other.seg_from.left - self.seg_from.right, other.seg_to.left - self.seg_to.right)
-            assert d[0] < 10 and d[1] < 10
+            assert 0 <= d[0] < 100 and 0 <= d[1] < 100, str(self) + " " + str(other)
             if min(d[0], d[1]) > 0:
                 ins += str(min(d[0], d[1])) + "M"
             if d[0] > d[1]:
@@ -283,15 +288,15 @@ class AlignmentPiece:
         return False
 
     def contradictingRTC(self,
-                         seg=None):  # contradiction between read and consensus sequence. Stricter consensus condition
-        # type: (Segment) -> bool
+                         seg=None, tail_size = 500):  # contradiction between read and consensus sequence. Stricter consensus condition
+        # type: (Segment, int) -> bool
         if seg is None:
             seg = self.seg_to.contig.asSegment()
         if not self.seg_to.inter(seg):
             return False
-        if self.seg_from.left >= 500 and self.seg_to.left >= seg.left + 50:
+        if self.seg_from.left >= tail_size and self.seg_to.left >= seg.left + 50:
             return True
-        if self.seg_from.right <= len(self.seg_from.contig) - 500 and self.seg_to.right <= seg.right - 50:
+        if self.rc.seg_from.left <= tail_size and self.seg_to.right <= seg.right - 50:
             return True
         return False
 
@@ -346,6 +351,7 @@ class AlignmentPiece:
 
     def reverse(self):
         # type: () -> AlignmentPiece
+        # print "Reverse", self, self.seg_from.contig[self.seg_from.right - 1], self.seg_to.contig[self.seg_to.right - 1]
         return AlignmentPiece(self.seg_to, self.seg_from, easy_cigar.ReverseCigar(self.cigar))
 
     def split(self):

@@ -45,7 +45,8 @@ def main(args):
     if params.test:
         aligner = Aligner(DirDistributor(params.alignmentDir()))
         Tester(aligner).testAll("tests/cases.txt")
-        return
+        sys.stdout.write("Finished\n")
+        print (time.strftime("%d.%m.%Y  %I:%M:%S"))
     print "Preparing initial state"
     if params.load_from is not None:
         print "Loading initial state from saves"
@@ -105,6 +106,8 @@ def main(args):
 
     lines.printToFile(sys.stdout)
     lines.printToFasta(open(os.path.join(params.dir, "lines.fasta"), "w"))
+    sys.stdout.write("Finished\n")
+    print (time.strftime("%d.%m.%Y  %I:%M:%S"))
 
 
 if __name__ == "__main__":

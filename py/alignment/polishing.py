@@ -5,6 +5,7 @@ from typing import Optional, List, Iterable, Tuple
 
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO, params
+from common.line_align import Scorer
 from common.seq_records import NamedSequence
 from common.sequences import Consensus, Contig, ContigCollection, Segment, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
@@ -151,8 +152,8 @@ class Polisher:
 
     def polishEnd(self, als, min_cov = 4):
         # type: (List[AlignmentPiece], int) -> Tuple[Contig, List[AlignmentPiece]]
+        scorer = Scorer()
         contig = als[0].seg_to.contig
-        relevant_seg = contig.asSegment().suffix(length=1000)
         new_contig = contig.asSegment().asContig()
         relevant_als = [al.changeTargetContig(new_contig) for al in als if al.rc.seg_to.left < 100]
         finished_als = []
@@ -167,7 +168,7 @@ class Polisher:
             # TODO replace with position search in cigar
             if len(relevant_als) < min_cov:
                 break
-            start = new_contig.asSegment().suffix(length=200).Seq()
+            start = basic.randomSequence(200) + new_contig.asSegment().suffix(length=200).Seq()
             reduced_read_list = [
                 AlignedRead.new(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), al.seg_from.contig.id)
                 for al in relevant_als if al.rc.seg_from.left > 100]
@@ -186,7 +187,7 @@ class Polisher:
                 for read in reduced_read_list:
                     candidate_alignments.append(None)
                     for al in read.alignmentsTo(polished_base.asSegment()):
-                        if al.seg_to.left == 0 and (candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right):
+                        if al.seg_to.left == 0 and ((candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right)):
                             candidate_alignments[-1] = al
                 positions = []
                 for al in candidate_alignments:
@@ -208,7 +209,12 @@ class Polisher:
                         read_mappings.append(AlignmentPiece.Identical(seg_from, seg_to))
                     candidate_alignments = [al2.compose(al1).compose(embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
                     corrected_relevant_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in relevant_als]
-                    relevant_als = [al1.mergeDistant(al2) for al1, al2 in zip(corrected_relevant_alignments, candidate_alignments)]
+                    relevant_als = []
+                    for al1, al2 in zip(corrected_relevant_alignments, candidate_alignments):
+                        al = al1.mergeDistant(al2)
+                        if al1.seg_from.dist(al2.seg_from) >= 10 or al1.seg_to.dist(al2.seg_to) >= 10:
+                            al = scorer.polyshAlignment(al)
+                        relevant_als.append(al)
                     finished_als = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in finished_als]
                     new_contig = new_contig_candidate
                     break

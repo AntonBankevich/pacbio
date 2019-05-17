@@ -157,6 +157,10 @@ class Scorer:
         return self.scoreCommon(piece1, piece2)
 
     def scoreCommon(self, piece1, piece2):
+        # type: (AlignmentPiece, AlignmentPiece) -> Tuple[int, int, int]
+        if not piece1.seg_from.inter(piece2.seg_from):
+            print "Nonintersecting alignments fighting", piece1, piece2
+            return 0, 0, 0
         matches1, matches2 = self.cutHomo(piece1.matchingSequence(), piece2.matchingSequence())
         if matches1 is None:
             print piece1, piece2
@@ -177,6 +181,14 @@ class Scorer:
 
     def scoreInCorrectSegments(self, al1, seg1, al2, seg2):
         # type: (AlignmentPiece, Segment, AlignmentPiece, Segment) -> Tuple[Optional[int], Optional[int], Optional[int]]
+        invalid1 = al1.contradictingRTC()
+        invalid2 = al2.contradictingRTC()
+        if invalid1 and invalid2:
+            return 0, 0, 0
+        elif invalid1:
+            return 1000, 0, 1000
+        elif invalid2:
+            return 0, 1000, 1000
         p1 = 0
         p2 = 0
         alignment_length_penalty = min(self.scores.ins_score, self.scores.del_score)
@@ -194,19 +206,13 @@ class Scorer:
         full_scores = self.scoreCommon(al1, al2)
 
         # On this segment both alignments go to correct sequences. We place larger weight on differences in this segment.
-        seg = al1.reduce(target=seg1).seg_from.cap(al2.reduce(target=seg2).seg_from)
-        correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
-        # print correct_scores
-        # seg1 = seg
-        # for i in range((len(seg1) + 49) / 60):
-        #     seg = seg1.contig.segment(seg1.left + i * 60, min(seg1.right, seg1.left + (i + 1) * 60))
-        #     correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
-        #     print correct_scores
-        #     print "\n".join(al1.reduce(query=seg).asMatchingStrings())
-        #     print "\n".join(al2.reduce(query=seg).asMatchingStrings())
-        #     difference = al2.reduce(query=seg).composeTargetDifference(al1.reduce(query=seg))
-        #     print "\n".join(difference.asMatchingStrings())
-        # sys.exit(0)
+        q1 = al1.reduce(target=seg1).seg_from
+        q2 = al2.reduce(target=seg2).seg_from
+        if q1.inter(q2):
+            seg = q1.cap(q2)
+            correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
+        else:
+            correct_scores = full_scores
         if correct_scores[0] > correct_scores[1]:
             p = p1 - p2
         else:
