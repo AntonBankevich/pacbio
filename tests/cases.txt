@@ -1,22 +1,28 @@
 1
 LineExtensionTest 1
-List aaabacadaeafagahaiaj 5 b
-List abcdefghijaklmnopaqrstuvwxyz 5 b
-List abcdefghCDEFij 5 ab gh
-List abcdefaghCDEFij 5 ab gh
-List abcdefghijaklmnEFGHIopaqr 5 abcde klmnEF
-List abcdefghijaklDEFGmnopaqrsDeFgHtuvwxyz 5 abcde klmnEF
+List abcdefghijaklDEFGmnopaqrsDeFgHtuv 5 0 ab ij no
+List abbBbbcdefBBbBBghij 5 2 ja de
+List abcdefghCDEFij 5 0 ab gh
+List abcdefaghCDEFij 5 0 ab gh
+List aaabacadaeafagahaiaj 5 0 b
+List abbbcdefBBBghij 5 0 ja de
+List abCDEFGHijklcdemnodgfpq 5 0 pa jk mn
+List abcdefghijaklmnopaqrstuvwxyz 5 0 b
+List abcdefghijaklmnEFGHIopaqr 5 0 abcde klmnEF
 
-StructureUpdatingTest 0
+
 KnottingTest 0
-ReadRecruitmentTest 0
 
 UniqueRegionMarkingTest 3
-List abcdefgh 32 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fgha fgha fgha fgha ghab ghab ghab ghab habc habc habc habc 1 abcdefgh 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:4400-0]]
-List abcdefghcdeijk 56 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fghc fghc fghc fghc ghcd ghcd ghcd ghcd hcde hcde hcde hcde cdei cdei cdei cdei deij deij deij deij eijk eijk eijk eijk ijka ijka ijka ijka jkab jkab jkab jkab kabc kabc kabc kabc 1 abcdefghcdeijk 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:1338],C0_abcdefgh[2500:4400-0]]
-List abcdefghCDEijkEFlmn 76 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fghc fghc fghc fghc ghcd ghcd ghcd ghcd hcde hcde hcde hcde cdei cdei cdei cdei deij deij deij deij eijk eijk eijk eijk ijke ijke ijke ijke jkef jkef jkef jkef kefl kefl kefl kefl eflm eflm eflm eflm flmn flmn flmn flmn lmna lmna lmna lmna mnab mnab mnab mnab nabc nabc nabc nabc 1 abcdefghcdeijkeflmn 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:1341],C0_abcdefgh[3050:4400-0]]
+List abcdefgh 32 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fgha fgha fgha fgha ghab ghab ghab ghab habc habc habc habc 1 abcdefghabcdefgh 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:4400-0]]
+List abcdefghcdeijk 56 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fghc fghc fghc fghc ghcd ghcd ghcd ghcd hcde hcde hcde hcde cdei cdei cdei cdei deij deij deij deij eijk eijk eijk eijk ijka ijka ijka ijka jkab jkab jkab jkab kabc kabc kabc kabc 1 abcdefghcdeijkabcdefghcdeijk 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:1350],C0_abcdefgh[2500:4400-0]]
+List abcdefghCDEijkEFlmn 76 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fghc fghc fghc fghc ghcd ghcd ghcd ghcd hcde hcde hcde hcde cdei cdei cdei cdei deij deij deij deij eijk eijk eijk eijk ijke ijke ijke ijke jkef jkef jkef jkef kefl kefl kefl kefl eflm eflm eflm eflm flmn flmn flmn flmn lmna lmna lmna lmna mnab mnab mnab mnab nabc nabc nabc nabc 1 abcdefghcdeijkeflmnabcdefghcdeijkeflmn 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:1350],C0_abcdefgh[3050:4400-0]]
 
 PotentialReadsTest 0
+
+StructureUpdatingTest 0
+ReadRecruitmentTest 0
+
 
 DotPlotModificationTest 0
 
@@ -35,4 +41,3 @@ AlignmentStorageTest 0
 AlignmentCompositionTest 0
 
 CorrectionMappingTest 0
-

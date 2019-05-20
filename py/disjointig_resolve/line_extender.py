@@ -121,9 +121,9 @@ class LineExtender:
                 if self.attemptProlongResolved(rec):
                     ok = True
             if not ok:
-                for rec in records:
+                for rec in records: # type:LineExtender.Record
                     if self.attemptJump(rec):
-                        print "Jumped", rec.next_resolved_start, str(rec.old_resolved), rec.resolved, rec.next_resolved_start
+                        print "Jumped", rec.line, rec.line.initial, len(rec.line), rec.next_resolved_start, str(rec.old_resolved), rec.resolved
                         ok = True
         for rec in records:
             line = rec.resolved.contig  # type: NewLine
@@ -159,6 +159,7 @@ class LineExtender:
 
     def correctSequences(self, interesting_segments):
         # type: (Iterable[Segment]) -> List[Segment]
+        interesting_segments = list(interesting_segments)
         to_correct = []
         for seg in interesting_segments:
             line = seg.contig # type: NewLine
@@ -173,6 +174,7 @@ class LineExtender:
         corrected = []
         for line_id, it in itertools.groupby(to_correct,
                                           key=lambda seg: basic.Normalize(seg.contig.id)):  # type: NewLine, Iterable[Segment]
+            it = list(it)
             line = None # type: NewLine
             forward = SegmentStorage()
             backward = SegmentStorage()
@@ -470,7 +472,7 @@ class LineExtender:
 
     def attemptProlongResolved(self, rec):
         # type: (Record) -> bool
-        # print "Walking"
+        # print "Walking", rec.resolved, rec.line
         res = self.findAndFilterResolvedBound(rec, params.k)
         if res <= rec.resolved.right:
             return False
@@ -481,10 +483,9 @@ class LineExtender:
         bound0 = self.findResolvedBound(rec, sz) + params.k / 2
         bound = min(rec.correct.right, rec.next_resolved_start + params.k - 1, bound0)
         res = rec.resolved.right
-        # print "oppa", rec.resolved, rec.correct.right, rec.next_resolved_start + params.k - 1, bound0
         if bound > rec.resolved.right:
             # print "Prolonging resolved"
-            candidates = self.segmentsWithGoodCopies(rec.line.segment(rec.resolved.right - sz, bound), sz)
+            candidates = self.segmentsWithGoodCopies(rec.line.segment(max(0, rec.resolved.right - sz), bound), sz)
             # print candidates
             for candidate in candidates:
                 if candidate.left == rec.resolved.right - sz and candidate.right > rec.resolved.right:
@@ -511,6 +512,7 @@ class LineExtender:
         bad_segments.mergeSegments()
         good_segments = bad_segments.reverse().reduce(rec.line.segment(rec.resolved.right - params.k, bound))
         for seg in good_segments:
+            seg = Segment(seg.contig, max(0, seg.left - params.k / 2), seg.right)
             for seg1 in self.segmentsWithGoodCopies(seg, params.k):
                 if len(seg1) >= params.k and seg1.right > rec.resolved.right:
                     rec.setResolved(seg1)

@@ -202,6 +202,43 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         self.removeLine(al2.seg_from.contig)
         print list(self.allInter(new_line.asSegment()))
 
+    def FireSplitLine(self, al1, al2):
+        # type: (AlignmentPiece, AlignmentPiece) -> None
+        print "Fire split line", al1, al2
+        line = al1.seg_from.contig
+        als_to_add = [] # type: List[AlignmentPiece]
+        als_to_add.extend(self.auto_alignments[line.id].content)
+        als_to_add.extend(self.rc_alignments[line.id].content)
+        for storage in self.alignmentsToFrom[line.id].values():
+            als_to_add.extend(storage.content)
+        self.removeLine(line)
+
+        line1 = al1.seg_to.contig
+        line2 = al2.seg_to.contig
+        self.addLine(line1)
+        self.addLine(line2)
+        for al in als_to_add:
+            tmp = [al]
+            while len(tmp) > 0:
+                al = tmp.pop()
+                if al.seg_to.contig == line:
+                    if al.seg_to.interSize(al1.seg_from) >= params.k:
+                        tmp.append(al.compose(al1))
+                    if al.seg_to.interSize(al2.seg_from) >= params.k:
+                        tmp.append(al.compose(al2))
+                elif al.seg_from.contig == line:
+                    if al.seg_from.interSize(al1.seg_from) >= params.k:
+                        tmp.append(al1.reverse().compose(al))
+                    if al.seg_from.interSize(al2.seg_from) >= params.k:
+                        tmp.append(al2.reverse().compose(al))
+                elif al.seg_from.contig == line.rc:
+                    if al.seg_from.interSize(al1.rc.seg_from) >= params.k:
+                        tmp.append(al1.rc.reverse().compose(al))
+                    if al.seg_from.interSize(al2.rc.seg_from) >= params.k:
+                        tmp.append(al2.rc.reverse().compose(al))
+                else:
+                    self.addAlignment(al)
+
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
         for storage in self.alignmentsToFrom[line.id].values():

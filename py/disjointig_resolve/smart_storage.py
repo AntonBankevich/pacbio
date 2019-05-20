@@ -231,6 +231,14 @@ class SegmentStorage(SmartStorage):
         self.rc.items = None
         self.sorted = self.rc.sorted
 
+    def map(self, al):
+        # type: (AlignmentPiece) -> SegmentStorage
+        matching = al.matchingSequence()
+        res = SegmentStorage()
+        for seg in self:
+             res.add(matching.mapSegDown(al.seg_to.contig, seg))
+        return res
+
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (accurate_line.NewLine, Contig, str) -> None
         self.makeCanonical()
@@ -285,10 +293,12 @@ class SegmentStorage(SmartStorage):
             return self.rc.subStorage(seg.RC(), inter_size).rc
 
     # here we assume that segments inside each colection can not have intersection at least min_inter
-    def cap(self, other, min_inter = 0):
-        # type: (SegmentStorage, int) -> SegmentStorage
+    def cap(self, other = None, min_inter = 0, seg = None):
+        # type: (SegmentStorage, Segment, int) -> SegmentStorage
+        if other is None:
+            other = SegmentStorage().addAll([seg])
         if not self.isCanonical():
-            return self.rc.cap(other.rc).rc
+            return self.rc.cap(other.rc, min_inter).rc
         cur = 0
         res = SegmentStorage()
         for seg in other:
@@ -461,10 +471,10 @@ class AlignmentStorage(SmartStorage):
         self.items = [al.targetAsSegment(Segment(line, line.left(), line.right())) for al in self.items] # type: List[AlignmentPiece]
 
     # Optimize? We are only interested in some of the last alignments.
-    def allInter(self, seg):
+    def allInter(self, seg, min_inter = 1):
         # type: (Segment) -> Generator[AlignmentPiece]
         for al in self: # type: AlignmentPiece
-            if al.seg_to.inter(seg):
+            if al.seg_to.interSize(seg) >= min_inter:
                 yield al
 
     def removeInter(self, seg):

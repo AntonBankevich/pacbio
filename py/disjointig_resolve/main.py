@@ -47,6 +47,7 @@ def main(args):
         Tester(aligner).testAll("tests/cases.txt")
         sys.stdout.write("Finished\n")
         print (time.strftime("%d.%m.%Y  %I:%M:%S"))
+        return
     print "Preparing initial state"
     if params.load_from is not None:
         print "Loading initial state from saves"

@@ -1,10 +1,10 @@
-from typing import Dict, List, Iterator, Optional, Iterable, BinaryIO
+from typing import Dict, List, Iterator, Optional, Iterable, BinaryIO, Tuple
 
 from alignment.align_tools import Aligner
-from common import SeqIO
+from common import SeqIO, params
 from common.alignment_storage import AlignmentPiece, ReadCollection
 from common.save_load import TokenWriter, TokenReader
-from common.sequences import ContigStorage, UniqueList, Contig, ContigCollection
+from common.sequences import ContigStorage, UniqueList, Contig, ContigCollection, Segment
 from disjointig_resolve.accurate_line import NewLine, ExtensionHandler
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.line_alignments import TwoLineAlignmentStorage
@@ -40,6 +40,11 @@ class NewLineStorage(ContigStorage):
         # type: (AlignmentPiece, AlignmentPiece) -> None
         for listener in self.listeners:
             listener.FireMergedLines(al1, al2)
+
+    def notifySplitLine(self, al1, al2):
+        # type: (AlignmentPiece, AlignmentPiece) -> None
+        for listener in self.listeners:
+            listener.FireSplitLine(al1, al2)
 
     def addNew(self, seq, name = None):
         # type: (str, Optional[str]) -> NewLine
@@ -132,6 +137,35 @@ class NewLineStorage(ContigStorage):
         self.remove(line2)
         return line
 
+    def splitLine(self, seg):
+        # type: (Segment) -> Tuple[NewLine, NewLine]
+        line = seg.contig # type: NewLine
+        seg1 = line.asSegment().prefix(pos=seg.right)
+        line1 = self.addNew(seg1.Seq(), line.id + "l")
+        seg2 = line.asSegment().suffix(pos=seg.left)
+        line2 = self.addNew(seg2.Seq(), line.id + "r")
+        al1 = AlignmentPiece.Identical(seg1, line1.asSegment())
+        al2 = AlignmentPiece.Identical(seg2, line2.asSegment())
+        line1.initial.addAll([al.compose(al1) for al in line.initial.allInter(seg1, params.k)])
+        line2.initial.addAll([al.compose(al2) for al in line.initial.allInter(seg2, params.k)])
+        line1.correct_segments.addAll(line.correct_segments.cap(seg=seg1, min_inter=params.k).map(al1))
+        line2.correct_segments.addAll(line.correct_segments.cap(seg=seg2, min_inter=params.k).map(al2))
+        line1.completely_resolved.addAll(line.completely_resolved.cap(seg=seg1, min_inter=params.k).map(al1).filterBySize(min=params.k))
+        line2.completely_resolved.addAll(line.completely_resolved.cap(seg=seg2, min_inter=params.k).map(al2).filterBySize(min=params.k))
+
+        line1.disjointig_alignments.addAll([al.compose(al1) for al in line.disjointig_alignments.allInter(seg1, params.k)])
+        line2.disjointig_alignments.addAll([al.compose(al2) for al in line.disjointig_alignments.allInter(seg2, params.k)])
+        for al in line1.read_alignments:
+            if al.seg_to.interSize(seg1) > params.k:
+                line1.addReadAlignment(al.compose(al1))
+            if al.seg_to.interSize(seg2) > params.k:
+                line2.addReadAlignment(al.compose(al2))
+        line.cleanReadAlignments()
+        self.notifySplitLine(al1, al2)
+        self.remove(line)
+        return line1, line2
+
+
     def printToFile(self, handler):
         # type: (BinaryIO) -> None
         for line in self.items:
@@ -174,5 +208,9 @@ class LineStorageListener:
         pass
 
     def FireMergedLines(self, al1, al2):
+        # type: (AlignmentPiece, AlignmentPiece) -> None
+        pass
+
+    def FireSplitLine(self, al1, al2):
         # type: (AlignmentPiece, AlignmentPiece) -> None
         pass

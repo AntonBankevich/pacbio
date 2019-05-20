@@ -48,6 +48,7 @@ class Tester:
             result = self.tests[name]().testAll(cases, self.aligner)
             if not result:
                 fail += 1
+        print len(params) - fail, "tests passed"
         print fail, "tests failed"
         # self.testLineExtension()
         # self.testLineMerging()
@@ -438,12 +439,12 @@ class DotPlotModificationTest(SimpleTest):
 class PotentialReadsTest(SimpleTest):
     def testManual(self):
         dataset = TestDataset("abcdefgh")
-        dataset.addDisjointig("abcdefgh")
+        dataset.addDisjointig("abcdefghabcdefgh")
         name = dataset.addContig("abcdefgh")
         dataset.generateReads(4, 2, True)
         lines, dp, reads = dataset.genAll(self.aligner)
         line = lines[name]
-        assert str(list(line.getRelevantAlignmentsFor(line.asSegment()))) == "[(R0_abcd[0:2196-4]->C0_abcdefgh[0:2195]:0.96), (R1_bcde[0:2202-0]->C0_abcdefgh[550:2750]:0.96), (R2_cdef[0:2187-0]->C0_abcdefgh[1100:3300]:0.96), (R3_defg[1:2189-0]->C0_abcdefgh[1651:3850]:0.97), (R4_efgh[0:2204-0]->C0_abcdefgh[2200:4400-0]:0.97), (R5_fgha[0:1644]->C0_abcdefgh[2750:4400-0]:0.96), (R5_fgha[1645:2200-0]->C0_abcdefgh[1:550]:0.95), (R6_ghab[1099:2198-0]->C0_abcdefgh[0:1100]:0.97), (R6_ghab[0:1099]->C0_abcdefgh[3300:4400-0]:0.97), (R7_habc[550:2192-8]->C0_abcdefgh[0:1643]:0.96), (R7_habc[0:550]->C0_abcdefgh[3850:4400-0]:0.97)]", str(list(line.getRelevantAlignmentsFor(line.asSegment())))
+        assert str(list(line.getRelevantAlignmentsFor(line.asSegment()))) == "[(R0_abcd[0:2189-0]->C0_abcdefgh[0:2200]:0.96), (R1_bcde[0:2189-0]->C0_abcdefgh[550:2750]:0.97), (R2_cdef[3:2198-0]->C0_abcdefgh[1102:3300]:0.97), (R3_defg[0:2198-0]->C0_abcdefgh[1650:3850]:0.97), (R4_efgh[1:2205-0]->C0_abcdefgh[2200:4400-0]:0.97), (R5_fgha[0:1642]->C0_abcdefgh[2750:4400-0]:0.96), (R5_fgha[1642:2186-2]->C0_abcdefgh[0:547]:0.97), (R6_ghab[0:1112]->C0_abcdefgh[3300:4400-0]:0.95), (R6_ghab[1112:2210-0]->C0_abcdefgh[0:1100]:0.97), (R7_habc[543:2201-0]->C0_abcdefgh[0:1650]:0.97), (R7_habc[0:543]->C0_abcdefgh[3850:4400-0]:0.96)]", str(list(line.getRelevantAlignmentsFor(line.asSegment())))
 
 
 class UniqueRegionMarkingTest(SimpleTest):
@@ -484,7 +485,7 @@ class ReadRecruitmentTest(SimpleTest):
 class KnottingTest(SimpleTest):
     def testManual(self):
         dataset = TestDataset("abcdefgabhiDEFjkl")
-        dname = dataset.addDisjointig("abcdefgabhiCDEjkl".upper())
+        dname = dataset.addDisjointig("abcdefgabhiCDEjklabcdefgabhiCDEjkl".upper())
         dataset.generateReads(5, 15, True)
         read1 = dataset.addRead("cdefg")
         read2 = dataset.addRead("cdefg")
@@ -498,7 +499,7 @@ class KnottingTest(SimpleTest):
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         res = knotter.tryMergeRight(line1)
         assert res is not None
-        assert str(list(dp.allInter(res.asSegment()))) == "[((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]"
+        assert str(list(dp.allInter(res.asSegment()))) == "[((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]", str(list(dp.allInter(res.asSegment())))
 
 class StructureUpdatingTest(SimpleTest):
     def testManual(self):
@@ -507,7 +508,7 @@ class StructureUpdatingTest(SimpleTest):
 
     def test1(self):
         dataset = TestDataset("abcdefghijklmCDEFGHInopqr")
-        dname = dataset.addDisjointig("abcdefghijklmCDEFGHInopqr".upper())
+        dname = dataset.addDisjointig("abcdefghijklmCDEFGHInopqrabcdefghijklmCDEFGHInopqr".upper())
         name1 = dataset.addContig("abcde")
         name2 = dataset.addContig("klmCDE")
         dataset.generateReads(4, 20, True)
@@ -517,14 +518,14 @@ class StructureUpdatingTest(SimpleTest):
         line2 = lines[name2]
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         extender.updateAllStructures(list(line1.correct_segments))
-        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2198]]"
-        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2193]]", str(line1.completely_resolved)
-        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2743]]"
-        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2743]]"
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2200]]", str(line1.correct_segments)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2198]]", str(line1.completely_resolved)
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2748]]", str(line2.correct_segments)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2748]]", str(line2.completely_resolved)
 
     def test2(self):
         dataset = TestDataset("abcdefgcijklmCDEFGHInopqr")
-        dname = dataset.addDisjointig("abcdefgcijklmCDEFGHInopqr".upper())
+        dname = dataset.addDisjointig("abcdefgcijklmCDEFGHInopqrabcdefgcijklmCDEFGHInopqr".upper())
         name1 = dataset.addContig("abcde")
         name2 = dataset.addContig("klmCDE")
         dataset.generateReads(4, 20, True)
@@ -535,10 +536,14 @@ class StructureUpdatingTest(SimpleTest):
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
         # extender.updateAllStructures(list(line1.correct_segments))
-        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2198]]"
-        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:1350], C0_abcde[1400:2193]]"
-        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2743]]"
-        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:1899], C1_klmCDE[1951:2743]]"
+        print str(line1.correct_segments)
+        print str(line1.completely_resolved)
+        print str(line2.correct_segments)
+        print str(line2.completely_resolved)
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[502:3699]]", str(line1.correct_segments)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[502:2849], C0_abcde[2899:3694]]", str(line1.completely_resolved)
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[500:4251]]", str(line2.correct_segments)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[707:3405], C1_klmCDE[3457:4251]]", str(line2.completely_resolved)
 
 
 class LineExtensionTest(SimpleTest):
@@ -547,7 +552,8 @@ class LineExtensionTest(SimpleTest):
         dataset = TestDataset(instance[0], mutation_rate=0.01)
         dname = dataset.addDisjointig(instance[0] + instance[0].upper())
         dataset.generateReads(int(instance[1]), 25, True)
-        for s in instance[2:]:
+        ethalon = int(instance[2])
+        for s in instance[3:]:
             dataset.addContig(s)
         lines, dp, reads = dataset.genAll(self.aligner)
         UniqueMarker().markAllUnique(lines, dp)
@@ -568,8 +574,11 @@ class LineExtensionTest(SimpleTest):
                 break
         print " ".join([str(dataset.translateBack(line, self.aligner)) for line in lines.unique()])
         print [line.circular for line in lines.unique()]
+        breaks = 0
         for line in lines.unique():
-            assert line.circular, str(line) + " " + dataset.translateBack(line, self.aligner)
+            if not line.circular:
+                breaks += 1
+        assert breaks == ethalon, str(breaks) + " " + str(ethalon)
 
     def testManual(self):
         pass

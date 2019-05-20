@@ -95,6 +95,7 @@ class NewLine(Contig):
             rc = NewLine(basic.RC(seq), basic.Reverse(self.id), extension_handler.rc, self) #type: NewLine
             self.rc = rc
             self.addListener(ReadAlignmentListener(self))
+            self.initial.add(AlignmentPiece.Identical( self.asSegment().asContig().asSegment(), self.asSegment()))
         else:
             self.initial = rc.initial.rc # type: AlignmentStorage
             self.correct_segments = rc.correct_segments.rc # type: SegmentStorage

@@ -119,7 +119,7 @@ class AlignmentPiece:
         new_cigar = [als[0].cigar]
         for al1, al2 in zip(als[:-1], als[1:]): #type: AlignmentPiece, AlignmentPiece
             if al1.seg_to.right < al2.seg_to.left:
-                new_cigar.append(str(al2.seg_to.left - al1.seg_to.right) + "I")
+                new_cigar.append(str(al2.seg_to.left - al1.seg_to.right) + "D")
             new_cigar.append(al2.cigar)
         return AlignmentPiece(new_contig.asSegment(), contig.segment(als[0].seg_to.left, als[-1].seg_to.right),
                               "".join(new_cigar))
