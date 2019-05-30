@@ -37,6 +37,8 @@ class LogPriority:
     common = 1
 
 
-downsample = 1000000000
+downsample = 100000000
 
 
+flanking_size = 500
+window_size = 1500

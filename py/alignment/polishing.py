@@ -184,7 +184,7 @@ class Polisher:
         while True:
             tmp = []
             for al in relevant_als:
-                if al.seg_to.inter(new_contig.asSegment().suffix(length=20)) and al.rc.seg_from.left > 200:
+                if al.seg_to.inter(new_contig.asSegment().suffix(length=20)) and al.rc.seg_from.left > 100:
                     tmp.append(al)
                 else:
                     finished_als.append(al)
@@ -192,7 +192,7 @@ class Polisher:
             # TODO replace with position search in cigar
             if len(relevant_als) < min_cov:
                 break
-            start = basic.randomSequence(200) + new_contig.asSegment().suffix(length=200).Seq()
+            start = basic.randomSequence(params.flanking_size) + new_contig.asSegment().suffix(length=params.flanking_size).Seq()
             reduced_read_list = [
                 AlignedRead.new(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), str(i) + "_" + al.seg_from.contig.id)
                 for i, al in enumerate(relevant_als)]
@@ -200,11 +200,11 @@ class Polisher:
             reduced_reads = ReadCollection(reduced_read_list)
             found = False
             for base_al in relevant_als:
-                if base_al.rc.seg_from.left < 200:
+                if base_al.rc.seg_from.left < params.flanking_size:
                     continue
                 # Base consists of copy of the previous 200 nucleotides and a segment of read of length at most 500
                 base_segment = base_al.seg_from.contig.segment(base_al.seg_from.right,
-                                                     min(len(base_al.seg_from.contig), base_al.seg_from.right + 500))
+                                                     min(len(base_al.seg_from.contig), base_al.seg_from.right + params.window_size))
                 base = Contig(start + base_segment.Seq(), "base")
                 for read in reduced_read_list:
                     read.clean()
@@ -261,7 +261,9 @@ class Polisher:
                             al = al1
                         else:
                             al = al1.mergeDistant(al2)
-                            if al1.seg_from.dist(al2.seg_from) >= 10 or al1.seg_to.dist(al2.seg_to) >= 10:
+                            if al is None:
+                                al = al1
+                            elif al1.seg_from.dist(al2.seg_from) >= 10 or al1.seg_to.dist(al2.seg_to) >= 10:
                                 al = scorer.polyshAlignment(al)
                         relevant_als.append(al)
                     finished_als = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in finished_als]

@@ -218,6 +218,8 @@ class AlignmentPiece:
     # TODO: do not use this
     def mergeDistant(self, other):
         ins = self.generateBufferCigar(other)
+        if ins is None:
+            return None
         return AlignmentPiece(self.seg_from.merge(other.seg_from), self.seg_to.merge(other.seg_to),
                               self.cigar + ins + other.cigar)
 
@@ -225,7 +227,10 @@ class AlignmentPiece:
         ins = ""
         if not self.connects(other):
             d = (other.seg_from.left - self.seg_from.right, other.seg_to.left - self.seg_to.right)
-            assert 0 <= d[0] < 100 and 0 <= d[1] < 100, str(self) + " " + str(other)
+            if d[0] < 0 or d[0] > 100 or d[1] < 0  or d[1] > 100:
+                print "Warning. Bad alignment:", str(self) + " " + str(other)
+                print self.seg_from.contig.seq
+                return None
             if min(d[0], d[1]) > 0:
                 ins += str(min(d[0], d[1])) + "M"
             if d[0] > d[1]:

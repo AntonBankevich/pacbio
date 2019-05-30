@@ -550,10 +550,10 @@ class StructureUpdatingTest(SimpleTest):
         print str(line1.completely_resolved)
         print str(line2.correct_segments)
         print str(line2.completely_resolved)
-        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[495:3681]]", str(line1.correct_segments)
-        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[495:2831], C0_abcde[2881:3676]]", str(line1.completely_resolved)
-        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[498:4249]]", str(line2.correct_segments)
-        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[705:3403], C1_klmCDE[3455:4249]]", str(line2.completely_resolved)
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[550:3850]]", str(line1.correct_segments)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[550:3000], C0_abcde[3300:3845]]", str(line1.completely_resolved)
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[550:4395]]", str(line2.correct_segments)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[851:3549], C1_klmCDE[3851:4395]]", str(line2.completely_resolved)
 
 
 class LineExtensionTest(SimpleTest):
