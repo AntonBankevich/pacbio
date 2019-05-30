@@ -12,7 +12,8 @@ from alignment.align_tools import DirDistributor, Aligner
 from dag_resolve.edge_resolver import EdgeResolver
 from dag_resolve.graph_resolver import GraphResolver
 from dag_resolve.line_tools import LineStorage
-from dag_resolve.repeat_graph import Graph, DotParser
+from dag_resolve.repeat_graph import Graph
+from common.dot_parser import DotParser
 from common.sequences import ContigCollection, UniqueList
 from common.alignment_storage import ReadCollection
 from common import basic, params

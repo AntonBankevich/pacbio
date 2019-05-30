@@ -16,6 +16,7 @@ class Correction:
         self.seq_from = seq_from
         self.seq_to = seq_to
         self.alignments = alignments
+        # TODO: reduce alignment size to essentials
         self.scorer = Scorer()
 
     def mapSegmentsUp(self, segments):

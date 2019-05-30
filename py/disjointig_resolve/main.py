@@ -3,112 +3,242 @@ import os
 import shutil
 import sys
 import time
+import traceback
+
+from typing import Iterable
 
 sys.path.append("py")
 
+
+from disjointig_resolve.accurate_line import NewLine
+from disjointig_resolve.smart_storage import AlignmentStorage
+from common.dot_parser import DotParser
 from disjointig_resolve.unique_marker import UniqueMarker
 from alignment.align_tools import Aligner, DirDistributor
 from alignment.polishing import Polisher
-from common import basic
+from common import basic, SeqIO, sam_parser, params
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.tests import Tester
 from disjointig_resolve.line_extender import LineExtender
 from common.save_load import TokenReader, SaveHandler
-from common.sequences import ContigCollection
-from common.alignment_storage import ReadCollection
+from common.sequences import ContigCollection, Contig
+from common.alignment_storage import ReadCollection, AlignmentPiece, AlignedRead
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params
 
 
-def CreateLog(params):
-    old_logs_dir = os.path.join(params.dir, "old")
+def CreateLog(dir):
+    old_logs_dir = os.path.join(dir, "old")
     basic.ensure_dir_existance(old_logs_dir)
-    log_file = os.path.join(params.dir, "log.info")
+    log_file = os.path.join(dir, "log.info")
     if os.path.isfile(log_file):
         num = len(os.listdir(old_logs_dir))
         shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
     log = open(log_file, "w")
     sys.stdout = basic.OStreamWrapper(sys.stdout, log)
+    sys.stdout.prefix = lambda s: time.strftime("%I:%M:%S") + "  "
     sys.stderr = sys.stdout
-    print " ".join(params.args)
+
+
+def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
+    h = open(disjointigs_file, "w")
+    for fn in disjointigs_file_list:
+        for rec in SeqIO.parse_fasta(open(fn, "r")):
+            SeqIO.write(rec, h, "fasta")
+    h.close()
+
+
+def printToFile(als, dir, name):
+    # type: (Iterable[AlignmentPiece], str, str) -> None
+    f = open(os.path.join(dir, name + ".txt"), "w")
+    for al in als:
+        f.write(" ".join([str(al.seg_from.contig.id), str(al.seg_to.contig.id), str(al.seg_from.left), str(al.seg_from.right), str(al.seg_to.left), str(al.seg_to.right), str(len(list(al.split())))]) + "\n")
+    f.close()
+
+def printVals(vals, dir, name):
+    # type: (Iterable[int], str, str) -> None
+    f = open(os.path.join(dir, name + ".txt"), "w")
+    for val in vals:
+        f.write(str(val))
+    f.close()
+
+
+def countStats(reads, lines, disjointigs, aligner, dir):
+    # type: (ReadCollection, NewLineStorage, DisjointigCollection, Aligner, str) -> None
+    tmp = AlignmentStorage()
+    cnt = 0
+    for al in aligner.alignClean(reads, lines):
+        line = al.seg_to.contig # type: NewLine
+        line.addReadAlignment(al)
+        tmp.addAll(al.split())
+        cnt += 1
+        if cnt % 10000 == 0:
+            print cnt
+    line = lines["1"]
+    als = line.read_alignments
+    print list(als.calculateWindowedCoverage(500))
+    als = line.read_alignments.filter(lambda al: al.contradictingRTC(line.asSegment(), 500))
+    print list(als.calculateWindowedCoverage(500))
+    print list(tmp.calculateWindowedCoverage(500))
+    als = tmp.filter(lambda al: al.contradictingRTC(line.asSegment(), 500))
+    print list(als.calculateWindowedCoverage(500))
+
+
+
+
+
+
+
 
 
 def main(args):
-    params = Params().parse(args)
-    params.check()
-    CreateLog(params)
-    sys.stdout.write("Started\n")
-    print (time.strftime("%d.%m.%Y  %I:%M:%S"))
-    if params.test:
-        aligner = Aligner(DirDistributor(params.alignmentDir()))
+    cl_params = Params().parse(args)
+    cl_params.check()
+    CreateLog(cl_params.dir)
+    print " ".join(cl_params.args)
+    sys.stdout.info("Started")
+    sys.stdout.info("Params:", " ".join(args))
+    if cl_params.test:
+        aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         Tester(aligner).testAll("tests/cases.txt")
         sys.stdout.write("Finished\n")
         print (time.strftime("%d.%m.%Y  %I:%M:%S"))
         return
-    print "Preparing initial state"
-    if params.load_from is not None:
-        print "Loading initial state from saves"
-        params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(params.load_from, "r")))
+    sys.stdout.info("Preparing initial state")
+    save_handler = SaveHandler(cl_params.save_dir)
+    if cl_params.load_from is not None:
+        sys.stdout.info("Loading initial state from saves")
+        cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(cl_params.load_from, "r")))
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
+        # for line in lines:
+        #     if line.knot is None and line.id.endswith("l") and not line.id.startswith("-"):
+        #         other = lines[line.id[:-1] + "r"]
+        #         line.tie(other, 0, "")
+        # writer = save_handler.getWriter()
+        # print "Save details:", writer.info
+        # saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
+        # dot_plot = LineDotPlot(lines, aligner)
+        # dot_plot.construct(aligner)
+        dot_plot.printAll(sys.stdout)
+        dp1 = LineDotPlot(lines, aligner)
+        dp1.construct(aligner)
+        dp1.printAll(sys.stdout)
+        dot_plot = dp1
     else:
-        aligner = Aligner(DirDistributor(params.alignmentDir()))
+        aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
+        # polisher = Polisher(aligner, aligner.dir_distributor)
+        # consensus = SeqIO.parse_fasta(open("results/NCTC9002/alignment/148/ref.fasta", "r")).next()
+        # consensus = Contig(consensus.seq, consensus.id)
+        # for al in sam_parser.Samfile(open("results/NCTC9002/alignment/148/work/polish/minimap_1.sam", "r")):
+        #     al = AlignmentPiece.FromSamRecord(Contig(al.seq, "1"), consensus, al)
+        #     print al
+        #     print "\n".join(al.asMatchingStrings())
+        # polisher.polish(ReadCollection().loadFromFasta(open("results/NCTC9002/alignment/148/reads.fasta", "r")), consensus)
 
-        print "Creating disjointig collection"
+
+        sys.stdout.info("Creating disjointig collection")
+        prepare_disjointigs_file(cl_params.disjointigs_file, cl_params.disjointigs_file_list)
         disjointigs = DisjointigCollection()
-        disjointigs.loadFromFasta(open(params.disjointigs_file, "r"))
+        disjointigs.loadFromFasta(open(cl_params.disjointigs_file, "r"))
 
-        print "Creating read collection"
-        reads = ReadCollection()
-        reads.loadFromFasta(open(params.reads_file, "r"))
-
-        print "Aligning reads to disjointigs"
-        disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
-
-        print "Creating contig collection"
+        sys.stdout.info("Creating contig collection")
+        unique = [str(val[0]) for val in DotParser(open(cl_params.graph_file, "r")).parse() if val[4].unique]
         contigs = ContigCollection()
-        contigs.loadFromFasta(open(params.contigs_file, "r"), num_names=True)
+        contigs.loadFromFasta(open(cl_params.contigs_file, "r"), num_names=True)
+        contigs = contigs.filter(lambda contig: contig.id in unique)
+        sys.stdout.info("Created", len(contigs), "initial contigs")
 
-        print "Creating line collection"
+        sys.stdout.info("Creating line collection")
         lines = NewLineStorage(disjointigs, aligner)
-        lines.fillFromContigs(contigs)
+        # lines.fillFromContigs(contigs)
+        lines.splitFromContigs(contigs)
         lines.alignDisjointigs()
         # lines.fillFromDisjointigs()
 
+        sys.stdout.info("Constructing line dot plot")
         dot_plot = LineDotPlot(lines, aligner)
         dot_plot.construct(aligner)
+        dot_plot.printAll(sys.stdout)
 
-        UniqueMarker().markAllUnique(lines, dot_plot)
+        sys.stdout.info("Creating read collection")
+        reads = ReadCollection()
+        reads.loadFromFasta(open(cl_params.reads_file, "r"), downsample=params.downsample)
+        if cl_params.stats:
+            countStats(reads, lines, disjointigs, aligner, cl_params.dir)
+            return
+
+        sys.stdout.info("Marking unique regions")
+        UniqueMarker(aligner).markAllUnique(lines, dot_plot, reads)
+        for line in lines.unique():
+            print line, line.completely_resolved
+
+        sys.stdout.info("Aligning reads to disjointigs")
+        disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
+        good_reads = set()
+        for dis in disjointigs:
+            for al in dis.read_alignments:
+                good_reads.add(al.seg_from.contig.id)
+                good_reads.add(al.seg_from.contig.rc.id)
+        bad_reads = []
+        brf = open(os.path.join(cl_params.dir, "br.fasta"), "w")
+        bad = 0
+        for read in reads:
+            if read.id not in good_reads:
+                bad += 1
+                bad_reads.append(read)
+                SeqIO.write(read, brf, "fasta")
+        brf.close()
+        sys.stdout.info("Fraction of reads without full alignment to disjointigs:", float(bad) / len(reads))
+
+        sys.stdout.info("Undating sequences and resolved segments.")
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
 
-    print "Resolving"
-    save_handler = SaveHandler(params.save_dir)
+        print "Saving initial state"
+        try:
+            writer = save_handler.getWriter()
+            print "Save details:", writer.info
+            saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
+        except Exception as e:
+            _, _, tb = sys.exc_info()
+            sys.stdout.warn("Could not write save")
+            traceback.print_tb(tb)
+            print "Message:", e.message
+
+
+    sys.stdout.info("Resolving")
+    print lines["-24"].completely_resolved
+    extender.updateAllStructures(lines["-24"].completely_resolved)
     cnt = 0
-    while True:
+    stop = False
+    while not stop:
         stop = True
         for line_id in list(lines.items.keys()):
             if line_id not in lines.items:
                 continue
             line = lines[line_id]
+            sys.stdout.info("Investigating", line)
             extended = extender.tryExtend(line)
             if extended:
                 cnt += 1
                 stop = False
-            if cnt > 20:
+            if cnt > 10:
                 cnt = 0
-                saveAll(save_handler.getWriter(), params, aligner, contigs, reads, disjointigs, lines, dot_plot)
-        if stop:
-            break
+                print "Saving current state"
+                writer = save_handler.getWriter()
+                print "Save details:", writer.info
+                saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
 
     lines.printToFile(sys.stdout)
-    lines.printToFasta(open(os.path.join(params.dir, "lines.fasta"), "w"))
-    sys.stdout.write("Finished\n")
-    print (time.strftime("%d.%m.%Y  %I:%M:%S"))
+    lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
+    # print "Disjointig alignments"
+    # for line in lines
+    sys.stdout.info("Finished")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
+import sys
+
 from typing import Tuple
 
 from alignment.align_tools import Aligner
+from common import params
 from common.save_load import TokenReader, TokenWriter
 from common.sequences import ContigCollection
 from common.alignment_storage import ReadCollection
@@ -12,20 +15,27 @@ from disjointig_resolve.cl_params import Params
 
 def loadAll(handler):
     # type: (TokenReader) -> Tuple[Params, Aligner, ContigCollection, ReadCollection, DisjointigCollection, NewLineStorage, LineDotPlot]
-    params = Params()
-    params.load(handler)
+    cl_params = Params()
+    cl_params.load(handler)
     aligner = Aligner.load(handler)
+    sys.stdout.info("Loading contigs")
     contigs = ContigCollection()
     contigs.load(handler)
+    sys.stdout.info("Loading reads")
     reads = ReadCollection()
-    reads.loadFromFasta(open(params.reads_file, "r"))
+    reads.loadFromFasta(open(cl_params.reads_file, "r"), downsample=params.downsample)
+    tmp_reads = reads.copy().addAllRC()
+    sys.stdout.info("Loading disjointigs")
     disjointigs = DisjointigCollection()
-    disjointigs.load(handler, reads)
+    disjointigs.load(handler, tmp_reads)
+    sys.stdout.info("Loading lines")
     lines = NewLineStorage(disjointigs, aligner)
-    lines.load(handler, reads, contigs)
+    lines.load(handler, tmp_reads, contigs)
+    sys.stdout.info("Loading dot plot")
     dot_plot = LineDotPlot(lines, aligner)
     dot_plot.load(handler)
-    return params, aligner, contigs, reads, disjointigs, lines, dot_plot
+    sys.stdout.info("Loading finished")
+    return cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot
 
 
 def saveAll(handler, params, aligner, contigs, reads, disjointigs, lines, dot_plot):

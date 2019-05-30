@@ -10,12 +10,13 @@ from flye_tools.alignment import make_alignment
 from common.sequences import ContigCollection, Segment, Contig, \
     ContigStorage
 from common.alignment_storage import AlignmentPiece, ReadCollection
-from typing import Iterable, Tuple, Generator, BinaryIO
+from typing import Iterable, Tuple, Generator, BinaryIO, List
 from common import basic, sam_parser, SeqIO, params
 
 
 class DirDistributor:
     def __init__(self, dir):
+        basic.ensure_dir_existance(dir)
         self.dir = dir
         self.cur_dir = 0
 
@@ -184,29 +185,69 @@ class Aligner:
         basic.ensure_dir_existance(dir)
         basic.ensure_dir_existance(alignment_dir)
         if same and not params.clean and os.path.exists(alignment_file):
-            # print "Alignment reused:", alignment_file
+            sys.stdout.log(params.LogPriority.alignment_files, "Alignment reused:", alignment_file)
             pass
         else:
-            # print "Performing alignment:", alignment_file
+            sys.stdout.log(params.LogPriority.alignment_files, "Performing alignment:", alignment_file)
             make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
-    # TODO: make this method accept reference dict of dome sort
-    def alignClean(self, reads, ref_storage):
+    def alignAndSplit(self, reads, ref_storage):
         # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
         reads = list(reads)
-        # print "Aligning", reads
-        # print list(ref_storage)
         parser = self.align(reads, list(ref_storage.unique()))
         read_storage = ContigStorage(reads, False)
+        als = [] # type: List[AlignmentPiece]
+        cnt = 0
+        cnt_skip = 0
         for rec in parser:
             if rec.is_unmapped:
                 continue
+            cnt += 1
+            if cnt % 10000 == 0:
+                print cnt, cnt_skip
+            if len(als) > 0 and rec.query_name != als[0].seg_from.contig.id:
+                res = list(self.filterAls(als))
+                for al in res:
+                    yield al
+                als = []
+            if len(als) > 0:
+                seq_from = als[0].seg_from.contig
+            else:
+                seq_from = read_storage[rec.query_name]
+            seq_to = ref_storage[rec.tname]
+            tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
+            if tmp is not None:
+                if tmp.indelLength * 8 > tmp.matchingPositionsCount:
+                    for al in tmp.split():
+                        als.append(al)
+                else:
+                    cnt_skip += 1
+                    als.append(tmp)
+        for al in self.filterAls(als):
+            yield al
+
+    def alignClean(self, reads, ref_storage):
+        # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
+        reads = list(reads)
+        parser = self.align(reads, list(ref_storage.unique()))
+        read_storage = ContigStorage(reads, False)
+        als = [] # type: List[AlignmentPiece]
+        for rec in parser:
+            if rec.is_unmapped:
+                continue
+            if len(als) > 0 and rec.query_name != als[0].seg_from.contig.id:
+                for al in self.filterAls(als):
+                    yield al
+                als = []
             rname = rec.query_name
             seq_from = read_storage[rname]
             seq_to = ref_storage[rec.tname]
-            for al in AlignmentPiece.FromSamRecord(seq_from, seq_to, rec).split():
-                yield al
+            tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
+            if tmp is not None and not tmp.contradictingRTC(tail_size=params.bad_end_length):
+                als.append(tmp)
+        for al in self.filterAls(als):
+            yield al
 
 
     # def matchingAlignment(self, seqs, contig):
@@ -251,8 +292,32 @@ class Aligner:
     @staticmethod
     def load(handler):
         # type: (TokenReader) -> Aligner
-        return Aligner(DirDistributor.load(handler), handler.readInt())
+        threads = handler.readInt()
+        return Aligner(DirDistributor.load(handler), threads)
 
+    def filterAls(self, als):
+        # type: (List[AlignmentPiece]) -> Generator[AlignmentPiece]
+        if len(als) == 1:
+            yield als[0]
+            return
+        als = sorted(als, key = lambda al: (al.seg_from.contig.id, al.seg_to.contig.id))
+        for k, iter in itertools.groupby(als, key=lambda al: (al.seg_from.contig.id, al.seg_to.contig.id)):
+            res = [] # type: List[AlignmentPiece]
+            iter = sorted(iter, key = lambda al: al.seg_from.left)
+            for al in iter:
+                ok = True
+                for i, al1 in enumerate(res):
+                    if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to):
+                        if al.deepInter(al1):
+                            if al.matchingPositionsCount > al1.matchingPositionsCount + 50 or \
+                                    (al.matchingPositionsCount > al1.matchingPositionsCount - 50 and al.indelLength < al1.indelLength):
+                                res[i] = al
+                            ok = False
+                            break
+                if ok:
+                    res.append(al)
+            for al in res:
+                yield al
 
 if __name__ == "__main__":
     dir = sys.argv[1]

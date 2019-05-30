@@ -181,8 +181,8 @@ class Scorer:
 
     def scoreInCorrectSegments(self, al1, seg1, al2, seg2):
         # type: (AlignmentPiece, Segment, AlignmentPiece, Segment) -> Tuple[Optional[int], Optional[int], Optional[int]]
-        invalid1 = al1.contradictingRTC()
-        invalid2 = al2.contradictingRTC()
+        invalid1 = al1.contradictingRTC(tail_size=params.bad_end_length)
+        invalid2 = al2.contradictingRTC(tail_size=params.bad_end_length)
         if invalid1 and invalid2:
             return 0, 0, 0
         elif invalid1:

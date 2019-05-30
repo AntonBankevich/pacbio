@@ -28,15 +28,15 @@ class DotPlot:
         self.addRCAlignmentStorage(line)
         self.addSelfAlignmentStorage(line)
 
-    def addTwoLineStorage(self, line1, line2):
+    def addTwoLineStorage(self, line_to, line_from):
         # type: (Contig, Contig) -> TwoLineAlignmentStorage
-        storage = TwoLineAlignmentStorage(line1, line2)
-        if line2.id not in self.alignmentsToFrom:
-            self.alignmentsToFrom[line2.id] = dict()
-        self.alignmentsToFrom[line2.id][line1.id] = storage
-        self.alignmentsToFrom[line2.rc.id][line1.rc.id] = storage.rc
-        self.alignmentsToFrom[line1.id][line2.id] = storage.reverse
-        self.alignmentsToFrom[line1.rc.id][line2.rc.id] = storage.rc.reverse
+        storage = TwoLineAlignmentStorage(line_from, line_to)
+        if line_to.id not in self.alignmentsToFrom:
+            self.alignmentsToFrom[line_to.id] = dict()
+        self.alignmentsToFrom[line_to.id][line_from.id] = storage
+        self.alignmentsToFrom[line_to.rc.id][line_from.rc.id] = storage.rc
+        self.alignmentsToFrom[line_from.id][line_to.id] = storage.reverse
+        self.alignmentsToFrom[line_from.rc.id][line_to.rc.id] = storage.rc.reverse
         return storage
 
     def addAlignment(self, al):
@@ -51,7 +51,7 @@ class DotPlot:
             self.rc_alignments[to_id].add(al)
         else:
             if from_id not in self.alignmentsToFrom[to_id]:
-                self.addTwoLineStorage(from_line, to_line)
+                self.addTwoLineStorage(to_line, from_line)
             self.alignmentsToFrom[to_id][from_id].add(al)
 
     def addRCAlignmentStorage(self, line):
@@ -90,11 +90,20 @@ class DotPlot:
 
     def construct(self, aligner):
         # type: (Aligner) -> None
-        for al in aligner.alignClean(self.lines.unique(), self.lines):
+        for al in aligner.alignAndSplit(self.lines.unique(), self.lines):
             # print al, len(al) > params.k, al.percentIdentity() > 0.8, al.seg_from.contig.id < al.seg_to.contig.id, al.seg_from <= al.seg_to
-            if len(al) > params.k and al.percentIdentity() > 0.8 and (
-                    al.seg_from.contig.id < al.seg_to.contig.id or al.seg_from <= al.seg_to):
-                self.addAlignment(al)
+            if len(al) > params.k and al.percentIdentity() > 0.8:
+                if al.seg_from.contig.id == al.seg_to.contig.id:
+                    ok = al.seg_from <= al.seg_to
+                elif al.seg_from.contig == al.seg_to.contig.rc:
+                    if basic.isCanonocal(al.seg_from.contig.id):
+                        ok = al.seg_from < al.seg_to.RC()
+                    else:
+                        ok = al.seg_from.RC() < al.seg_to
+                else:
+                    ok = basic.canonical(al.seg_from.contig.id) < basic.canonical(al.seg_to.contig.id)
+                if ok:
+                    self.addAlignment(al)
 
     def save(self, handler):
         # type: (TokenWriter) -> None
@@ -123,11 +132,11 @@ class DotPlot:
         # type: (TokenReader) -> None
         keys = list(handler.readTokens())
         while True:
-            l1 = handler.readToken()
-            l2 = handler.readToken()
-            if l1 == "0" and l2 == "0":
+            l_to = handler.readToken()
+            l_from = handler.readToken()
+            if l_to == "0" and l_from == "0":
                 break
-            storage = self.addTwoLineStorage(self.lines[l1], self.lines[l2])
+            storage = self.addTwoLineStorage(self.lines[l_to], self.lines[l_from])
             storage.load(handler, self.lines)
         for lid in keys:
             storage = self.rc_alignments[lid]
@@ -188,16 +197,16 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         common = set(self.alignmentsToFrom[line1.id].keys()).intersection(set(self.alignmentsToFrom[line2.id].keys()))
         for storage in self.alignmentsToFrom[line1.id].values():
             if storage.line_from.id not in common and storage.line_from != line2:
-                self.addTwoLineStorage(storage.line_from, new_line).addAll([al.compose(al1) for al in storage])
+                self.addTwoLineStorage(new_line, storage.line_from).addAll([al.compose(al1) for al in storage])
         for storage in self.alignmentsToFrom[line2.id].values():
             if storage.line_from.id not in common and storage.line_from != line1:
-                self.addTwoLineStorage(storage.line_from, new_line).addAll([al.compose(al2) for al in storage])
+                self.addTwoLineStorage(new_line, storage.line_from).addAll([al.compose(al2) for al in storage])
         for c in common:
             storage1 = self.alignmentsToFrom[line1.id][c]
             storage2 = self.alignmentsToFrom[line2.id][c]
             als1 = AlignmentStorage().addAll([al.compose(al1) for al in storage1])
             als2 = AlignmentStorage().addAll([al.compose(al2) for al in storage2])
-            self.addTwoLineStorage(storage1.line_from, new_line).addAll(als1.merge(als2))
+            self.addTwoLineStorage(new_line, storage1.line_from).addAll(als1.merge(als2))
         self.removeLine(al1.seg_from.contig)
         self.removeLine(al2.seg_from.contig)
         print list(self.allInter(new_line.asSegment()))
@@ -268,13 +277,13 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
             storage.fireAfterExtendRight(line, seq)
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
-        new_seg = line.asSegment().suffix(length=min(len(line), len(seq) + 1000))
+        new_seg = line.asSegment().suffix(length=min(len(line), len(seq) + params.k + 500))
         # print "Aligning new extension"
-        for al in self.aligner.alignClean([new_seg.asContig()], self.lines):
-            al = al.queryAsSegment(new_seg)
-            self.addAndMergeRight(al)
-
-
+        for al in self.aligner.alignAndSplit([new_seg.asContig()], self.lines):
+            if len(al.seg_to) >= params.k:
+                al = al.queryAsSegment(new_seg)
+                self.addAndMergeRight(al)
+        print "Updated line alignments:", list(self.allInter(line.asSegment()))
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None
@@ -306,6 +315,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         for storage in self.alignmentsToFrom[line.id].values():
             line_from = storage.line_from # type: NewLine
             del self.alignmentsToFrom[line_from.id][line.id]
+            del self.alignmentsToFrom[line_from.rc.id][line.rc.id]
         del self.alignmentsToFrom[line.id]
         del self.alignmentsToFrom[line.rc.id]
         self.deleteRCAlignmentStorage(line)

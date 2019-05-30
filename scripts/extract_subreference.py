@@ -8,7 +8,8 @@ from common import SeqIO
 from common.sam_parser import Samfile
 from common.sequences import ContigCollection, Segment
 from common.alignment_storage import ReadCollection
-from dag_resolve.repeat_graph import DotParser, Graph, Vertex
+from dag_resolve.repeat_graph import Graph, Vertex
+from common.dot_parser import DotParser
 
 
 def ParseVertices(s):

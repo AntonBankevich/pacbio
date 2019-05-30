@@ -40,6 +40,10 @@ class Tester:
                 testList.append(obj)
         self.tests = dict([(c.__name__, c) for c in testList])
         params.redo_alignments = True
+        params.k = 500
+        params.l = 1500
+        params.min_k_mer_cov = 5
+        # sys.stdout.level = params.LogPriority.main_parts
 
     def testAll(self, fname):
         params = self.readParams(fname)
@@ -67,6 +71,62 @@ class Tester:
             for j in range(handler.readInt()):
                 params[name].append(list(handler.readTokens()))
         return params
+
+class SimpleTest:
+    def __init__(self):
+        self.aligner = None # type: Aligner
+        self.scorer = Scorer()
+
+    def testAll(self, params, aligner):
+        # type: (List[List[str]], Aligner) -> bool
+        self.aligner = aligner
+        print "Starting test", self.__class__.__name__
+        fails = []
+        try:
+            self.testManual()
+        except AssertionError as e:
+            _, _, tb = sys.exc_info()
+            fails.append(("Manual", tb, e.message))
+        for tn, instance in enumerate(params):
+            try:
+                self.testCase(instance)
+            except AssertionError as e:
+                _, _, tb = sys.exc_info()
+                fails.append([str(tn), tb, e.message])
+        if len(fails) == 0:
+            print "Finished test", self.__class__.__name__ + ": Passed"
+            return True
+        else:
+            print "Finished test", self.__class__.__name__ + ": Failed"
+            for tn, tb, message in fails:
+                print "Failed test " + tn + ":"
+                traceback.print_tb(tb)
+                print "Message:", message
+            return False
+
+    # def runTestSilently(self, testf):
+    #     # type: (Callable[[], None]) -> None
+    #     tmp1 = sys.stdout # type: OStreamWrapper
+    #     tmp2 = sys.stderr # type: OStreamWrapper
+    #     tmp1.block()
+    #     tmp2.block()
+    #     testf()
+    #     tmp1.release()
+    #     tmp2.release()
+
+
+    def assertResult(self, res, ethalon):
+        # type: (str, str) -> None
+        assert res.replace(" ", "") == ethalon, res.replace(" ", "") + " " + ethalon
+        pass
+
+    def testCase(self, instance):
+        # type: (list[str]) -> None
+        pass
+
+    def testManual(self):
+        pass
+
 
 class TestDataset:
     def __init__(self, genome = "", letter_size = 550, error_rate = 0.05, mutation_rate = 0.005, seed = 0):
@@ -188,69 +248,13 @@ class TestDataset:
     def translateBack(self, contig, aligner):
         # type: (Contig, Aligner) -> str
         res = []
-        for al in sorted(aligner.alignClean([contig], self.alphabet), key = lambda al: al.seg_from.left):
+        for al in sorted(aligner.alignAndSplit([contig], self.alphabet), key = lambda al: al.seg_from.left):
             if len(res) > 0 and al.seg_from.interSize(res[-1].seg_from) > self.letter_size / 2:
                 if al.percentIdentity() > res[-1].percentIdentity():
                     res[-1] = al
             else:
                 res.append(al)
         return "".join([al.seg_to.contig.id for al in res])
-
-
-class SimpleTest:
-    def __init__(self):
-        self.aligner = None # type: Aligner
-        self.scorer = Scorer()
-
-    def testAll(self, params, aligner):
-        # type: (List[List[str]], Aligner) -> bool
-        self.aligner = aligner
-        print "Starting test", self.__class__.__name__
-        fails = []
-        try:
-            self.testManual()
-        except AssertionError as e:
-            _, _, tb = sys.exc_info()
-            fails.append(("Manual", tb, e.message))
-        for tn, instance in enumerate(params):
-            try:
-                self.testCase(instance)
-            except AssertionError as e:
-                _, _, tb = sys.exc_info()
-                fails.append([str(tn), tb, e.message])
-        if len(fails) == 0:
-            print "Finished test", self.__class__.__name__ + ": Passed"
-            return True
-        else:
-            print "Finished test", self.__class__.__name__ + ": Failed"
-            for tn, tb, message in fails:
-                print "Failed test " + tn + ":"
-                traceback.print_tb(tb)
-                print "Message:", message
-            return False
-
-    # def runTestSilently(self, testf):
-    #     # type: (Callable[[], None]) -> None
-    #     tmp1 = sys.stdout # type: OStreamWrapper
-    #     tmp2 = sys.stderr # type: OStreamWrapper
-    #     tmp1.block()
-    #     tmp2.block()
-    #     testf()
-    #     tmp1.release()
-    #     tmp2.release()
-
-
-    def assertResult(self, res, ethalon):
-        # type: (str, str) -> None
-        assert res.replace(" ", "") == ethalon, res.replace(" ", "")
-        pass
-
-    def testCase(self, instance):
-        # type: (list[str]) -> None
-        pass
-
-    def testManual(self):
-        pass
 
 
 class SegmentStorageTest(SimpleTest):
@@ -452,7 +456,7 @@ class UniqueRegionMarkingTest(SimpleTest):
         data = TokenReader(StringIO(" ".join(instance)))
         dataset = TestDataset.loadStructure(data)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker().markAllUnique(lines, dp)
+        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
         ethalon1 = data.readToken()
         ethalon2 = data.readToken()
         line = lines[dataset.contigs[0].id]
@@ -495,11 +499,14 @@ class KnottingTest(SimpleTest):
         read1 = reads[read1]
         read2 = reads[read2]
         line1 = lines[name1]
-        UniqueMarker().markAllUnique(lines, dp)
+        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
+        dp.printAll(sys.stdout)
         res = knotter.tryMergeRight(line1)
         assert res is not None
-        assert str(list(dp.allInter(res.asSegment()))) == "[((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]", str(list(dp.allInter(res.asSegment())))
+        assert str(list(dp.allInter(res.asSegment()))) == \
+               "[((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4950]:1.000!!!), ((C0_abcde,C1_efgabhi)[3850:4950]->(C0_abcde,C1_efgabhi)[0:1100]:1.000!!!), ((C0_abcde,C1_efgabhi)[0:6050-0]->(C0_abcde,C1_efgabhi)[0:6050-0]:1.000)]", str(list(dp.allInter(res.asSegment())))
+               # "[((C0_abcde,C1_efgabhi)[0:1100]->(C0_abcde,C1_efgabhi)[3850:4948]:0.997!!!), ((C0_abcde,C1_efgabhi)[3850:4948]->(C0_abcde,C1_efgabhi)[0:1100]:0.997!!!), ((C0_abcde,C1_efgabhi)[0:6048-0]->(C0_abcde,C1_efgabhi)[0:6048-0]:1.000)]
 
 class StructureUpdatingTest(SimpleTest):
     def testManual(self):
@@ -513,7 +520,7 @@ class StructureUpdatingTest(SimpleTest):
         name2 = dataset.addContig("klmCDE")
         dataset.generateReads(4, 20, True)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker().markAllUnique(lines, dp)
+        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
         line1 = lines[name1]
         line2 = lines[name2]
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
@@ -530,20 +537,21 @@ class StructureUpdatingTest(SimpleTest):
         name2 = dataset.addContig("klmCDE")
         dataset.generateReads(4, 20, True)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker().markAllUnique(lines, dp)
+        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
         line1 = lines[name1]
         line2 = lines[name2]
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
         # extender.updateAllStructures(list(line1.correct_segments))
+        print line1, line2
         print str(line1.correct_segments)
         print str(line1.completely_resolved)
         print str(line2.correct_segments)
         print str(line2.completely_resolved)
-        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[502:3699]]", str(line1.correct_segments)
-        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[502:2849], C0_abcde[2899:3694]]", str(line1.completely_resolved)
-        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[500:4251]]", str(line2.correct_segments)
-        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[707:3405], C1_klmCDE[3457:4251]]", str(line2.completely_resolved)
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[495:3681]]", str(line1.correct_segments)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[495:2831], C0_abcde[2881:3679]]", str(line1.completely_resolved)
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[498:4252]]", str(line2.correct_segments)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[705:3403], C1_klmCDE[3455:4252]]", str(line2.completely_resolved)
 
 
 class LineExtensionTest(SimpleTest):
@@ -556,7 +564,7 @@ class LineExtensionTest(SimpleTest):
         for s in instance[3:]:
             dataset.addContig(s)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker().markAllUnique(lines, dp)
+        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         extender = LineExtender(self.aligner, knotter, lines.disjointigs, dp)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))

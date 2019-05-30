@@ -468,11 +468,12 @@ class AlignmentStorage(SmartStorage):
     def fireAfterCorrect(self, line):
         # type: (accurate_line.NewLine) -> None
         self.makeCanonical()
-        self.items = [al.targetAsSegment(Segment(line, line.left(), line.right())) for al in self.items] # type: List[AlignmentPiece]
+        assert len(self) == 0 or len(self.items[0].seg_to.contig) == len(line), str([self.items[0].seg_to.contig, line])
+        self.items = [al.targetAsSegment(line.asSegment()) for al in self.items] # type: List[AlignmentPiece]
 
     # Optimize? We are only interested in some of the last alignments.
     def allInter(self, seg, min_inter = 1):
-        # type: (Segment) -> Generator[AlignmentPiece]
+        # type: (Segment, int) -> Generator[AlignmentPiece]
         for al in self: # type: AlignmentPiece
             if al.seg_to.interSize(seg) >= min_inter:
                 yield al
@@ -637,11 +638,32 @@ class AlignmentStorage(SmartStorage):
         if positions[-1][0] < len(contig):
             yield contig.asSegment().suffix(pos=positions[-1][0]), 0
 
+    def calculateWindowedCoverage(self, sz):
+        line = self.__iter__().next().seg_to.contig
+        cseg = line.segment(0, sz)
+        val= 0
+        for seg, c in self.calculateCoverage():
+            if seg.inter(cseg):
+                val += c * seg.interSize(cseg)
+            if seg.right > cseg.left:
+                yield cseg, float(val) / sz
+                if cseg.right + sz <= len(line):
+                    cseg = line.segment(cseg.right, cseg.right + sz)
+                    val = c * seg.interSize(cseg)
+                else:
+                    return
+                yield cseg, float(val) / sz
+
+
     def __str__(self):
         if self.isCanonical():
             sign = "+"
         else:
             sign = "-"
         return "AlignmentStorage" + sign  + str(list(self))
+
+    def filter(self, condition):
+        # type: (Callable[[AlignmentPiece], bool]) -> AlignmentStorage
+        return AlignmentStorage().addAll(filter(condition, self))
 
 

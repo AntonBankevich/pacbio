@@ -1,12 +1,13 @@
 import itertools
 import multiprocessing
+import sys
 
 from typing import Optional, Iterable, List, Any, Generator
 
 from alignment.align_tools import Aligner
 from common import basic, params
 from common.save_load import TokenWriter, TokenReader
-from common.sequences import Segment, ContigCollection, Contig
+from common.sequences import Segment, ContigCollection, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
@@ -54,6 +55,27 @@ class Knot:
             rc = Knot(line_right.rc, line_left.rc, gap, basic.RC(gap_seq), self)
         self.rc = rc
 
+    def save(self, handler):
+        # type: (TokenWriter) -> None
+        handler.writeToken(self.line_left.id)
+        handler.writeToken(self.line_right.id)
+        handler.writeInt(self.gap)
+        if self.gap > 0:
+            handler.writeToken(self.gap_seq)
+
+    @staticmethod
+    def load(handler, collection):
+        # type: (TokenReader, ContigStorage) -> Knot
+        line_left = collection[handler.readToken()]
+        line_right = collection[handler.readToken()]
+        gap = handler.readInt()
+        if gap > 0:
+            gap_seq = handler.readToken()
+        else:
+            gap_seq = ""
+        return Knot(line_left, line_right, gap, gap_seq)
+
+
 # This class supports alignment of reads and disjointigs to extended sequences
 class ExtensionHandler(LineListener):
     def __init__(self, disjointigs, aligner):
@@ -70,7 +92,7 @@ class ExtensionHandler(LineListener):
             line.read_alignments.clean()
             line.read_alignments.addAll(tmp)
         new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + 1000))
-        for al in self.aligner.alignClean([new_seg.asContig()], self.disjointigs):
+        for al in self.aligner.alignAndSplit([new_seg.asContig()], self.disjointigs):
             al = al.reverse().targetAsSegment(new_seg)
             line.disjointig_alignments.addAndMergeRight(al)
 
@@ -95,7 +117,7 @@ class NewLine(Contig):
             rc = NewLine(basic.RC(seq), basic.Reverse(self.id), extension_handler.rc, self) #type: NewLine
             self.rc = rc
             self.addListener(ReadAlignmentListener(self))
-            self.initial.add(AlignmentPiece.Identical( self.asSegment().asContig().asSegment(), self.asSegment()))
+            # self.initial.add(AlignmentPiece.Identical(self.asSegment().asContig().asSegment(), self.asSegment()))
         else:
             self.initial = rc.initial.rc # type: AlignmentStorage
             self.correct_segments = rc.correct_segments.rc # type: SegmentStorage
@@ -105,7 +127,7 @@ class NewLine(Contig):
             self.listeners = [listener.rc for listener in rc.listeners] # type: List[LineListener]
         Contig.__init__(self, seq, id, rc)
         self.rc = rc #type: NewLine
-        self.knot = None
+        self.knot = None # type: Knot
 
     def updateCorrectSegments(self, seg, threshold = params.reliable_coverage):
         # type: (Segment, int) -> None
@@ -144,14 +166,22 @@ class NewLine(Contig):
 
     def getRelevantAlignmentsFor(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
+        sys.stdout.info("Requesting read alignments for", seg)
         result = []
         for alDL in self.disjointig_alignments.allInter(seg):
+            # print "Using disjointig alignment", alDL
+            dt = alDL.seg_from.contig # type: Disjointig
             reduced = alDL.reduce(target=seg)
             dt = alDL.seg_from.contig # type: Disjointig
-            for alRD in dt.allInter(reduced.seg_from):
-                al = alRD.compose(alDL)
+            cnt = 0
+            compositions = alDL.massComposeBack(dt.allInter(reduced.seg_from))
+            for al in compositions:
                 if len(al.seg_to) >= params.k:
                     result.append(al)
+                cnt += 1
+                # if cnt % 100 == 0:
+                #     print cnt
+        sys.stdout.info("Request for read alignments for", seg, " collecting finished. Started filtering")
         result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
         for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig): # type: AlignedRead, Generator[AlignmentPiece]
             readRes = []
@@ -165,6 +195,7 @@ class NewLine(Contig):
                 if not found:
                     yield al
                     readRes.append(al)
+        sys.stdout.info("Request for read alignments for", seg, "finished")
 
     def position(self, pos):
         # type: (int) -> LinePosition
@@ -172,6 +203,7 @@ class NewLine(Contig):
 
     def extendRight(self, seq, relevant_als = None):
         # type: (str, List[AlignmentPiece]) -> None
+        sys.stdout.info("Line operation Extend:", self, len(seq), relevant_als)
         assert self.knot is None
         if relevant_als is None:
             relevant_als = []
@@ -194,6 +226,7 @@ class NewLine(Contig):
 
     def cutRight(self, pos):
         assert pos > 0 and pos <= len(self)
+        sys.stdout.info("Line operation Cut:", self, pos)
         cut_length = len(self) - pos
         if cut_length == 0:
             return
@@ -215,6 +248,7 @@ class NewLine(Contig):
 
     def correctSequence(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
+        sys.stdout.info("Line operation Correct:", alignments)
         alignments = list(alignments)
         assert len(alignments) > 0
         correction = Correction.constructCorrection(alignments)
@@ -268,8 +302,17 @@ class NewLine(Contig):
     def loadLine(self, handler, disjointigs, reads, contigs):
         # type: (TokenReader, DisjointigCollection, ReadCollection, ContigCollection) -> None
         self.id = handler.readToken()
-        self.rc.id = basic.RC(self.id)
-        self.initial.load(handler, contigs, self)
+        self.seq = handler.readToken()
+        self.rc.id = basic.Reverse(self.id)
+        n = handler.readInt()
+        for i in range(n):
+            handler.readToken()
+            handler.readToken()
+            handler.readToken()
+            seg = Segment.load(handler, self)
+            handler.readToken()
+            self.initial.add(AlignmentPiece.Identical(seg.asContig().asSegment(), seg))
+            # self.add(AlignmentPiece.load(handler, collection_from, collection_to))
         self.correct_segments.load(handler, self)
         self.completely_resolved.load(handler, self)
         self.disjointig_alignments.load(handler, disjointigs, self)
@@ -282,7 +325,8 @@ class NewLine(Contig):
         if self.name_printer is not None:
             return self.name_printer(self)
         points = [self.left()]
-        points.extend(self.initial)
+        points.append(self.initial[0].seg_to.left)
+        points.append(self.initial[-1].seg_to.right)
         points.append(self.right())
         points = map(str, points)
         return "Line:" + str(self.id) + ":" + "[" + ":".join(points) +"]"
@@ -311,7 +355,9 @@ class NewLine(Contig):
 
     def tie(self, other, gap, gap_seq):
         self.knot = Knot(self, other, gap, gap_seq)
-        self.rc.knot = self.knot.rc
+        other.rc.knot = self.knot.rc
+        if self == other:
+            self.setCircular()
 
 
 class LinePosition(LineListener):

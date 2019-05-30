@@ -1,11 +1,11 @@
 from typing import Dict, List, Iterator, Optional, Iterable, BinaryIO, Tuple
 
 from alignment.align_tools import Aligner
-from common import SeqIO, params
+from common import SeqIO, params, basic
 from common.alignment_storage import AlignmentPiece, ReadCollection
 from common.save_load import TokenWriter, TokenReader
 from common.sequences import ContigStorage, UniqueList, Contig, ContigCollection, Segment
-from disjointig_resolve.accurate_line import NewLine, ExtensionHandler
+from disjointig_resolve.accurate_line import NewLine, ExtensionHandler, Knot
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.line_alignments import TwoLineAlignmentStorage
 from disjointig_resolve.smart_storage import AlignmentStorage
@@ -60,15 +60,28 @@ class NewLineStorage(ContigStorage):
     def fillFromContigs(self, contigs):
         # type: (Iterable[Contig]) -> None
         for contig in UniqueList(contigs):
-            line = self.addNew(contig.seq)
-            line.initial.add(AlignmentPiece.Identical(line.asSegment(), contig.asSegment()))
-            for seg in line.correct_segments:
-                line.completely_resolved.add(seg)
+            line = self.addNew(contig.seq, contig.id)
+            line.initial.add(AlignmentPiece.Identical(contig.asSegment(), line.asSegment()))
+
+    def splitFromContigs(self, contigs, max_contig = 40000, cut_size = 10000):
+        # type: (ContigStorage, int, int) -> None
+        for contig in contigs.unique():
+            if not basic.isCanonocal(contig.id):
+                contig = contig.rc
+            if len(contig) > max_contig:
+                line1 = self.addNew(contig.seq[:cut_size], contig.id + "l")
+                line2 = self.addNew(contig.seq[-cut_size:], contig.id + "r")
+                line1.initial.add(AlignmentPiece.Identical(contig.asSegment().prefix(length=cut_size), line1.asSegment()))
+                line2.initial.add(AlignmentPiece.Identical(contig.asSegment().suffix(length=cut_size), line2.asSegment()))
+                line1.tie(line2, 0, "")
+            else:
+                line = self.addNew(contig.seq, contig.id)
+                line.initial.add(AlignmentPiece.Identical(contig.asSegment(), contig.asSegment()))
 
     def alignDisjointigs(self):
         for line in self:
             line.disjointig_alignments.clean()
-        for al in self.aligner.alignClean(self.disjointigs.unique(), self):
+        for al in self.aligner.alignAndSplit(self.disjointigs.unique(), self):
             line = al.seg_to.contig # type: NewLine
             line.disjointig_alignments.add(al)
 
@@ -109,7 +122,7 @@ class NewLineStorage(ContigStorage):
         line1.correctSequence([alignment])
 
         # Now lines have exact match
-        name = "(" + line1.id + "," + line2.id + ")"
+        name = "(" + ",".join(basic.parseLineName(line1.id) + basic.parseLineName(line2.id))  + ")"
         line = self.addNew(new_seq.seq, name)
         assert line.seq.startswith(line1.seq)
         assert line.seq.endswith(line2.seq)
@@ -135,6 +148,13 @@ class NewLineStorage(ContigStorage):
         self.notifyMergedLines(al1, al2)
         self.remove(line1)
         self.remove(line2)
+        if line2.knot is not None:
+            if line2.knot.line_right == line1:
+                line.tie(line, line2.knot.gap, line2.knot.gap_seq)
+            else:
+                line.tie(line2.knot.line_right, line2.knot.gap, line2.knot.gap_seq)
+        if line1.rc.knot is not None and line1.rc.knot.line_right != line2.rc:
+            line.rc.tie(line1.rc.knot.line_right, line1.rc.knot.gap, line1.rc.knot.gap_seq)
         return line
 
     def splitLine(self, seg):
@@ -163,6 +183,10 @@ class NewLineStorage(ContigStorage):
         line.cleanReadAlignments()
         self.notifySplitLine(al1, al2)
         self.remove(line)
+        if line.knot is not None:
+            line2.tie(line.knot.line_right, line.knot.gap, line.knot.gap_seq)
+        if line.rc.knot is not None:
+            line1.rc.tie(line.rc.knot.line_right, line.rc.knot.gap, line.rc.knot.gap_seq)
         return line1, line2
 
 
@@ -187,16 +211,39 @@ class NewLineStorage(ContigStorage):
         for line_id in line_ids:
             line = self.items[line_id]
             line.save(handler)
+        for line_id in line_ids:
+            line = self.items[line_id]
+            if line.knot is not None:
+                handler.writeToken("Knot")
+                line.knot.save(handler)
+            else:
+                handler.writeToken("None")
+            if line.rc.knot is not None:
+                handler.writeToken("Knot")
+                line.rc.knot.save(handler)
+            else:
+                handler.writeToken("None")
 
     def load(self, handler, reads, contigs):
         # type: (TokenReader, ReadCollection, ContigCollection) -> None
         self.cnt = int(handler.readToken())
-        keys = handler.readTokens()
+        keys = list(handler.readTokens())
         for key in keys:
             self.addNew(handler.readToken(), key)
         for key in keys:
             line = self.items[key]
             line.loadLine(handler, self.disjointigs, reads, contigs)
+        for key in keys:
+            line = self.items[key]
+            if handler.readToken() is not None:
+                knot = Knot.load(handler, self)
+                line.knot = knot
+                line.knot.line_right.rc.knot = knot.rc
+            line = line.rc
+            if handler.readToken() is not None:
+                knot = Knot.load(handler, self)
+                line.knot = knot
+                line.knot.line_right.rc.knot = knot.rc
 
     def remove(self, line):
         del self.items[line.id]

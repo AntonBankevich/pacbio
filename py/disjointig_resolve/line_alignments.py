@@ -233,7 +233,7 @@ class RCAlignmentStorage(LineListener):
 
     def load(self, handler):
         # type: (TokenReader) -> None
-        self.content.load(handler, self.line, self.line)
+        self.content.load(handler, self.line.rc, self.line)
 
 
 class TwoLineAlignmentStorage(LineListener):
@@ -261,6 +261,8 @@ class TwoLineAlignmentStorage(LineListener):
 
     def add(self, al):
         # type: (AlignmentPiece) -> None
+        assert al.seg_from.contig == self.line_from
+        assert al.seg_to.contig == self.line_to
         self.content.add(al)
         reverse = al.reverse()
         self.reverse.content.add(reverse)

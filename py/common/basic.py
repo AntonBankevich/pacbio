@@ -3,7 +3,9 @@ import random
 import shutil
 import os
 
-from typing import Callable, Union
+from typing import Callable, Union, List
+
+from common import params
 
 rc = dict()
 rc['A'] = 'T'
@@ -100,20 +102,34 @@ class OStreamWrapper:
     def __init__(self, *streams):
         self.streams = list(streams)
         self.active = True
+        self.prefix = lambda x: ""
+        self.level = params.LogPriority.log_level
 
     def fileno(self):
         return 1
 
     def write(self, string):
-        if self.active:
+        if self.level >= params.LogPriority.common and self.active:
             for stream in self.streams:
                 stream.write(string)
 
     def writelines(self, lines):
-        if self.active:
+        if self.level >= params.LogPriority.common and self.active:
             for line in lines:
                 for stream in self.streams:
                     stream.write(line)
+
+    def info(self, *strings):
+        self.log(params.LogPriority.main_parts, " ".join(map(str, strings)))
+
+    def warn(self, *strings):
+        self.log(params.LogPriority.warning, "WARNING: " + " ".join(map(str, strings)))
+
+    def log(self, level = 0, *strings):
+        if level <= self.level and self.active:
+            string = " ".join(map(str, strings))
+            if self.active:
+                self.write(self.prefix(string) + string + "\n")
 
     def block(self):
         self.active = False
@@ -172,6 +188,12 @@ def isCanonocal(val):
         return val > 0
     assert False, "Tried to check canonical an object that is neither number nor a string"
 
+def canonical(val):
+    if isCanonocal(val):
+        return val
+    else:
+        return Reverse(val)
+
 
 def quoted(val):
     return "\"" + str(val) + "\""
@@ -189,3 +211,18 @@ def randomSequence(n):
     for i in range(n):
         res[i] = random.choice(["A", "C", "G", "T"])
     return "".join(res)
+
+
+def parseLineName(name):
+    # type: (str) -> List[str]
+    if name[0] == "-":
+        rc = True
+        name = name[1:]
+    else:
+        rc = False
+    if name.startswith("("):
+        name = name[1:-1]
+    seq = name.split(",")
+    if rc:
+        seq = map(Reverse, seq[::-1])
+    return seq

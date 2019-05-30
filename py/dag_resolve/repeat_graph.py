@@ -14,6 +14,9 @@ class EdgeInfo(TmpInfo):
         self.cov = cov
         self.selfrc = selfrc
 
+    def __repr__(self):
+        return str([self.label, self.unique, self.cov, self.selfrc])
+
 
 class Vertex:
     def __init__(self, id, label = None):
@@ -230,8 +233,9 @@ class Graph:
                 continue
             read = self.reads[rec.query_name]
             new_al = read.AddSamAlignment(rec, self.E[edge_id])
-            new_al.seg_to.contig.reads.addNew(read)
-            new_al.seg_to.contig.rc.reads.addNew(read.rc)
+            if new_al is not None:
+                new_al.seg_to.contig.reads.addNew(read)
+                new_al.seg_to.contig.rc.reads.addNew(read.rc)
         self.newEdges = []
 
     def fillRelevant(self, relevants, reads):
@@ -259,29 +263,5 @@ class Graph:
         for edge in self.E.values():
             if edge.id <= edge.rc.id:
                 yield (edge, edge.rc)
-
-class DotParser:
-    def __init__(self, dot):
-        # type: (BinaryIO) -> DotParser
-        self.dot = dot
-
-    def parse(self, edge_ids = None):
-        # type: (Optional[Dict[int, list[str]]]) -> Generator[Tuple[int, int, int, int, EdgeInfo]]
-        for s in self.dot.readlines():
-            if s.find("->") == -1:
-                continue
-            v_from = basic.parseNumber(s)
-            v_to = basic.parseNumber(s, s.find("->"))
-            eid = basic.parseNegativeNumber(s, s.find("id"))
-            cov = basic.parseNumber(s, s.find("k "))
-            unique = (s.find("black") != -1)
-            src = (s.find("dir = both") != -1)
-            if edge_ids is None or eid in edge_ids:
-                if edge_ids is not None:
-                    if "sink" in edge_ids[eid]:
-                        v_to = "sink"
-                    if "source" in edge_ids[eid]:
-                        v_from = "source"
-                yield eid, v_from, v_to, cov, EdgeInfo(s, unique, cov, src)
 
 

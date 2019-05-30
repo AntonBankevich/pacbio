@@ -50,7 +50,7 @@ class Contig(NamedSequence):
         return Contig(seq, id)
 
     def print_fasta(self, handler):
-        # type: (file) -> None
+        # type: (BinaryIO) -> None
         SeqIO.write(self, handler, "fasta")
 
 
@@ -70,6 +70,12 @@ class ContigStorage:
             self.items[item.rc.id] = item.rc
         return item
 
+    def addAll(self, items):
+        # type: (Iterable[Contig]) -> ContigStorage
+        for item in items:
+            self.add(item)
+        return self
+
     def __getitem__(self, item):
         # type: (str) -> Optional[Contig]
         if item in self.items:
@@ -83,7 +89,13 @@ class ContigStorage:
         return len(self.items)
 
     def unique(self):
-        return UniqueList(self).__iter__()
+        if self.add_rc:
+            for item in self.items.values():
+                if basic.isCanonocal(item.id):
+                    yield item
+        else:
+            for item in UniqueList(self).__iter__():
+                yield item
 
     def __contains__(self, item):
         # type: (Contig) -> bool
@@ -92,6 +104,15 @@ class ContigStorage:
     def containsKey(self, key):
         # type: (str) -> bool
         return key in self.items
+
+    def loadFromFasta(self, handler, num_names=True):
+        # type: (BinaryIO, bool) -> ContigCollection
+        for rec in SeqIO.parse_fasta(handler):
+            if num_names:
+                self.add(Contig(rec.seq, str(basic.parseNegativeNumber(rec.id))))
+            else:
+                self.add(Contig(rec.seq, rec.id))
+        return self
 
 
 #TODO: Merge with EasyContigStorage
@@ -113,17 +134,8 @@ class ContigCollection(ContigStorage):
         for contig in self:
             handler.write(str(contig.id) + "\n")
 
-    def loadFromFasta(self, handler, num_names=True):
-        # type: (BinaryIO, bool) -> ContigCollection
-        for rec in SeqIO.parse_fasta(handler):
-            if num_names:
-                self.add(Contig(rec.seq, str(basic.parseNegativeNumber(rec.id))))
-            else:
-                self.add(Contig(rec.seq, rec.id))
-        return self
-
     def print_fasta(self, handler):
-        # type: (file) -> None
+        # type: (BinaryIO) -> None
         for contig in self.items.values():
             contig.print_fasta(handler)
 
@@ -282,6 +294,14 @@ class Segment:
     def expand(self, range):
         # type: (int) -> Segment
         return Segment(self.contig, max(self.left - range, 0), min(self.right + range, len(self.contig)))
+
+    def expandLeft(self, range):
+        # type: (int) -> Segment
+        return Segment(self.contig, max(self.left - range, 0), self.right)
+
+    def expandRight(self, range):
+        # type: (int) -> Segment
+        return Segment(self.contig, self.left, min(self.right + range, len(self.contig)))
 
     def copy(self):
         # type: () -> Segment

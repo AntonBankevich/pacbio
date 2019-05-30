@@ -1,6 +1,10 @@
+import sys
+
 from typing import Generator, Iterable, List, Tuple
 
+from alignment.align_tools import Aligner
 from common import params
+from common.alignment_storage import AlignedRead, AlignmentPiece
 from common.sequences import Segment
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.line_storage import NewLineStorage
@@ -10,9 +14,9 @@ from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 
 
 class UniqueMarker:
-    def __init__(self):
-        # type: () -> None
-        pass
+    def __init__(self, aligner):
+        # type: (Aligner) -> None
+        self.aligner = aligner
 
     # Mark unique regions on a contig as correct
     def findUniqueInDisjointigs(self, disjointigs):
@@ -43,26 +47,72 @@ class UniqueMarker:
 
     def markUniqueInLine(self, line, dot_plot):
         # type: (NewLine, LineDotPlot) -> None
-        alignments = filter(lambda al: len(al.seg_to) > params.k, line.getRelevantAlignmentsFor(line.asSegment()))
+        print "Finding unique in", line
+        alignments = list(line.read_alignments) # type: List[AlignmentPiece]
+        for i, al in enumerate(alignments):
+            read = al.seg_from.contig # type: AlignedRead
+            for al1 in read.alignments:
+                if al1.contains(al) and al != al1:
+                    alignments[i] = None
+                    print "Removed alignment", al, al1
+                    print "\n".join(al1.asMatchingStrings())
+        alignments = filter(lambda al: al is not None, alignments)
+        alignments = sorted(alignments, key=lambda al:al.seg_to.left)
         inc = self.link(line, [al.seg_to.left for al in alignments if al.seg_from.left > 1000 and al.seg_to.left > 50], 20)
-        inc.append((line.segment(len(line) - 1, len(line)), 5))
-        out = self.link(line, [al.seg_to.right for al in alignments if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50 ], 20)
-        out.insert(0, (line.segment(0, 1), 5))
-        inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= 5]).reverse()
-        out = SegmentStorage().addAll([seg for seg, cov in out if cov >= 5]).reverse()
-        segs1 = inc.orderedCap(out)
-        line_als = AlignmentStorage().addAll(dot_plot.allInter(line.asSegment()))
-        segs2 = line_als.filterByCoverage(1, 2)
-        segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
         for al in alignments:
+            if al.seg_from.left > 1000 and al.seg_to.left > 50:
+                print "Breakpoint read inc:", al
+        inc.append((line.segment(len(line) - 1, len(line)), params.min_k_mer_cov))
+        alignments = sorted(alignments, key=lambda al:al.seg_to.right)
+        out = self.link(line, [al.seg_to.right for al in alignments if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50 ], 20)
+        for al in alignments:
+            if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50:
+                print "Breakpoint read out:", al
+        out.insert(0, (line.segment(0, 1), params.min_k_mer_cov))
+        print "inc:", inc
+        print "out:", out
+        inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= params.min_k_mer_cov]).reverse()
+        out = SegmentStorage().addAll([seg for seg, cov in out if cov >= params.min_k_mer_cov]).reverse()
+        print "inc:", inc
+        print "out:", out
+        segs1 = inc.orderedCap(out)
+        print "segs1:", segs1
+        line_als = AlignmentStorage().addAll(dot_plot.allInter(line.asSegment()))
+        print "als:", line_als
+        segs2 = line_als.filterByCoverage(1, 2)
+        print "segs2:", segs2
+        segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
+        line.cleanReadAlignments()
+        line.read_alignments.clean()
+        all = 0
+        inter = 0
+        contradicting = 0
+        print "Unique segments:", segs
+        for al in alignments:
+            all += 1
             if segs.inter(al.seg_to, params.k):
-                line.addReadAlignment(al)
+                inter += 1
+                if not al.contradictingRTC(tail_size=params.bad_end_length):
+                    line.addReadAlignment(al)
+                    # print "Added read alignment", al, str(al.seg_from.contig.alignments)
+                else:
+                    contradicting += 1
+                    print "Contradicting read alignment", al, str(al.seg_from.contig.alignments)
+            # else:
+            #     print "Ambiguous read alignment", al, str(al.seg_from.contig.alignments)
+        print all, inter, float(contradicting) / inter
         line.updateCorrectSegments(line.asSegment())
         segs = segs.cap(line.correct_segments, params.k)
         line.completely_resolved.addAll(segs)
 
-    def markAllUnique(self, lines, dot_plot):
-        # type: (NewLineStorage, LineDotPlot) -> None
+    def markAllUnique(self, lines, dot_plot, reads):
+        # type: (NewLineStorage, LineDotPlot, Iterable[AlignedRead]) -> None
+        sys.stdout.info("Aligning reads to contigs")
+        for al in self.aligner.alignAndSplit(reads, lines):
+            if len(al.seg_to) >= params.k:
+                line = al.seg_to.contig # type: NewLine
+                line.addReadAlignment(al)
+        sys.stdout.info("Marking unique regions in lines")
         for line in lines.unique():
             self.markUniqueInLine(line, dot_plot)
 

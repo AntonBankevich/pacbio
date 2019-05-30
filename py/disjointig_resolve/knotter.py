@@ -23,10 +23,16 @@ class LineMerger:
             # type: (AlignmentPiece, AlignmentPiece) -> None
             self.read = al1.seg_from.contig # type: AlignedRead
             line = al1.seg_to.contig # type: NewLine
-            self.gap = len(self.read) - al1.seg_from.right - (len(line) - al1.seg_to.right) - (len(self.read) - al2.seg_from.left) - al2.seg_to.left
+            if al1.seg_from.inter(al2.seg_from):
+                self.gap = al1.matchingSequence().mapDown(al2.seg_from.left, roundDown=False) - len(al1.seg_to.contig) - al2.seg_to.left
+            else:
+                self.gap = len(self.read) - al1.seg_from.right - (len(line) - al1.seg_to.right) - (len(self.read) - al2.seg_from.left) - al2.seg_to.left
             self.al1 = al1
             self.al2 = al2
             self.other = al2.seg_to.contig # type: NewLine
+
+        def __repr__(self):
+            return str([self.other, self.gap, self.al1, self.al2])
 
         def __str__(self):
             return str([self.other, self.gap, self.al1, self.al2])
@@ -65,8 +71,13 @@ class LineMerger:
             if final[0] + len(final[1]) > candidate[0]:
                 print "\n".join(map(str, candidates))
                 assert False, "Contradicting candidates" + str(final[0]) + " " + str(final[1]) + " " + str(candidate[0]) + " " + str(candidate[1])
-        if final[0] > 0 or len(final[2]) <= 1:
-            print "Positive gap. Can not merge."
+        if final[0] > 0:
+            print "Positive gap. Can not merge line", line
+            print final
+            return None
+        elif len(final[2]) <= 1:
+            print "Insufficient support to merge line", line
+            print final
             return None
         else:
             print "Merging", line, "with", final[1], "with gap", final[0]
@@ -75,12 +86,15 @@ class LineMerger:
             assert other.rc.knot is None
             line_alignment = final[2][0].al1.composeTargetDifference(final[2][0].al2)
             print "Alignment:", line_alignment
+            print "\n".join(line_alignment.asMatchingStrings())
+            print list(self.dot_plot.getAlignmentsToFrom(other, line))
             tmp = None
-            for al in self.dot_plot.getAlignmentsToFrom(other, line):
-                if len(list(al.matchingSequence().common(line_alignment.matchingSequence()))) > 0:
-                    tmp = al
-                    break
-            assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
+            if final[0] < -params.k - 200:
+                for al in self.dot_plot.getAlignmentsToFrom(other, line):
+                    if len(list(al.matchingSequence().common(line_alignment.matchingSequence()))) > 0:
+                        tmp = al
+                        break
+                assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)

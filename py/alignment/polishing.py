@@ -9,6 +9,7 @@ from common.line_align import Scorer
 from common.seq_records import NamedSequence
 from common.sequences import Consensus, Contig, ContigCollection, Segment, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
+from flye_tools.polish import PolishException
 from flye_tools.polysh_job import JobPolishing
 
 
@@ -109,7 +110,8 @@ class Polisher:
     # Returns alignment of polished sequence to old sequence
     def polishSegment(self, seg, als):
         # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
-        w = 400
+        print "Polishing segment", seg
+        w = 900
         r = 50
         first = seg.left / w
         last = min(seg.right + w - 1, len(seg.contig)) / w
@@ -124,14 +126,22 @@ class Polisher:
                 if al.seg_to.inter(segs[i]):
                     als_by_segment[i].append(al)
         res_als = []
-        for seg, seg_als in zip(segs, als_by_segment):
-            res_als.append(self.polishSmallSegment(seg, seg_als))
+        for seg1, seg_als in zip(segs, als_by_segment):
+            res_als.append(self.polishSmallSegment(seg1, seg_als))
+        # print "Res als", res_als
         res = AlignmentPiece.GlueOverlappingAlignments(res_als)
         return res.reduce(target=seg)
 
     # Returns alignment of polished sequence to old sequence
     def polishSmallSegment(self, seg, als):
         # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
+        ok = False
+        for al in als:
+            if al.seg_to.contains(seg):
+                ok = True
+        if not ok:
+            sys.stdout.log(params.LogPriority.warning, "Warning", seg, "has no covering reads")
+            return AlignmentPiece.Identical(seg.asContig().asSegment(), seg)
         reads = []
         start = basic.randomSequence(200)
         end = basic.randomSequence(200)
@@ -145,7 +155,21 @@ class Polisher:
                 new_seq += end
             reads.append(NamedSequence(new_seq, al.seg_from.contig.id))
         base = Contig(start + seg.Seq() + end, "base")
-        polished = Contig(self.polish(reads, base), "polished")
+        polished = False
+        try:
+            polished = Contig(self.polish(reads, base), "polished")
+        except PolishException:
+            sys.stdout.log(params.LogPriority.warning, "Warning", seg, "has a sequence very different from reads. Using reads to correct.")
+            for al, read in zip(als, reads):
+                if al.seg_to.contains(seg):
+                    try:
+                        polished = Contig(self.polish(reads, Contig(read.seq, read.id)), "polished")
+                        break
+                    except PolishException:
+                        pass
+        if polished is None:
+            sys.stdout.log(params.LogPriority.warning, "Warning", seg, "could not be corrected even though some reads cover it.")
+            polished = seg.asContig()
         al = self.aligner.alignClean([polished], ContigStorage([base])).next()
         mapping = AlignmentPiece.Identical(base.segment(len(start), len(base) - len(end)), seg)
         return al.compose(mapping)
@@ -170,8 +194,9 @@ class Polisher:
                 break
             start = basic.randomSequence(200) + new_contig.asSegment().suffix(length=200).Seq()
             reduced_read_list = [
-                AlignedRead.new(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), al.seg_from.contig.id)
-                for al in relevant_als if al.rc.seg_from.left > 100]
+                AlignedRead.new(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), str(i) + "_" + al.seg_from.contig.id)
+                for i, al in enumerate(relevant_als)]
+            # print "RRL:", reduced_read_list
             reduced_reads = ReadCollection(reduced_read_list)
             found = False
             for base_al in relevant_als:
@@ -181,22 +206,33 @@ class Polisher:
                 base_segment = base_al.seg_from.contig.segment(base_al.seg_from.right,
                                                      min(len(base_al.seg_from.contig), base_al.seg_from.right + 500))
                 base = Contig(start + base_segment.Seq(), "base")
+                for read in reduced_read_list:
+                    read.clean()
                 polished_base = Contig(self.polish(reduced_reads, base), "polished_base")
                 self.aligner.alignReadCollection(reduced_reads, [polished_base])
                 candidate_alignments = []
+                # print "RRL1:", reduced_read_list
                 for read in reduced_read_list:
                     candidate_alignments.append(None)
                     for al in read.alignmentsTo(polished_base.asSegment()):
                         if al.seg_to.left == 0 and ((candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right)):
                             candidate_alignments[-1] = al
                 positions = []
-                for al in candidate_alignments:
-                    assert al is not None
+                # print "CA:", candidate_alignments
+                for i, al in enumerate(candidate_alignments):
+                    if al is None:
+                        print al, reduced_read_list[i]
+                        print reduced_read_list[i].alignments
+                        print reduced_read_list[i].seq
+                        print polished_base.seq
+                    assert al is not None, reduced_read_list[i]
                     positions.append(al.seg_to.right)
                 positions = sorted(positions)[::-1]
                 num = max(min_cov, len(relevant_als)  * 8 / 10)
                 if num >= len(positions):
                     continue
+                print "Chose to use read", base_al, "Alignments:"
+                print map(str, reduced_read_list)
                 cutoff_pos = max(positions[num - 1], len(start))
                 if cutoff_pos > len(start) + 100:
                     found = True
@@ -207,13 +243,26 @@ class Polisher:
                         seg_from = al2.seg_from.contig.asSegment().suffix(length = len(al1.seg_from.contig) - len(start))
                         seg_to = al1.seg_from.contig.asSegment().suffix(length = len(al1.seg_from.contig) - len(start))
                         read_mappings.append(AlignmentPiece.Identical(seg_from, seg_to))
-                    candidate_alignments = [al2.compose(al1).compose(embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
+                    # print [(al2, al1, embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
+                    embedded_alignments = []
+                    for al1, al2 in zip(candidate_alignments, read_mappings):
+                        # print al2, al1, embedding
+                        # print al2.compose(al1)
+                        # print al2.compose(al1).compose(embedding)
+                        if al1.seg_from.right <= len(start) + 5:
+                            embedded_alignments.append(None)
+                        else:
+                            embedded_alignments.append(al2.compose(al1).compose(embedding))
+                    # candidate_alignments = [al2.compose(al1).compose(embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
                     corrected_relevant_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in relevant_als]
                     relevant_als = []
-                    for al1, al2 in zip(corrected_relevant_alignments, candidate_alignments):
-                        al = al1.mergeDistant(al2)
-                        if al1.seg_from.dist(al2.seg_from) >= 10 or al1.seg_to.dist(al2.seg_to) >= 10:
-                            al = scorer.polyshAlignment(al)
+                    for al1, al2 in zip(corrected_relevant_alignments, embedded_alignments):
+                        if al2 is None:
+                            al = al1
+                        else:
+                            al = al1.mergeDistant(al2)
+                            if al1.seg_from.dist(al2.seg_from) >= 10 or al1.seg_to.dist(al2.seg_to) >= 10:
+                                al = scorer.polyshAlignment(al)
                         relevant_als.append(al)
                     finished_als = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in finished_als]
                     new_contig = new_contig_candidate

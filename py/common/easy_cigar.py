@@ -40,3 +40,10 @@ def CigarToList(cigar):
         else:
             n = 1
         yield (n, c)
+
+def CigarLen(cigar):
+    res = 0
+    for n, c in CigarToList(cigar):
+        if c in "MD":
+            res += n
+    return res

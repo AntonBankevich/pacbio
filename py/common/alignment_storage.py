@@ -21,15 +21,21 @@ class AlignmentPiece:
         if cigar == "=":
             cigar = str(len(seg_from)) + "M"
         self.cigar = cigar
+        # self.blocks = None
         assert len(seg_from) > 0 and len(seg_to) > 0
+        assert len(seg_to) == easy_cigar.CigarLen(cigar), str([len(seg_to), easy_cigar.CigarLen(cigar)])
         assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left], str(self) + " " + self.seg_from.contig[self.seg_from.left]+ " " + self.seg_to.contig[self.seg_to.left]
         assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1], str(self) + " " + self.seg_from.contig[self.seg_from.right - 1]+ " " + self.seg_to.contig[self.seg_to.right - 1]
         if params.assert_pi:
-            pi = self.matchingPercentIdentity()
-            if pi < 0.05:
-                print seg_from.Seq()
-                print seg_to.Seq()
-            assert pi >= 0.5, str(self)
+            pi = self.percentIdentity()
+            if pi < params.min_pi:
+                print "\n".join(self.asMatchingStrings())
+            assert pi >= params.min_pi, str(self)
+        self.matchingPositionsCount = 0
+        for n, c in easy_cigar.CigarToList(cigar):
+            if c == "M":
+                self.matchingPositionsCount += n
+        self.indelLength = len(self.seg_from) + len(self.seg_to) - 2 * self.matchingPositionsCount
         if rc is None:
             self.rc = AlignmentPiece(seg_from.RC(), seg_to.RC(), easy_cigar.RCCigar(self.cigar), self)
         else:
@@ -45,22 +51,36 @@ class AlignmentPiece:
         cigar_list = list(easy_cigar.CigarToList(rec.cigar))
         ls = 0
         rs = 0
-        if cigar_list[0][1] in "HS":
-            ls = cigar_list[0][0]
-        if cigar_list[-1][1] in "HS":
-            rs = cigar_list[-1][0]
+        lrefs = 0
+        rrefs = 0
+        l = 0
+        r = len(cigar_list)
+        while cigar_list[l][1] != "M":
+            if cigar_list[l][1] == "D":
+                lrefs += cigar_list[l][0]
+            else:
+                ls += cigar_list[l][0]
+            l += 1
+        while cigar_list[r-1][1] != "M":
+            r -= 1
+            if cigar_list[r][1] == "D":
+                rrefs += cigar_list[r][0]
+            else:
+                rs = cigar_list[r][0]
         new_cigar = []
-        for num, s in cigar_list:
-            if s not in "HS":
-                new_cigar.append(num)
-                new_cigar.append(s)
+        for num, s in cigar_list[l:r]:
+            new_cigar.append(num)
+            new_cigar.append(s)
         new_cigar = "".join(map(str, new_cigar))
-        seg_from = Segment(seq_from, ls, len(seq_from) - rs)
-        seg_to = Segment(seq_to, rec.pos - 1, rec.pos - 1 + rec.alen)
+        seg_to = Segment(seq_to, rec.pos - 1 + lrefs, rec.pos - 1 + rec.alen - rrefs)
         if rec.rc:
             seg_from = Segment(seq_from.rc, ls, len(seq_from) - rs).RC()
             seg_to = seg_to.RC()
             new_cigar = easy_cigar.RCCigar(new_cigar)
+        else:
+            seg_from = Segment(seq_from, ls, len(seq_from) - rs)
+        if seg_from.contig[seg_from.left] != seg_to.contig[seg_to.left] or seg_from.contig[seg_from.right - 1] != seg_to.contig[seg_to.right - 1]:
+            return None
         piece = AlignmentPiece(seg_from, seg_to, new_cigar)
         # seg_from.contig.alignments.append(piece)
         # seg_from.contig.rc.alignments.append(piece.rc)
@@ -85,6 +105,9 @@ class AlignmentPiece:
             next = al.matchingSequence()
             shared = list(last.common_to(next))
             if len(shared) == 0:
+                print "Broken glue:", al
+                print last
+                print next
                 return None
             pos1, pos2 = shared[len(shared) / 2]
             truncated[-1] = truncated[-1].prefix(pos=last.matches[pos1][1])
@@ -262,7 +285,11 @@ class AlignmentPiece:
         return "".join(l1), "".join(l2)
 
     def percentIdentity(self):
-        res = len(list(self.matchingPositions(True)))
+        res = 0
+        for seg1, seg2 in self.matchingBlocks():
+            for i in range(len(seg1)):
+               if seg1.contig[seg1.left + i] == seg2.contig[seg2.left + i]:
+                   res += 1
         return float(res) / max(len(self.seg_from), len(self.seg_to))
 
     def matchingPercentIdentity(self):
@@ -296,13 +323,14 @@ class AlignmentPiece:
             return False
         if self.seg_from.left >= tail_size and self.seg_to.left >= seg.left + 50:
             return True
-        if self.rc.seg_from.left <= tail_size and self.seg_to.right <= seg.right - 50:
+        if self.rc.seg_from.left >= tail_size and self.seg_to.right <= seg.right - 50:
             return True
         return False
 
     def targetAsSegment(self, seg):
         # type: (Segment) -> AlignmentPiece
         seg_to = self.seg_to.contigAsSegment(seg)
+        assert len(seg_to) == len(self.seg_to)
         return AlignmentPiece(self.seg_from, seg_to, self.cigar)
 
     def queryAsSegment(self, seg):
@@ -314,9 +342,13 @@ class AlignmentPiece:
         # type: (Optional[Segment], Optional[Segment], Optional[Segment]) -> AlignmentPiece
         # TODO alignment reduce without additional translation. Same for alignment glue and composition
         if query is not None:
+            if query.contains(self.seg_from):
+                return self
             return self.matchingSequence().reduceQuery(query.left, query.right).asAlignmentPiece(self.seg_from.contig,
                                                                                                  self.seg_to.contig)
         else:
+            if target.contains(self.seg_to):
+                return self
             return self.matchingSequence().reduceTarget(target.left, target.right).asAlignmentPiece(
                 self.seg_from.contig, self.seg_to.contig)
 
@@ -333,6 +365,29 @@ class AlignmentPiece:
         return AlignmentPiece(Segment.load(handler, collection_from), Segment.load(handler, collection_to), handler.readToken())
 
     # composes alignments A->B and B->C into alignment A->C
+    def massCompose(self, others):
+        # type: (Iterable[AlignmentPiece]) -> List[AlignmentPiece]
+        return [ms.asAlignmentPiece(self.seg_from.contig, al.seg_to.contig) for ms, al in itertools.izip(self.matchingSequence().massCompose([other.matchingSequence() for other in others]), others)]
+
+    # composes alignments B->C and A->B into alignment A->C
+    def massComposeBack(self, others):
+        # type: (Iterable[AlignmentPiece]) -> List[AlignmentPiece]
+        others = list(others)
+        return [ms.asAlignmentPiece(al.seg_from.contig, self.seg_to.contig) for ms, al in itertools.izip(self.matchingSequence().massComposeBack([other.matchingSequence() for other in others]), others)]
+
+    # composes alignments A->B and A->C into alignment B->C
+    def massComposeTargetDifference(self, others):
+        # type: (Iterable[AlignmentPiece]) -> List[AlignmentPiece]
+        others = list(others)
+        return [ms.asAlignmentPiece(self.seg_to.contig, al.seg_to.contig) for ms, al in itertools.izip(self.matchingSequence().massComposeDifference([other.matchingSequence() for other in others]), others)]
+
+    # composes alignments A->B and C->B into alignment A->C
+    def massComposeQueryDifference(self, others):
+        # type: (Iterable[AlignmentPiece]) -> List[AlignmentPiece]
+        others = list(others)
+        return [ms.asAlignmentPiece(self.seg_from.contig, al.seg_from.contig) for ms, al in itertools.izip(self.matchingSequence().massCompose([other.matchingSequence().reverse() for other in others]), others)]
+
+    # composes alignments A->B and B->C into alignment A->C
     def compose(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
         return self.matchingSequence().compose(other.matchingSequence()).asAlignmentPiece(self.seg_from.contig, other.seg_to.contig)
@@ -346,7 +401,7 @@ class AlignmentPiece:
     # composes alignments A->B and C->B into alignment A->C
     def composeQueryDifference(self, other):
         # type: (AlignmentPiece) -> AlignmentPiece
-        return self.matchingSequence(False).compose(other.matchingSequence().reverse()).\
+        return self.matchingSequence().compose(other.matchingSequence().reverse()).\
             asAlignmentPiece(self.seg_from.contig, other.seg_from.contig)
 
     def reverse(self):
@@ -354,21 +409,97 @@ class AlignmentPiece:
         # print "Reverse", self, self.seg_from.contig[self.seg_from.right - 1], self.seg_to.contig[self.seg_to.right - 1]
         return AlignmentPiece(self.seg_to, self.seg_from, easy_cigar.ReverseCigar(self.cigar))
 
+    def matchingBlocks(self):
+        # type: () -> Generator[Tuple[Segment, Segment]]
+        # if self.blocks is None:
+        #     self.blocks = []
+        cur_query = self.seg_from.left
+        cur_tar = self.seg_to.left
+        for n, c in easy_cigar.CigarToList(self.cigar):
+            if c == 'M':
+                tmp = (Segment(self.seg_from.contig, cur_query, cur_query + n), Segment(self.seg_to.contig, cur_tar, cur_tar + n))
+                yield tmp
+                # self.blocks.append(tmp)
+                cur_tar += n
+                cur_query += n
+            elif c == "D":
+                cur_tar += n
+            elif c == "I":
+                cur_query += n
+        # else:
+        #     for b1, b2 in self.blocks:
+        #         yield b1, b2
+
+
     def split(self):
         res = []
-        for a, b in self.matchingPositions(True):
+        prev = 0
+        w = 100
+        for seg_from, seg_to in self.matchingBlocks():
+            while prev + 1 < len(res) and res[prev + 1][1].left < seg_to.left - w:
+                prev += 1
             if len(res) > 0:
-                prev = res[max(0, len(res) - 10)]
-                if prev[0] < a - 100 or prev[1] < b - 100:
-                    yield MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq, res).asAlignmentPiece(
-                        self.seg_from.contig, self.seg_to.contig)
+                if abs((seg_from.left - res[prev][0].left) - (seg_to.left - res[prev][1].left)) > 40:
+                    # print "New part:"
+                    # for b1, b2 in res:
+                    #     print b1.Seq()
+                    #     print b2.Seq()
+                    if max(res[-1][0].right - res[0][0].left, res[-1][1].right - res[0][1].left) < 2 * sum(map(lambda p: len(p[0]), res)) and \
+                            res[-1][0].right - res[0][0].left > 200:
+                        yield AlignmentPiece.FromBlocks(res)
                     res = []
-            res.append((a, b))
-        if res[0] == self.seg_from.left:
+                    prev = 0
+            res.append((seg_from, seg_to))
+        if res[0][0].left == self.seg_from.left:
             yield self
         else:
-            yield MatchingSequence(self.seg_from.contig.seq, self.seg_to.contig.seq, res).asAlignmentPiece(
-                self.seg_from.contig, self.seg_to.contig)
+            yield AlignmentPiece.FromBlocks(res)
+
+    @staticmethod
+    def FromBlocks(blocks):
+        # type: (List[Tuple[Segment, Segment]]) -> AlignmentPiece
+        blocks = list(blocks)
+        seq_from = blocks[0][0].contig
+        seq_to = blocks[0][1].contig
+        while seq_from[blocks[0][0].left] != seq_to[blocks[0][1].left]:
+            if len(blocks[0][0]) == 1:
+                blocks = blocks[1:]
+            else:
+                blocks[0] = (blocks[0][0].suffix(length=len(blocks[0][0]) - 1), blocks[0][1].suffix(length=len(blocks[0][0]) - 1))
+        while seq_from[blocks[-1][0].right - 1] != seq_to[blocks[-1][1].right - 1]:
+            if len(blocks[-1][0]) == 1:
+                blocks = blocks[:-1]
+            else:
+                blocks[-1] = (blocks[-1][0].prefix(length=len(blocks[-1][0]) - 1), blocks[-1][1].prefix(length=len(blocks[-1][0]) - 1))
+        cigar = []
+        for p1, p2 in zip(blocks[:-1], blocks[1:]): # type: Tuple[Segment, Segment], Tuple[Segment, Segment]
+            d_from = p2[0].left - p1[0].right
+            d_to = p2[1].left - p1[1].right
+            cigar.append(str(len(p1[0]) + min(d_from, d_to)) + "M")
+            if d_from > d_to:
+                cigar.append(str(d_from - d_to) + "I")
+            elif d_to > d_from:
+                cigar.append(str(d_to - d_from) + "D")
+        cigar.append(str(len(blocks[-1][0])) + "M")
+        return AlignmentPiece(seq_from.segment(blocks[0][0].left, blocks[-1][0].right), seq_to.segment(blocks[0][1].left, blocks[-1][1].right), "".join(cigar))
+
+    def deepInter(self, al1):
+        # type: (AlignmentPiece) -> bool
+        al1 = al1# type: AlignmentPiece
+        other = list(al1.matchingBlocks())
+        cur = 0
+        for seg1, seg2 in self.matchingBlocks():
+            while cur < len(other) and seg1.left >= other[cur][0].right:
+                cur += 1
+            while cur < len(other) and seg1.right > other[cur][0].right:
+                if seg1.left - other[cur][0].left == seg2.left - other[cur][1].left:
+                    return True
+                cur += 1
+            if cur < len(other) and seg1.right > other[cur][0].left:
+                if seg1.left - other[cur][0].left == seg2.left - other[cur][1].left:
+                    return True
+        return False
+
 
 
 class MatchingSequence:
@@ -554,6 +685,108 @@ class MatchingSequence:
 
     def __len__(self):
         return len(self.matches)
+
+    def mapPositionsDown(self, positions):
+        # type: (List[int]) -> List[Optional[int]]
+        tmp = [(pos, i) for i, pos in enumerate(positions)]
+        tmp = sorted(tmp)
+        res = [0] * len(positions)
+        cur_pos = 0
+        while cur_pos < len(tmp) and tmp[cur_pos][0] < self.matches[0][0]:
+            res[tmp[cur_pos][1]] = None
+            cur_pos += 1
+        for p1, p2 in self.matches:
+            while cur_pos < len(positions) and tmp[cur_pos][0] <= p1:
+                if tmp[cur_pos][0] == p1:
+                    res[tmp[cur_pos][1]] = p2
+                else:
+                    res[tmp[cur_pos][1]] = None
+                cur_pos += 1
+        while cur_pos < len(positions):
+            res[tmp[cur_pos][1]] = None
+            cur_pos += 1
+        return res
+
+    def mapPositionsUp(self, positions):
+        # type: (List[int]) -> List[Optional[int]]
+        tmp = [(pos, i) for i, pos in enumerate(positions)]
+        tmp = sorted(tmp)
+        res = [0] * len(positions)
+        cur_pos = 0
+        while cur_pos < len(tmp) and tmp[cur_pos][0] < self.matches[0][1]:
+            res[tmp[cur_pos][1]] = None
+            cur_pos += 1
+        for p1, p2 in self.matches:
+            while cur_pos < len(positions) and tmp[cur_pos][0] <= p2:
+                if tmp[cur_pos][0] == p2:
+                    res[tmp[cur_pos][1]] = p1
+                else:
+                    res[tmp[cur_pos][1]] = None
+                cur_pos += 1
+        while cur_pos < len(positions):
+            res[tmp[cur_pos][1]] = None
+            cur_pos += 1
+        return res
+
+    def continuousMapping(self, map_function, iter):
+        # type: (Callable[[List[int]], List[int]], Iterator[int]) -> Generator[int]
+        chunk = []
+        for item in iter:
+            chunk.append(item)
+            if len(chunk) > 100000:
+                for res in map_function(chunk):
+                    yield res
+                chunk = []
+        for res in map_function(chunk):
+            yield res
+
+    def massCompose(self, others):
+        # type: (List[MatchingSequence]) -> List[MatchingSequence]
+        res = []
+        positions = itertools.chain.from_iterable([[p[0] for p in m.matches] for m in others])
+        generator = self.continuousMapping(lambda poslist: self.mapPositionsUp(poslist), positions)
+        for matching in others:
+            new_pairs = []
+            for pos_from, pos_to in matching.matches:
+                new_pos = generator.next()
+                if new_pos is not None:
+                    # print pos_to, pos_from, new_pos, al.seg_to.contig[pos_to], al.seg_from.contig[pos_from], self.seq_from[new_pos]
+                    new_pairs.append((new_pos, pos_to))
+            new_matching = MatchingSequence(self.seq_from, matching.seq_to, new_pairs)
+            res.append(new_matching)
+        return res
+
+    def massComposeBack(self, others):
+        # type: (List[MatchingSequence]) -> List[MatchingSequence]
+        res = []
+        positions = itertools.chain.from_iterable([[p[1] for p in m.matches] for m in others])
+        generator = self.continuousMapping(lambda poslist: self.mapPositionsDown(poslist), positions)
+        for matching in others:
+            new_pairs = []
+            for pos_from, pos_to in matching.matches:
+                new_pos = generator.next()
+                if new_pos is not None:
+                    # print pos_to, pos_from, new_pos, al.seg_to.contig[pos_to], al.seg_from.contig[pos_from], self.seq_from[new_pos]
+                    new_pairs.append((pos_from, new_pos))
+            new_matching = MatchingSequence(matching.seq_from, self.seq_to, new_pairs)
+            res.append(new_matching)
+        return res
+
+    def massComposeDifference(self, others):
+        # type: (List[MatchingSequence]) -> List[MatchingSequence]
+        res = []
+        positions = itertools.chain.from_iterable([[p[0] for p in m.matches] for m in others])
+        generator = self.continuousMapping(lambda poslist: self.mapPositionsDown(poslist), positions)
+        for matching in others:
+            new_pairs = []
+            for pos_from, pos_to in matching.matches:
+                new_pos = generator.next()
+                if new_pos is not None:
+                    # print pos_to, pos_from, new_pos, al.seg_to.contig[pos_to], al.seg_from.contig[pos_from], self.seq_from[new_pos]
+                    new_pairs.append((new_pos, pos_to))
+            new_matching = MatchingSequence(self.seq_to, matching.seq_to, new_pairs)
+            res.append(new_matching)
+        return res
 
 
 class AlignedRead(Contig):
@@ -890,10 +1123,14 @@ class ReadCollection:
         for read in self.reads.values():
             yield common.seq_records.SeqRecord(read.seq, read.id)
 
-    def loadFromFasta(self, handler):
-        # type: (BinaryIO) -> ReadCollection
+    def loadFromFasta(self, handler, downsample = 1000000000):
+        # type: (BinaryIO, int) -> ReadCollection
+        cnt = 0
         for rec in SeqIO.parse_fasta(handler):
-            new_read = self.add(AlignedRead(rec))
+            cnt += 1
+            self.add(AlignedRead(rec))
+            if cnt >= downsample:
+                break
         return self
 
     def nontontradictingCopy(self, contig):
@@ -922,13 +1159,13 @@ class ReadCollection:
         for read in self.reads.values():
             read.changeTargets(contigs)
 
-    def cleanCopy(self, contigs, filter=lambda read: True):
-        # type: (ContigCollection, Callable[[AlignedRead], bool]) -> ReadCollection
+    def cleanCopy(self, filter=lambda read: True):
+        # type: (Callable[[AlignedRead], bool]) -> ReadCollection
         res = ReadCollection()
         for read in self.reads.values():
             if not filter(read):
                 continue
-            if read.rc in res.reads:
+            if read.rc.id in res.reads:
                 res.add(res.reads[read.rc.id].rc)
             else:
                 res.addNewRead(read)

@@ -105,11 +105,16 @@ class LineExtender:
     # input: a collection of segments that had reads recruited to.
     def updateAllStructures(self, interesting_segments):
         # type: (Iterable[Segment]) -> None
-        # Correct read sequences, update correct segment storages. Return segments that were corrected.
+        # Correct contig sequences, update correct segment storages. Return segments that were corrected.
         corrected = self.correctSequences(interesting_segments)
         # Collect all relevant contig segments, collect all reads that align to relevant segments. Mark resolved bound for each read.
-        records = self.collectRecords(corrected)
-        # Update resolced segmetns on all relevant contig positions
+        records = self.collectRecords(corrected) # type: List[LineExtender.Record]
+        print "\n".join(map(str, records))
+        for rec in records:
+            print rec.line, rec.correct, rec.resolved
+            for al in rec.reads:
+                print al, al.seg_from.contig.alignments
+        # Update resolved segments on all relevant contig positions
         self.updateResolved(records)
 
     def updateResolved(self, records):
@@ -119,6 +124,7 @@ class LineExtender:
             ok = False
             for rec in records:
                 if self.attemptProlongResolved(rec):
+                    print "Prolonged resolved", rec.line, rec.line.initial, rec.resolved, rec.line.completely_resolved
                     ok = True
             if not ok:
                 for rec in records: # type:LineExtender.Record
@@ -133,16 +139,21 @@ class LineExtender:
             line.completely_resolved.mergeSegments(params.k - 1)
 
     def collectRecords(self, corrected):
-        # type: (List[Segment]) -> List[Record]
+        # type: (List[Segment]) -> List[LineExtender.Record]
         print "Collcting records", corrected
         read_bounds = dict()
         records = dict()  # type: Dict[Segment, LineExtender.Record]
         good_reads = set()
         for seg in corrected:
+            # print "initial:", seg
+            seg = seg.expandLeft(params.k)
             for al in self.dot_plot.allInter(seg):
+                # print "Alignment:", al
                 line = al.seg_from.contig  # type:NewLine
                 for seg_correct in line.correct_segments.allInter(al.seg_from):
+                    # print "candidate correct segment:",seg_correct
                     for seg_resolved in line.completely_resolved.allInter(seg_correct):
+                        # print "candidate resolved segment:", seg_resolved
                         if seg_resolved in records:
                             continue
                         if seg_resolved.right == len(line):
@@ -322,7 +333,7 @@ class LineExtender:
         assert line.seq == new_contig.prefix(len=len(line)).Seq()
         print "Extending", line, "for", len(new_contig) - len(line)
         line.extendRight(new_contig.suffix(pos = len(line)).Seq(), relevant_als)
-        print "Extended line", line
+        print "Extended line " + str(line)
         return True
 
     def polyshSegments(self, line, to_polysh):
@@ -368,14 +379,19 @@ class LineExtender:
 
         def add(self, al):
             # type: (AlignmentPiece) -> None
+            print "Adding", al, "to", self.line
             if al.seg_from.left < params.k / 2:
                 self.potential_good.append(al)
+                print "Potential good"
             else:
+                print "Just add"
                 self.reads.append(al)
             read = al.seg_from.contig # type: AlignedRead
             if read.id not in self.read_bounds:
+                print "init read bound"
                 self.read_bounds[read.id] = len(read)
             if al.rc.seg_to.left < 50:
+                print "update read bound", self.read_bounds[read.id], al.seg_from.right
                 self.read_bounds[read.id] = min(self.read_bounds[read.id], al.seg_from.right)
             self.sorted = False
 
@@ -423,6 +439,7 @@ class LineExtender:
                     self.good_reads.add(al.seg_from.contig.id)
             while len(self.potential_good) > 0 and self.potential_good[-1].seg_to.left <= self.resolved.right - params.k:
                 al = self.potential_good.pop()
+                print "Filtering uninteresting:", al
                 if al.seg_to.interSize(self.resolved) >= params.k:
                     self.good_reads.add(al.seg_from.contig.id)
 
@@ -448,10 +465,10 @@ class LineExtender:
         #         next_start = min(next_start, al.seg_to.left + params.k / 2)
         res = self.Record(resolved, next_start, correct, good_reads, read_bounds)
         # print "Getting relevant alignments", str(focus)
-        als = line.getRelevantAlignmentsFor(focus)
         # als = filter(lambda al: al.seg_from.left > params.k / 2 + 20, als)
-        res.addAll(als)
+        res.addAll(line.getRelevantAlignmentsFor(focus))
         res.updateGood()
+
         return res
 
     def findResolvedBound(self, rec, inter_size):
@@ -460,7 +477,7 @@ class LineExtender:
         for read in rec:
             if len(read.seg_to) >= inter_size:
                 bad_reads.append(read)
-            if len(bad_reads) >= 3:
+            if len(bad_reads) >= params.min_k_mer_cov:
                 if bad_reads[-1].seg_to.left - bad_reads[0].seg_to.left > 50:
                     bad_reads = bad_reads[1:]
                 else:

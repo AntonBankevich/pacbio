@@ -8,10 +8,11 @@ from common import basic
 
 
 class TokenWriter:
-    def __init__(self, handler):
-        # type: (Union[BinaryIO, StringIO]) -> None
+    def __init__(self, handler, info = ""):
+        # type: (Union[BinaryIO, StringIO], str) -> None
         self.handler = handler
         self.new_line = True
+        self.info = info
 
     def writeToken(self, token):
         # type: (str) -> None
@@ -33,7 +34,7 @@ class TokenWriter:
         if not self.new_line:
             self.handler.write(" ")
         self.new_line = False
-        self.handler.write(token)
+        self.handler.write(str(token))
         self.newLine()
 
     def writeIntLine(self, val):
@@ -96,7 +97,9 @@ class SaveHandler:
                 self.cnt = num + 1
 
     def getWriter(self, suffix = None):
-        name = str(self.cnt) + "_" + datetime.datetime.now().strftime('%Y:%m:%d:%H:%M')
+        name = str(self.cnt) + "_" + datetime.datetime.now().strftime('%Y.%m.%d.%H.%M')
+        self.cnt += 1
         if suffix is not None:
             name += "_" + suffix
-        return TokenWriter(open(os.path.join(self.dir, name), "w"))
+        fn = os.path.join(self.dir, name)
+        return TokenWriter(open(fn, "w"), fn)

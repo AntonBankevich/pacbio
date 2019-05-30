@@ -44,14 +44,12 @@ class Disjointig(Contig):
         handler.writeTokenLine(self.seq)
         self.read_alignments.save(handler)
 
-    def loadDisjointig(self, handler, disjointigs, reads):
-        # type: (TokenReader, DisjointigCollection, ReadCollection) -> None
+    def loadDisjointig(self, handler, reads):
+        # type: (TokenReader, ReadCollection) -> None
         self.id = handler.readToken()
-        self.rc.id = basic.RC(self.id)
-        self.read_alignments.load(handler, reads, disjointigs)
-        for al in self.read_alignments:
-            read = al.seg_from.contig # type: AlignedRead
-            read.addAlignment(al)
+        self.rc.id = basic.Reverse(self.id)
+        seq = handler.readToken()
+        self.read_alignments.load(handler, reads, self)
 
 
 class DisjointigCollection(ContigStorage):
@@ -93,21 +91,27 @@ class DisjointigCollection(ContigStorage):
                 if int_ids:
                     self.addNew(rec.seq, str(number))
                 else:
-                    self.addNew(rec.seq, rec.id)
+                    self.addNew(rec.seq)
             else:
                 self.addNew(rec.seq)
 
     def addAlignments(self, als):
         # type: (Union[Generator[AlignmentPiece], Iterable[AlignmentPiece]]) -> None
+        cnt = 0
+        all = 0
         for al in als:
             dt = al.seg_to.contig # type: Disjointig
-            if al.seg_from.left < 500 and al.rc.seg_from.left < 500:
+            all += 1
+            if al.seg_from.left < 500 and al.rc.seg_from.left < 500 and len(list(al.split())) == 1:
+                cnt += 1
                 dt.addAlignment(al)
+                if cnt % 10000 == 0:
+                    print cnt, float(cnt) / all
 
     def save(self, handler):
         # type: (TokenWriter) -> None
         handler.writeTokenLine(str(self.cnt))
-        handler.writeTokens(str(map(lambda line: line.id, UniqueList(self.items.values()))))
+        handler.writeTokens(map(lambda line: line.id, UniqueList(self.items.values())))
         for disjointig in UniqueList(self.items.values()):
             handler.writeTokenLine(disjointig.id)
             handler.writeTokenLine(disjointig.seq)
@@ -117,7 +121,7 @@ class DisjointigCollection(ContigStorage):
     def load(self, handler, reads):
         # type: (TokenReader, ReadCollection) -> None
         self.cnt = int(handler.readToken())
-        keys = handler.readTokens()
+        keys = list(handler.readTokens())
         for key in keys:
             id = handler.readToken()
             assert id == key
@@ -125,7 +129,7 @@ class DisjointigCollection(ContigStorage):
             disjointig = self.addNew(seq, key)
             assert key == disjointig.id, key + " " + disjointig.id
         for key in keys:
-            self.items[key].loadDisjointig(handler, self, reads)
+            self.items[key].loadDisjointig(handler, reads)
 
 
 
