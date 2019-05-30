@@ -155,7 +155,7 @@ class Polisher:
                 new_seq += end
             reads.append(NamedSequence(new_seq, al.seg_from.contig.id))
         base = Contig(start + seg.Seq() + end, "base")
-        polished = False
+        polished = None
         try:
             polished = Contig(self.polish(reads, base), "polished")
         except PolishException:

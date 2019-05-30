@@ -37,6 +37,6 @@ class LogPriority:
     common = 1
 
 
-downsample = 50000
+downsample = 1000000000
 
 
