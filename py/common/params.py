@@ -18,6 +18,7 @@ bad_end_length = 500
 # l = 1500
 threads = 16
 min_k_mer_cov = 10
+max_read_length = 100000
 
 class Scores:
     ins_score = 8
@@ -37,3 +38,5 @@ class LogPriority:
 
 
 downsample = 50000
+
+

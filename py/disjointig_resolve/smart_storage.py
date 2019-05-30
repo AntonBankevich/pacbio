@@ -1,4 +1,5 @@
 import itertools
+import sys
 
 from typing import Optional, Iterator, List, Any, Iterable, Generator, Tuple, Callable
 
@@ -474,9 +475,34 @@ class AlignmentStorage(SmartStorage):
     # Optimize? We are only interested in some of the last alignments.
     def allInter(self, seg, min_inter = 1):
         # type: (Segment, int) -> Generator[AlignmentPiece]
-        for al in self: # type: AlignmentPiece
-            if al.seg_to.interSize(seg) >= min_inter:
-                yield al
+        if self.isCanonical():
+            self.sort()
+            l = -1 # items[l].left < seg.right
+            r = len(self.items) # items[r].left >= seg.right
+            while l + 1 < r:
+                m = (l + r) / 2
+                if self.items[m].seg_to.left >= seg.right:
+                    r = m
+                else:
+                    l = m
+            # res = []
+            while l >= 0 and self.items[l].seg_to.left >= seg.left - params.max_read_length:
+                if self.items[l].seg_to.interSize(seg) >= min_inter:
+                    # res.append(self.items[r])
+                    yield self.items[l]
+                l -= 1
+            # tmp = []
+            # for al in self: # type: AlignmentPiece
+            #     if al.seg_to.interSize(seg) >= min_inter:
+            #         tmp.append(al)
+            # if len(res) != len(tmp):
+            #     print res
+            #     print tmp
+            #     sys.exit(1)
+
+        else:
+            for al in self.rc.allInter(seg.RC(), min_inter):
+                yield al.rc
 
     def removeInter(self, seg):
         # type: (Segment) -> None

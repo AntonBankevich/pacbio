@@ -131,6 +131,9 @@ class NewLine(Contig):
 
     def updateCorrectSegments(self, seg, threshold = params.reliable_coverage):
         # type: (Segment, int) -> None
+        # print "seg:", seg
+        # print list(self.read_alignments)
+        # print "als:", list(self.read_alignments.allInter(seg))
         segs = AlignmentStorage().addAll(self.read_alignments.allInter(seg)).filterByCoverage(mi=threshold)
         self.correct_segments.addAll(segs)
         self.correct_segments.mergeSegments()
@@ -169,12 +172,15 @@ class NewLine(Contig):
         sys.stdout.info("Requesting read alignments for", seg)
         result = []
         for alDL in self.disjointig_alignments.allInter(seg):
+            if len(alDL.seg_to) < params.k:
+                continue
             # print "Using disjointig alignment", alDL
             dt = alDL.seg_from.contig # type: Disjointig
             reduced = alDL.reduce(target=seg)
             dt = alDL.seg_from.contig # type: Disjointig
             cnt = 0
-            compositions = alDL.massComposeBack(dt.allInter(reduced.seg_from))
+            als = filter(lambda al: al.seg_to.interSize(alDL.seg_from) > 8 * params.k / 10, dt.allInter(reduced.seg_from))
+            compositions = alDL.massComposeBack(als)
             for al in compositions:
                 if len(al.seg_to) >= params.k:
                     result.append(al)

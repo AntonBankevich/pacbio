@@ -59,15 +59,15 @@ class UniqueMarker:
         alignments = filter(lambda al: al is not None, alignments)
         alignments = sorted(alignments, key=lambda al:al.seg_to.left)
         inc = self.link(line, [al.seg_to.left for al in alignments if al.seg_from.left > 1000 and al.seg_to.left > 50], 20)
-        for al in alignments:
-            if al.seg_from.left > 1000 and al.seg_to.left > 50:
-                print "Breakpoint read inc:", al
+        # for al in alignments:
+        #     if al.seg_from.left > 1000 and al.seg_to.left > 50:
+        #         print "Breakpoint read inc:", al
         inc.append((line.segment(len(line) - 1, len(line)), params.min_k_mer_cov))
         alignments = sorted(alignments, key=lambda al:al.seg_to.right)
         out = self.link(line, [al.seg_to.right for al in alignments if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50 ], 20)
-        for al in alignments:
-            if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50:
-                print "Breakpoint read out:", al
+        # for al in alignments:
+        #     if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50:
+        #         print "Breakpoint read out:", al
         out.insert(0, (line.segment(0, 1), params.min_k_mer_cov))
         print "inc:", inc
         print "out:", out

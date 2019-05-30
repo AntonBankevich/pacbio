@@ -1,4 +1,6 @@
-13
+14
+ReadRecruitmentTest 0
+StructureUpdatingTest 0
 KnottingTest 0
 
 UniqueRegionMarkingTest 3
@@ -6,19 +8,13 @@ List abcdefghcdeijk 56 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cd
 List abcdefgh 32 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fgha fgha fgha fgha ghab ghab ghab ghab habc habc habc habc 1 abcdefghabcdefgh 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:4400-0]]
 List abcdefghCDEijkEFlmn 76 abcd abcd abcd abcd bcde bcde bcde bcde cdef cdef cdef cdef defg defg defg defg efgh efgh efgh efgh fghc fghc fghc fghc ghcd ghcd ghcd ghcd hcde hcde hcde hcde cdei cdei cdei cdei deij deij deij deij eijk eijk eijk eijk ijke ijke ijke ijke jkef jkef jkef jkef kefl kefl kefl kefl eflm eflm eflm eflm flmn flmn flmn flmn lmna lmna lmna lmna mnab mnab mnab mnab nabc nabc nabc nabc 1 abcdefghcdeijkeflmnabcdefghcdeijkeflmn 1 abcdefgh ReadStorage+:[C0_abcdefgh[0:4400-0]] ReadStorage+:[C0_abcdefgh[0:1341],C0_abcdefgh[3050:4400-0]]
 
-StructureUpdatingTest 0
-
-
 PotentialReadsTest 0
-
-ReadRecruitmentTest 0
-
 
 DotPlotModificationTest 0
 
 DotPlotConstructionTest 2
-List abcdefgh 0 1 abcdeab 0 ListD0_abcdeab0001D0_abcdeab27433837D0_abcdeab01098113M1D6M1D132M1D98M1D483M1I47M1D214M
-List abcdefgh 0 3 abc abc bce 0 ListD0_abcD2_bceD1_abcD0_abcD1_abc1D1_abc01642D0_abc016463M1D11M1I44M1D63M1I115M1D311M1I24M1D261M1I227M1D149M1D4M1D5M1D227M1D91M1I102MD0_abcD2_bce1D2_bce01097D0_abc5491646286M1I52M1D387M1D75M1I193M1I14M1D87MD1_abcD2_bce1D2_bce01097D1_abc549164224M1I314M1D173M1I151M1I4M1I4M1I51M1D76M1I99M1I107M1D87M00000000
+List abcdefgh 0 1 abcdeab 0 ListD0_abcdeab0001D0_abcdeab01098D0_abcdeab27433837113M1I4M1I132M1I100M1I482M1D46M1I216M
+List abcdefgh 0 3 abc abc bce 0 ListD0_abcD2_bceD1_abcD0_abcD1_abc1D1_abc21642D0_abc3164611M1I43M1D65M1I114M1D309M1I26M1D261M1I226M1D151M1D4M1D4M1D227M1D92M1I102MD0_abcD2_bce1D2_bce01097D0_abc5491646286M1I52M1D387M1D75M1I193M1I14M1D87MD1_abcD2_bce1D2_bce01097D1_abc549164224M1I314M1D173M1I151M1I4M1I4M1I51M1D76M1I99M1I107M1D87M00000000
 
 AlignmentPolishingTest 0
 
@@ -32,7 +28,7 @@ AlignmentCompositionTest 0
 
 CorrectionMappingTest 0
 
-LineExtensionTest 1
+LineExtensionTest 9
 List abCDEFGHijklcdemnodgfp 5 0 pa jk mn
 List abbbcdefBBBghij 5 0 ja de
 List abcdefghijaklDEFGmnopaqrsDeFgHtuv 5 0 ab ij no

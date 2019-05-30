@@ -34,9 +34,9 @@ class Disjointig(Contig):
         # type: (Segment) -> Generator[AlignmentPiece]
         return self.read_alignments.getAlignmentsTo(seg)
 
-    def allInter(self, seg):
-        # type: (Segment) -> Generator[AlignmentPiece]
-        return self.read_alignments.allInter(seg)
+    def allInter(self, seg, min_inter = 1):
+        # type: (Segment, int) -> Generator[AlignmentPiece]
+        return self.read_alignments.allInter(seg, min_inter)
 
     def save(self, handler):
         # type: (TokenWriter) -> None

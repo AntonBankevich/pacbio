@@ -22,7 +22,7 @@ from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.tests import Tester
 from disjointig_resolve.line_extender import LineExtender
 from common.save_load import TokenReader, SaveHandler
-from common.sequences import ContigCollection, Contig
+from common.sequences import ContigCollection, Contig, ContigStorage
 from common.alignment_storage import ReadCollection, AlignmentPiece, AlignedRead
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.saves_io import loadAll, saveAll
@@ -212,8 +212,25 @@ def main(args):
 
 
     sys.stdout.info("Resolving")
-    print lines["-24"].completely_resolved
-    extender.updateAllStructures(lines["-24"].completely_resolved)
+    for line in lines:
+        cov = 0
+        for al in line.read_alignments:
+            cov += len(al.seg_to)
+        print line.id, float(cov) / len(line)
+    # extender.tryExtend(lines["-24"])
+    # print "initial", lines["-16l"].initial
+    # print "resolved", lines["-16l"].completely_resolved
+    # print "initial", lines["-15l"].initial
+    # print "resolved", lines["-15l"].completely_resolved
+    # print "dotplot:", list(dot_plot.alignmentsToFrom["-16l"]["-15l"])
+    # print "correct", lines["-16l"].correct_segments
+    # print "disjointig alignments", lines["-16l"].disjointig_alignments
+    # # print "Reads to disjointigs", list(disjointigs["-D1"].read_alignments.allInter(disjointigs["-D1"].segment(4953235-22220,4953235-17220)))
+    # print "Selected read alignments", list(lines["-16l"].read_alignments.allInter(lines["-16l"].asSegment().suffix(length=4000)))
+    # print "Detected read alignments", list(lines["-16l"].getRelevantAlignmentsFor(lines["-16l"].completely_resolved[-1].suffix(length=1000)))
+    # print "Bruteforce:", list(AlignmentStorage().addAll(aligner.alignClean(reads, ContigStorage().addAll([lines["-16l"]]))).allInter(lines["-16l"].completely_resolved[-1].suffix(length=1000)))
+    # print "Bruteforce:", list(AlignmentStorage().addAll(aligner.alignAndSplit(reads, ContigStorage().addAll([lines["-16l"]]))).allInter(lines["-16l"].completely_resolved[-1].suffix(length=1000)))
+    # extender.updateAllStructures(lines["-16l"].completely_resolved)
     cnt = 0
     stop = False
     while not stop:
