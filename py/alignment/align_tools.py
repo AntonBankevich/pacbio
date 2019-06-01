@@ -249,7 +249,6 @@ class Aligner:
         for al in self.filterAls(als):
             yield al
 
-
     # def matchingAlignment(self, seqs, contig):
     #     # type: (list[str], Contig) -> list[AlignedSequences]
     #     collection = ContigCollection([contig])

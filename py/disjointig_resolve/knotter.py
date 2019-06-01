@@ -67,10 +67,13 @@ class LineMerger:
             return None
         final_candidates = sorted(final_candidates)
         final = final_candidates[0]
-        for candidate in final_candidates[1:]:
-            if final[0] + len(final[1]) > candidate[0]:
-                print "\n".join(map(str, candidates))
-                assert False, "Contradicting candidates" + str(final[0]) + " " + str(final[1]) + " " + str(candidate[0]) + " " + str(candidate[1])
+        if len(final_candidates) > 1:
+            print "Extra candidates:"
+            print "\n".join(map(str, candidates))
+        # for candidate in final_candidates[1:]:
+        #     if final[0] + len(final[1]) > candidate[0]:
+        #         print "\n".join(map(str, candidates))
+        #         assert False, "Contradicting candidates" + str(final[0]) + " " + str(final[1]) + " " + str(candidate[0]) + " " + str(candidate[1])
         if final[0] > 0:
             print "Positive gap. Can not merge line", line
             print final

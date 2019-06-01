@@ -108,6 +108,7 @@ class LineExtender:
         # Correct contig sequences, update correct segment storages. Return segments that were corrected.
         corrected = self.correctSequences(interesting_segments)
         # Collect all relevant contig segments, collect all reads that align to relevant segments. Mark resolved bound for each read.
+        print "Expanding resolved segments:"
         records = self.collectRecords(corrected) # type: List[LineExtender.Record]
         for rec in records:
             print rec.line, rec.correct, rec.resolved
@@ -259,13 +260,14 @@ class LineExtender:
                     ok = True
                     break
             if not ok:
-                # print "No resolved inter"
+                print "Read does not overlap with resolved", resolved
                 continue
+
             skip = False
             for al1 in als:
                 for al2 in read.alignments:
                     if al1[0].seg_to.inter(al2.seg_to):
-                        print "Resolved inter", al1, al2
+                        print "Read already recruited", al1, al2
                         skip = True
                         break
                 if skip:
@@ -331,13 +333,22 @@ class LineExtender:
             return False
         relevant_reads = list(line.read_alignments.allInter(line.asSegment().suffix(length=min(1000, len(line)))))
         print "Relevent reads for extending", relevant_reads
+        if len(relevant_reads) == 0:
+            return False
         new_contig, relevant_als = self.polisher.polishEnd(relevant_reads)
         if len(new_contig) == len(line):
             return False
         assert line.seq == new_contig.prefix(len=len(line)).Seq()
-        print "Extending", line, "for", len(new_contig) - len(line)
+        tmp = len(new_contig) - len(line)
+        print "Extending", line, "for", tmp
         line.extendRight(new_contig.suffix(pos = len(line)).Seq(), relevant_als)
-        print "Extended line", line, "for", len(new_contig) - len(line)
+        print "Extended line", line, "for", tmp
+        print "Disjointigs:"
+        print line.disjointig_alignments
+        print "Reads:"
+        print list(line.read_alignments.allInter(line.asSegment().suffix(length=min(len(line), 2000))))
+        print "Sequence:"
+        print line.seq
         return True
 
     def polyshSegments(self, line, to_polysh):

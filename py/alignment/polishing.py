@@ -209,7 +209,9 @@ class Polisher:
                 for read in reduced_read_list:
                     read.clean()
                 polished_base = Contig(self.polish(reduced_reads, base), "polished_base")
-                self.aligner.alignReadCollection(reduced_reads, [polished_base])
+                for al in self.aligner.alignAndSplit(reduced_reads, ContigStorage().addAll([polished_base])):
+                    reduced_reads.reads[al.seg_from.contig.id].addAlignment(al)
+                # self.aligner.alignReadCollection(reduced_reads, [polished_base])
                 candidate_alignments = []
                 # print "RRL1:", reduced_read_list
                 for read in reduced_read_list:

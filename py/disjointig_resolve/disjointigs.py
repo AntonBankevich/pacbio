@@ -94,6 +94,7 @@ class DisjointigCollection(ContigStorage):
                     self.addNew(rec.seq)
             else:
                 self.addNew(rec.seq)
+        return self
 
     def addAlignments(self, als):
         # type: (Union[Generator[AlignmentPiece], Iterable[AlignmentPiece]]) -> None

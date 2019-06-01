@@ -196,10 +196,10 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         self.rc_alignments[new_line.id].addAll(rc1.merge(rc3).merge(rc2))
         common = set(self.alignmentsToFrom[line1.id].keys()).intersection(set(self.alignmentsToFrom[line2.id].keys()))
         for storage in self.alignmentsToFrom[line1.id].values():
-            if storage.line_from.id not in common and storage.line_from != line2:
+            if storage.line_from.id not in common and storage.line_from != line2 and storage.line_from != line2.rc:
                 self.addTwoLineStorage(new_line, storage.line_from).addAll([al.compose(al1) for al in storage])
         for storage in self.alignmentsToFrom[line2.id].values():
-            if storage.line_from.id not in common and storage.line_from != line1:
+            if storage.line_from.id not in common and storage.line_from != line1 and storage.line_from != line1.rc:
                 self.addTwoLineStorage(new_line, storage.line_from).addAll([al.compose(al2) for al in storage])
         for c in common:
             storage1 = self.alignmentsToFrom[line1.id][c]

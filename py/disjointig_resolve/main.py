@@ -1,6 +1,7 @@
 import itertools
 import os
 import shutil
+import subprocess
 import sys
 import time
 import traceback
@@ -44,10 +45,13 @@ def CreateLog(dir):
 
 
 def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
-    h = open(disjointigs_file, "w")
+    recs = []
     for fn in disjointigs_file_list:
         for rec in SeqIO.parse_fasta(open(fn, "r")):
-            SeqIO.write(rec, h, "fasta")
+            rec.append(rec)
+    h = open(disjointigs_file, "w")
+    for rec in recs:
+        SeqIO.write(rec, h, "fasta")
     h.close()
 
 
@@ -93,7 +97,6 @@ def countStats(reads, lines, disjointigs, aligner, dir):
 
 
 
-
 def main(args):
     cl_params = Params().parse(args)
     cl_params.check()
@@ -110,6 +113,11 @@ def main(args):
     sys.stdout.info("Preparing initial state")
     save_handler = SaveHandler(cl_params.save_dir)
     if cl_params.load_from is not None:
+        # if cl_params.new_disjointigs:
+        #     new_disjointigs = cl_params.disjointigs_file_list
+        # else:
+        #     new_disjointigs = []
+        # print new_disjointigs
         sys.stdout.info("Loading initial state from saves")
         cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(cl_params.load_from, "r")))
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
@@ -124,10 +132,39 @@ def main(args):
         # dot_plot = LineDotPlot(lines, aligner)
         # dot_plot.construct(aligner)
         dot_plot.printAll(sys.stdout)
-        dp1 = LineDotPlot(lines, aligner)
-        dp1.construct(aligner)
-        dp1.printAll(sys.stdout)
-        dot_plot = dp1
+        # dp1 = LineDotPlot(lines, aligner)
+        # dp1.construct(aligner)
+        # dp1.printAll(sys.stdout)
+        # dot_plot = dp1
+        # if len(new_disjointigs) > 0:
+        #     sys.stdout.info("Creating disjointig collection")
+        #     for line in lines:
+        #         line.disjointig_alignments.clean()
+        #     for f in new_disjointigs:
+        #         disjointigs.loadFromFasta(open(f, "r"))
+        #     print "Disjointigs:"
+        #     print list(disjointigs)
+        #     lines.alignDisjointigs()
+        #
+        #     sys.stdout.info("Aligning reads to disjointigs")
+        #     disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
+        #     good_reads = set()
+        #     for dis in disjointigs:
+        #         for al in dis.read_alignments:
+        #             good_reads.add(al.seg_from.contig.id)
+        #             good_reads.add(al.seg_from.contig.rc.id)
+        #     bad_reads = []
+        #     brf = open(os.path.join(cl_params.dir, "br.fasta"), "w")
+        #     bad = 0
+        #     for read in reads:
+        #         if read.id not in good_reads:
+        #             bad += 1
+        #             bad_reads.append(read)
+        #             SeqIO.write(read, brf, "fasta")
+        #     brf.close()
+        #     sys.stdout.info("Fraction of reads without full alignment to disjointigs:", float(bad) / len(reads))
+
+
     else:
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         # polisher = Polisher(aligner, aligner.dir_distributor)
@@ -140,10 +177,41 @@ def main(args):
         # polisher.polish(ReadCollection().loadFromFasta(open("results/NCTC9002/alignment/148/reads.fasta", "r")), consensus)
 
 
+        sys.stdout.info("Creating read collection")
+        reads = ReadCollection()
+        reads.loadFromFasta(open(cl_params.reads_file, "r"), downsample=params.downsample)
+        # if cl_params.stats:
+        #     countStats(reads, lines, disjointigs, aligner, cl_params.dir)
+        #     return
+
         sys.stdout.info("Creating disjointig collection")
-        prepare_disjointigs_file(cl_params.disjointigs_file, cl_params.disjointigs_file_list)
+        # prepare_disjointigs_file(cl_params.disjointigs_file, cl_params.disjointigs_file_list)
         disjointigs = DisjointigCollection()
-        disjointigs.loadFromFasta(open(cl_params.disjointigs_file, "r"))
+        for f in cl_params.disjointigs_file_list:
+            disjointigs.loadFromFasta(open(f, "r"))
+
+        sys.stdout.info("Extending disjointig collection")
+        clen = 5000000
+        bad_reads = reads.cleanCopy()
+        tlen0 = sum(map(len, bad_reads))
+        good_reads = set()
+        for al in aligner.alignAndSplit(reads, disjointigs):
+            if not al.contradictingRTC(al.seg_to.contig.asSegment(), 500):
+                good_reads.add(al.seg_from.contig.id)
+        sys.stdout.info("Fraction of reads without full alignment to disjointigs:", 1 - float(len(good_reads)) / len(reads))
+        rf = os.path.join(cl_params.dir, "badreads.fasta")
+        bad_reads = bad_reads.filter(lambda read: read.id not in good_reads)
+        tlen = sum(map(len, bad_reads))
+        bad_reads.print_fasta(open(rf, "w"))
+        l = tlen * clen / tlen0
+        assembly_dir = os.path.join(cl_params.dir, "assembly0")
+        subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", "8", "--pacbio-raw", rf, "--genome-size", str(l),
+             "--no-trestle"])
+        df = os.path.join(assembly_dir, "10-consensus", "consensus.fasta")
+        disjointigs.loadFromFasta(open(df, "r"))
+
+        sys.stdout.info("Aligning reads to disjointigs")
+        disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
 
         sys.stdout.info("Creating contig collection")
         unique = [str(val[0]) for val in DotParser(open(cl_params.graph_file, "r")).parse() if val[4].unique]
@@ -164,37 +232,12 @@ def main(args):
         dot_plot.construct(aligner)
         dot_plot.printAll(sys.stdout)
 
-        sys.stdout.info("Creating read collection")
-        reads = ReadCollection()
-        reads.loadFromFasta(open(cl_params.reads_file, "r"), downsample=params.downsample)
-        if cl_params.stats:
-            countStats(reads, lines, disjointigs, aligner, cl_params.dir)
-            return
-
         sys.stdout.info("Marking unique regions")
         UniqueMarker(aligner).markAllUnique(lines, dot_plot, reads)
         for line in lines.unique():
             print line, line.completely_resolved
 
-        sys.stdout.info("Aligning reads to disjointigs")
-        disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
-        good_reads = set()
-        for dis in disjointigs:
-            for al in dis.read_alignments:
-                good_reads.add(al.seg_from.contig.id)
-                good_reads.add(al.seg_from.contig.rc.id)
-        bad_reads = []
-        brf = open(os.path.join(cl_params.dir, "br.fasta"), "w")
-        bad = 0
-        for read in reads:
-            if read.id not in good_reads:
-                bad += 1
-                bad_reads.append(read)
-                SeqIO.write(read, brf, "fasta")
-        brf.close()
-        sys.stdout.info("Fraction of reads without full alignment to disjointigs:", float(bad) / len(reads))
-
-        sys.stdout.info("Undating sequences and resolved segments.")
+        sys.stdout.info("Updating sequences and resolved segments.")
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
@@ -210,13 +253,20 @@ def main(args):
             traceback.print_tb(tb)
             print "Message:", e.message
 
-
-    sys.stdout.info("Resolving")
+    print "Disjointig alignments"
     for line in lines:
-        cov = 0
-        for al in line.read_alignments:
-            cov += len(al.seg_to)
-        print line.id, float(cov) / len(line)
+        print line.disjointig_alignments
+    sys.stdout.info("Resolving")
+    # for line in lines:
+    #     cov = 0
+    #     for al in line.read_alignments:
+    #         cov += len(al.seg_to)
+    #     print line.id, float(cov) / len(line)
+    # while "52" in lines.items and "-11l" in lines.items:
+    #     extender.tryExtend(lines["52"])
+    #     if "-11l" in lines.items:
+    #         extender.tryExtend(lines["-11l"])
+    # return
     # extender.tryExtend(lines["-24"])
     # print "initial", lines["-16l"].initial
     # print "resolved", lines["-16l"].completely_resolved
@@ -235,9 +285,19 @@ def main(args):
     stop = False
     while not stop:
         stop = True
-        for line_id in list(lines.items.keys()):
+        if cl_params.focus is None:
+            keys = list(lines.items.keys())
+        else:
+            keys = cl_params.focus
+        for line_id in keys:
             if line_id not in lines.items:
-                continue
+                if cl_params.focus is None:
+                    continue
+                else:
+                    for key in lines.items.keys:
+                        if basic.parseLineName(key)[-1].startswith(line_id):
+                            line_id = key
+                            break
             line = lines[line_id]
             sys.stdout.info("Investigating", line)
             extended = extender.tryExtend(line)
@@ -250,8 +310,6 @@ def main(args):
                 writer = save_handler.getWriter()
                 print "Save details:", writer.info
                 saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
-
-    lines.printToFile(sys.stdout)
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
     # print "Disjointig alignments"
     # for line in lines

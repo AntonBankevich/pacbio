@@ -20,9 +20,11 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats flye-dir= graph= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats flye-dir= graph= focus= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:h"
         self.stats = False
+        self.new_disjointigs = False
+        self.foxus = None
 
     def check(self):
         if self.dir is None:
@@ -69,10 +71,13 @@ class Params:
                 self.contigs_file = value
             elif key == "--disjointigs":
                 self.disjointigs_file_list.append(value)
+                self.new_disjointigs = True
             elif key == "--load":
                 self.load_from = value
             elif key == "-t":
                 self.threads = int(value)
+            elif key == "--focus":
+                self.focus = value.split(",")
             elif key == "--help" or key == "-h":
                 self.print_usage_and_exit(0)
             else:
