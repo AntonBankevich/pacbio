@@ -24,7 +24,7 @@ class Params:
         self.short_params = "o:t:h"
         self.stats = False
         self.new_disjointigs = False
-        self.foxus = None
+        self.focus = None
 
     def check(self):
         if self.dir is None:
