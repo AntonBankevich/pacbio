@@ -110,6 +110,8 @@ def main(args):
         sys.stdout.write("Finished\n")
         print (time.strftime("%d.%m.%Y  %I:%M:%S"))
         return
+    if cl_params is not None:
+        print "Focus:", str(cl_params.focus)
     sys.stdout.info("Preparing initial state")
     save_handler = SaveHandler(cl_params.save_dir)
     if cl_params.load_from is not None:
