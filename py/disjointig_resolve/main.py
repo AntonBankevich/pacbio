@@ -296,7 +296,7 @@ def main(args):
                 if cl_params.focus is None:
                     continue
                 else:
-                    for key in lines.items.keys:
+                    for key in lines.items.keys():
                         if basic.parseLineName(key)[-1].startswith(line_id):
                             line_id = key
                             break
