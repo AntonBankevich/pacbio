@@ -302,6 +302,8 @@ def main(args):
                         if basic.parseLineName(key)[-1].startswith(line_id):
                             line_id = key
                             break
+                    if line_id not in lines.items.keys():
+                        continue
             line = lines[line_id]
             sys.stdout.info("Investigating", line)
             extended = extender.tryExtend(line)

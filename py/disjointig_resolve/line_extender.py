@@ -289,6 +289,10 @@ class LineExtender:
         # type: (Tuple[AlignmentPiece, Segment], Tuple[AlignmentPiece, Segment]) -> Optional[Tuple[AlignmentPiece, Segment]]
         assert c1[0].seg_from.contig == c2[0].seg_from.contig
         s1, s2, s12 = self.scorer.scoreInCorrectSegments(c1[0], c1[1], c2[0], c2[1])
+        if s1 is not None and s2 is not None:
+            diff = abs(s1 - s2)
+        else:
+            diff = None
         if s12 is None:
             if s1 is None:
                 winner = c2
@@ -302,9 +306,9 @@ class LineExtender:
             else:
                 winner = c1
         if winner is None:
-            print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner"
+            print "Fight:", c1, c2, "Comparison results:", diff, s12, s1, s2, "No winner"
         else:
-            print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", winner
+            print "Fight:", c1, c2, "Comparison results:", diff, s12, s1, s2, "Winner:", winner
         return winner
 
     def tournament(self, candidates):
