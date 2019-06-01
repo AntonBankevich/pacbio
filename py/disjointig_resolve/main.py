@@ -115,6 +115,7 @@ def main(args):
     sys.stdout.info("Preparing initial state")
     save_handler = SaveHandler(cl_params.save_dir)
     if cl_params.load_from is not None:
+        tmp = cl_params.focus
         # if cl_params.new_disjointigs:
         #     new_disjointigs = cl_params.disjointigs_file_list
         # else:
@@ -122,6 +123,7 @@ def main(args):
         # print new_disjointigs
         sys.stdout.info("Loading initial state from saves")
         cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(cl_params.load_from, "r")))
+        cl_params.focus = tmp
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         # for line in lines:
