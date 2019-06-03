@@ -231,8 +231,8 @@ class LineExtender:
         print "Attempting recruitment:", resolved
         line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k / 2,
                                  self.dot_plot.allInter(resolved)) # type: List[AlignmentPiece]
-        print "Alternative lines:", line_alignments
         line_alignments = [al for al in line_alignments if al.rc.seg_to.left > 20 or al.seg_from.left > 20 or al.isIdentical()]
+        print "Alternative lines:", line_alignments
         line_alignments = [al.reduce(target=resolved) for al in line_alignments]
         read_alignments = [] # type: List[Tuple[AlignmentPiece, Segment]]
         correct_segments = []

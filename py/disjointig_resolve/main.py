@@ -307,7 +307,7 @@ def main(args):
             line = lines[line_id]
             sys.stdout.info("Investigating", line)
             extended = extender.tryExtend(line)
-            if extended:
+            if extended > 0:
                 cnt += 1
                 stop = False
             if cnt > 10:
