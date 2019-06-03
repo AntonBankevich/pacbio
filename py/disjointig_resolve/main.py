@@ -299,7 +299,7 @@ def main(args):
                     continue
                 else:
                     for key in lines.items.keys():
-                        if basic.parseLineName(key)[-1].startswith(line_id):
+                        if basic.parseLineName(key)[-1].startswith(line_id) and lines[key].knot is None:
                             line_id = key
                             break
                     if line_id not in lines.items.keys():
@@ -316,6 +316,9 @@ def main(args):
                 writer = save_handler.getWriter()
                 print "Save details:", writer.info
                 saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
+    dot_plot.printAll(sys.stdout)
+    for line in lines:
+        print line 
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
     # print "Disjointig alignments"
     # for line in lines
