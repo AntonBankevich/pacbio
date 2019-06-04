@@ -295,6 +295,10 @@ class Segment:
         # type: (int) -> Segment
         return Segment(self.contig, max(self.left - range, 0), min(self.right + range, len(self.contig)))
 
+    def shrink(self, range):
+        # type: (int) -> Segment
+        return Segment(self.contig, max(self.left + range, 0), min(self.right - range, len(self.contig)))
+
     def expandLeft(self, range):
         # type: (int) -> Segment
         return Segment(self.contig, max(self.left - range, 0), self.right)

@@ -45,12 +45,14 @@ def main(args):
     CreateLog(dir)
     basic.ensure_dir_existance(dir)
     aligner = Aligner(DirDistributor(os.path.join(dir, "alignments")))
-    contigs=ContigCollection().loadFromFasta(open(cf, "r"))
-    ref = ContigCollection().loadFromFasta(open(rf, "r"))
+    contigs=ContigCollection().loadFromFasta(open(cf, "r"), False)
+    ref = ContigCollection().loadFromFasta(open(rf, "r"), False)
     good = set()
     print "Good"
     for al in aligner.alignClean(contigs, ref):
-        print al
+        if len(al) > 20000:
+            al = al.reduce(target=al.seg_to.shrink(10000))
+        print al, len(al), al.percentIdentity()
         print "\n".join(al.asMatchingStrings())
         good.add(al.seg_from.contig.id)
     contigs = contigs.filter(lambda contig: contig.id not in good)
