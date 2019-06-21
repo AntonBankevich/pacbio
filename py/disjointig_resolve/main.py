@@ -6,8 +6,7 @@ import sys
 import time
 import traceback
 
-from typing import Iterable
-
+from typing import Iterable, List, Dict
 
 sys.path.append("py")
 
@@ -50,7 +49,7 @@ def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
     recs = []
     for fn in disjointigs_file_list:
         for rec in SeqIO.parse_fasta(open(fn, "r")):
-            rec.append(rec)
+            recs.append(rec)
     h = open(disjointigs_file, "w")
     for rec in recs:
         SeqIO.write(rec, h, "fasta")
@@ -93,9 +92,27 @@ def countStats(reads, lines, disjointigs, aligner, dir):
     print list(als.calculateWindowedCoverage(500))
 
 
-
-
-
+def ExtendShortLines(contigs, reads, aligner, polisher):
+    # type: (ContigStorage, ReadCollection, Aligner, Polisher) -> None
+    short_contigs = ContigStorage()
+    als = dict() # type: Dict[str, List[AlignmentPiece]]
+    for contig in contigs.unique():
+        if len(contig) < params.k + 500:
+            short_contigs.add(contig)
+            als[contig.id] = []
+    for al in aligner.alignClean(reads, short_contigs):
+        als[al.seg_to.contig.id].append(al)
+    for contig in short_contigs.unique():
+        tmp_contig, new_als = polisher.polishEnd(als[contig.id], params.reliable_coverage)
+        r = len(tmp_contig) - len(contig)
+        tmp_contig, new_als = polisher.polishEnd([al.rc for al in new_als], params.reliable_coverage)
+        l = len(tmp_contig) - len(contig) - r
+        if len(tmp_contig) > params.k + 500:
+            sys.stdout.info("Prolonged contig", contig.id, "for", l, "and", r, "nucleotides from left and right")
+            contigs.add(Contig(tmp_contig.seq, contig.id))
+        else:
+            sys.stdout.warn("Could not prolong contig", contig.id, "enough. Removing it.")
+            contigs.remove(contig)
 
 
 
@@ -240,6 +257,9 @@ def main(args):
         contigs.loadFromFasta(open(cl_params.contigs_file, "r"), num_names=True)
         contigs = contigs.filter(lambda contig: contig.id in unique)
         sys.stdout.info("Created", len(contigs), "initial contigs")
+
+        sys.stdout.info("Extending short lines")
+        ExtendShortLines(contigs, reads, aligner, Polisher)
 
         sys.stdout.info("Creating line collection")
         lines = NewLineStorage(disjointigs, aligner)

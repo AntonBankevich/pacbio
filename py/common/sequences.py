@@ -63,6 +63,13 @@ class ContigStorage:
             for item in contigs_list:
                 self.add(item)
 
+    def remove(self, item):
+        # type: (Contig) -> None
+        assert item.id in self.items
+        del self.items[item.id]
+        if self.add_rc:
+            del self.items[item.rc.id]
+
     def add(self, item):
         # type: (Contig) -> Contig
         self.items[item.id] = item
