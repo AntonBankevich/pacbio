@@ -8,9 +8,11 @@ import traceback
 
 from typing import Iterable
 
+
 sys.path.append("py")
 
 
+from common.line_align import Scorer
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.smart_storage import AlignmentStorage
 from common.dot_parser import DotParser
@@ -123,6 +125,21 @@ def main(args):
         # print new_disjointigs
         sys.stdout.info("Loading initial state from saves")
         cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(cl_params.load_from, "r")))
+        # scorer = Scorer()
+        # for read in reads:
+        #     if len(read.alignments) > 0 :
+        #         al = read.alignments[0]
+        #         line = al.seg_to.contig # type: NewLine
+        #         for al1 in dot_plot.allInter(al.seg_to):
+        #             if not al1.isIdentical() and al1.seg_to.interSize(al.seg_to) > 500 and al1.contradictingRTC(tail_size=100):
+        #                 focus = al.seg_to.cap(al1.seg_to)
+        #                 tmp1 = al.reduce(target=focus)
+        #                 tmp2 = al.reduce(target=focus).compose(al1.reverse())
+        #                 a, b, c =  scorer.scoreInCorrectSegments(tmp1, tmp1.seg_to, tmp2, tmp2.seg_to)
+        #                 if a + b + c != 2000 and a + b + c != 0:
+        #                     print a, b, c
+        #
+        # return
         cl_params.focus = tmp
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)

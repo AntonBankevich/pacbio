@@ -24,7 +24,11 @@ class LineMerger:
             self.read = al1.seg_from.contig # type: AlignedRead
             line = al1.seg_to.contig # type: NewLine
             if al1.seg_from.inter(al2.seg_from):
-                self.gap = al1.matchingSequence().mapDown(al2.seg_from.left, roundDown=False) - len(al1.seg_to.contig) - al2.seg_to.left
+                if al1.seg_from.interSize(al2.seg_from) > 100:
+                    tmp = al1.composeTargetDifference(al2)
+                    self.gap = tmp.seg_to.left + tmp.rc.seg_from.right
+                else:
+                    self.gap = al1.matchingSequence().mapDown(al2.seg_from.left, roundDown=False) - len(al1.seg_to.contig) - al2.seg_to.left
             else:
                 self.gap = len(self.read) - al1.seg_from.right - (len(line) - al1.seg_to.right) - (len(self.read) - al2.seg_from.left) - al2.seg_to.left
             self.al1 = al1
