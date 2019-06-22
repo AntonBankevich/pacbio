@@ -207,7 +207,7 @@ def main(args):
 
     else:
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
-        # polisher = Polisher(aligner, aligner.dir_distributor)
+        polisher = Polisher(aligner, aligner.dir_distributor)
         # consensus = SeqIO.parse_fasta(open("results/NCTC9002/alignment/148/ref.fasta", "r")).next()
         # consensus = Contig(consensus.seq, consensus.id)
         # for al in sam_parser.Samfile(open("results/NCTC9002/alignment/148/work/polish/minimap_1.sam", "r")):
@@ -261,7 +261,7 @@ def main(args):
         sys.stdout.info("Created", len(contigs), "initial contigs")
 
         sys.stdout.info("Extending short lines")
-        ExtendShortLines(contigs, reads, aligner, Polisher)
+        ExtendShortLines(contigs, reads, aligner, polisher)
 
         sys.stdout.info("Creating line collection")
         lines = NewLineStorage(disjointigs, aligner)
