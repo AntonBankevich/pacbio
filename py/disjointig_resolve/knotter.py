@@ -26,7 +26,7 @@ class LineMerger:
             if al1.seg_from.inter(al2.seg_from):
                 if al1.seg_from.interSize(al2.seg_from) > 100:
                     tmp = al1.composeTargetDifference(al2)
-                    self.gap = tmp.seg_to.left + tmp.rc.seg_from.right
+                    self.gap = -tmp.seg_to.left - tmp.rc.seg_from.right
                 else:
                     self.gap = al1.matchingSequence().mapDown(al2.seg_from.left, roundDown=False) - len(al1.seg_to.contig) - al2.seg_to.left
             else:
