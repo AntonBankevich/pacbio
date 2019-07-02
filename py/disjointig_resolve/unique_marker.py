@@ -112,6 +112,9 @@ class UniqueMarker:
             if len(al.seg_to) >= params.k:
                 line = al.seg_to.contig # type: NewLine
                 line.addReadAlignment(al)
+        sys.stdout.info("Removing bad regions from lines")
+        for line in list(lines.unique()):
+            self.splitBad(line, lines)
         sys.stdout.info("Marking unique regions in lines")
         for line in lines.unique():
             self.markUniqueInLine(line, dot_plot)
@@ -125,4 +128,21 @@ class UniqueMarker:
                 median_cov = cov
                 break
         return median_cov
+
+    def splitBad(self, line, lines):
+        # type: (NewLine, NewLineStorage) -> None
+        segs = list(line.read_alignments.filterByCoverage(mi=params.reliable_coverage)) # type: List[Segment]
+        assert len(segs) > 0, "No part of a unique edge is covered by reads"
+        if len(segs) == 1 and len(segs[0]) > len(line) - 10:
+            print "Whole line", line.id, "is covered by reads"
+            return
+        segs = filter(lambda seg: len(seg) >= params.k, segs)
+        print "Line", line.id, "has poorly covered regions. Splitting into", len(segs), "parts"
+        print segs
+        for seg in list(segs)[:0:-1]:
+            line, new_line = lines.splitLine(line.segment(seg.left, seg.left))
+            new_line.cutRight(len(seg))
+        line.cutRight(segs[0].right)
+        line.rc.cutRight(len(segs[0]))
+
 
