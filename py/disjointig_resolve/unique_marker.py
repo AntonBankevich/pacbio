@@ -49,14 +49,14 @@ class UniqueMarker:
         # type: (NewLine, LineDotPlot) -> None
         print "Finding unique in", line
         alignments = list(line.read_alignments) # type: List[AlignmentPiece]
-        for i, al in enumerate(alignments):
-            read = al.seg_from.contig # type: AlignedRead
-            for al1 in read.alignments:
-                if al1.contains(al) and al != al1:
-                    alignments[i] = None
-                    print "Removed alignment", al, al1
-                    print "\n".join(al1.asMatchingStrings())
-        alignments = filter(lambda al: al is not None, alignments)
+        # for i in range(len(alignments)):
+        #     for j in range(len(alignments)):
+        #         if i != j and alignments[j] is not None and alignments[j].contains(alignments[i]):
+        #             print "Removed alignment", alignments[i], alignments[j]
+        #             print "\n".join(alignments[j].asMatchingStrings())
+        #             alignments[i] = None
+        #             break
+        # alignments = filter(lambda al: al is not None, alignments)
         alignments = sorted(alignments, key=lambda al:al.seg_to.left)
         inc = self.link(line, [al.seg_to.left for al in alignments if al.seg_from.left > 1000 and al.seg_to.left > 50], 20)
         # for al in alignments:
@@ -108,7 +108,7 @@ class UniqueMarker:
     def markAllUnique(self, lines, dot_plot, reads):
         # type: (NewLineStorage, LineDotPlot, Iterable[AlignedRead]) -> None
         sys.stdout.info("Aligning reads to contigs")
-        for al in self.aligner.alignAndSplit(reads, lines):
+        for al in self.aligner.localAlign(reads, lines):
             if len(al.seg_to) >= params.k:
                 line = al.seg_to.contig # type: NewLine
                 line.addReadAlignment(al)

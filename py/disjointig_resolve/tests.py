@@ -195,7 +195,7 @@ class TestDataset:
         reads = ReadCollection()
         for read in self.reads:
             reads.addNewRead(read)
-        disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
+        disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
         return lines, dp, reads
 
     def mutate(self, seq, rate):
@@ -249,7 +249,7 @@ class TestDataset:
     def translateBack(self, contig, aligner):
         # type: (Contig, Aligner) -> str
         res = []
-        for al in sorted(aligner.alignAndSplit([contig], self.alphabet), key = lambda al: al.seg_from.left):
+        for al in sorted(aligner.overlapAlign([contig], self.alphabet), key = lambda al: al.seg_from.left):
             if len(res) > 0 and al.seg_from.interSize(res[-1].seg_from) > self.letter_size / 2:
                 if al.percentIdentity() > res[-1].percentIdentity():
                     res[-1] = al

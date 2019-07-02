@@ -1,10 +1,10 @@
 import itertools
 import os
+import subprocess
 import sys
 
-from common.save_load import TokenWriter, TokenReader
-
 sys.path.append("py")
+from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
 from common.sequences import ContigCollection, Segment, Contig, \
@@ -13,6 +13,8 @@ from common.alignment_storage import AlignmentPiece, ReadCollection
 from typing import Iterable, Tuple, Generator, BinaryIO, List
 from common import basic, sam_parser, SeqIO, params
 
+class AlignmentException(Exception):
+    pass
 
 class DirDistributor:
     def __init__(self, dir):
@@ -113,6 +115,10 @@ class Aligner:
         # type: (DirDistributor, int) -> Aligner
         self.dir_distributor = dir_distributor
         self.threads = threads
+        self.filters = dict()
+        self.filters["overlap"] = lambda als: self.filterOverlaps(als)
+        self.filters["dotplot"] = lambda als: self.filterLocal(als)
+        self.filters["local"] = lambda als: als
 
     def alignReadCollection(self, reads_collection, contigs):
         # type: (ReadCollection, Iterable[Contig]) -> None
@@ -175,8 +181,37 @@ class Aligner:
             res.fillFromSam(self.align(res, [contig]), contigs_collection)
         return res
 
-    def align(self, reads, reference):
-        # type: (Iterable[NamedSequence], Iterable[Contig]) -> sam_parser.Samfile
+    def align_files(self, reference_file, reads_files, threads, platform, mode, out_alignment):
+        out_file = out_alignment + "_initial"
+        cmdline = [params.MINIMAP_BIN, reference_file]
+        cmdline.extend(reads_files)
+        cmdline.extend(["-N1000", "-a", "-Q", "-w5", "-m100", "-g10000", "--max-chain-skip",
+                        "25", "-t", str(threads)])
+        # cmdline.extend(["-x", "ava-pb"])
+        if mode == "dotplot":
+            cmdline.append("-p0.00")
+        elif mode in ["overlap", "local"]:
+            cmdline.append("-p0.1")
+        else:
+            assert False, "Unknown mode"
+        if platform == "nano":
+            cmdline.append("-k15")
+        else:
+            cmdline.append("-Hk19")
+        try:
+            devnull = open(os.devnull, "w")
+            sys.stdout.log(params.LogPriority.alignment_files, "Running: " + " ".join(cmdline))
+            subprocess.check_call(cmdline, stderr=devnull, stdout=open(out_file, "w"))
+            env = os.environ.copy()
+            env["LC_ALL"] = "C"
+            subprocess.check_call(["sort", "-T", os.path.dirname(out_alignment), out_file],
+                                  stdout=open(out_alignment, "w"), env=env)
+            # os.remove(out_file)
+        except (subprocess.CalledProcessError, OSError) as e:
+            raise AlignmentException(str(e))
+
+    def align(self, reads, reference, mode):
+        # type: (Iterable[NamedSequence], Iterable[Contig], str) -> sam_parser.Samfile
         dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (list(reads), "reads.fasta")])
         contigs_file = new_files[0]
         reads_file = new_files[1]
@@ -189,25 +224,26 @@ class Aligner:
             pass
         else:
             sys.stdout.log(params.LogPriority.alignment_files, "Performing alignment:", alignment_file)
-            make_alignment(contigs_file, [reads_file], self.threads, alignment_dir, "pacbio", alignment_file)
+            self.align_files(contigs_file, [reads_file], self.threads, "pacbio", mode, alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
-    def alignAndSplit(self, reads, ref_storage):
-        # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
-        reads = list(reads)
-        parser = self.align(reads, list(ref_storage.unique()))
+    def alignAndFilter(self, reads, ref_storage, mode):
+        # type: (Iterable[Contig], ContigStorage, str) -> Generator[AlignmentPiece]
+        filter = self.filters[mode]
         read_storage = ContigStorage(reads, False)
-        als = [] # type: List[AlignmentPiece]
         cnt = 0
-        cnt_skip = 0
-        for rec in parser:
+        cnt_out = 0
+        als = []
+        for rec in self.align(read_storage, list(ref_storage.unique()), mode):
             if rec.is_unmapped:
                 continue
             cnt += 1
             if cnt % 10000 == 0:
-                print cnt, cnt_skip
+                print cnt, cnt - cnt_out
             if len(als) > 0 and rec.query_name != als[0].seg_from.contig.id:
-                res = list(self.filterAls(als))
+                cnt += len(als)
+                res = list(filter(als))
+                cnt_out += len(res)
                 for al in res:
                     yield al
                 als = []
@@ -222,66 +258,28 @@ class Aligner:
                     for al in tmp.split():
                         als.append(al)
                 else:
-                    cnt_skip += 1
                     als.append(tmp)
-        for al in self.filterAls(als):
-            yield al
+        if len(als) > 0:
+            cnt += len(als)
+            res = list(filter(als))
+            cnt_out += len(res)
+            for al in res:
+                yield al
 
-    def alignClean(self, reads, ref_storage):
+    def dotplotAlign(self, reads, ref_storage):
         # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
-        reads = list(reads)
-        parser = self.align(reads, list(ref_storage.unique()))
-        read_storage = ContigStorage(reads, False)
-        als = [] # type: List[AlignmentPiece]
-        for rec in parser:
-            if rec.is_unmapped:
-                continue
-            if len(als) > 0 and rec.query_name != als[0].seg_from.contig.id:
-                for al in self.filterAls(als):
-                    yield al
-                als = []
-            rname = rec.query_name
-            seq_from = read_storage[rname]
-            seq_to = ref_storage[rec.tname]
-            tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
-            if tmp is not None and not tmp.contradictingRTC(tail_size=params.bad_end_length):
-                als.append(tmp)
-        for al in self.filterAls(als):
+        for al in self.alignAndFilter(reads, ref_storage, "dotplot"):
             yield al
 
-    # def matchingAlignment(self, seqs, contig):
-    #     # type: (list[str], Contig) -> list[AlignedSequences]
-    #     collection = ContigCollection([contig])
-    #     res = [] # type: list[AlignedSequences]
-    #     for seq in seqs:
-    #         res.append(AlignedSequences(seq, contig.seq))
-    #     reads = ReadCollection(collection).loadFromSam(
-    #         self.align([AlignedRead(SeqIO.SeqRecord(seq, str(i))) for i, seq in enumerate(seqs)], collection))
-    #     for read in reads:
-    #         tid = int(read.id)
-    #         read.sort()
-    #         groups = [] #type: list[list[AlignmentPiece]]
-    #         group_lens = []
-    #         for al in read.alignments:
-    #             if al.seg_to.contig != contig:
-    #                 continue
-    #             found = False
-    #             for i, group in enumerate(groups):
-    #                 if group[-1].precedes(al, 50):
-    #                     group.append(al)
-    #                     group_lens[i] += len(al.seg_from)
-    #                     found = True
-    #                     break
-    #             if not found:
-    #                 groups.append([al])
-    #                 group_lens.append(len(al.seg_from))
-    #         best = None
-    #         for i in range(len(groups)):
-    #             if best == None or group_lens[i] > group_lens[best]:
-    #                 best = i
-    #         for al in groups[best]:
-    #             res[tid].addCigar(al.cigar, al.seg_to.left)
-    #     return res
+    def overlapAlign(self, reads, ref_storage):
+        # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
+        for al in self.alignAndFilter(reads, ref_storage, "overlap"):
+            yield al
+
+    def localAlign(self, reads, ref_storage):
+        # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
+        for al in self.alignAndFilter(reads, ref_storage, "local"):
+            yield al
 
     def save(self, handler):
         # type: (TokenWriter) -> None
@@ -294,12 +292,12 @@ class Aligner:
         threads = handler.readInt()
         return Aligner(DirDistributor.load(handler), threads)
 
-    def filterAls(self, als):
-        # type: (List[AlignmentPiece]) -> Generator[AlignmentPiece]
+    def filterLocal(self, als):
+        # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
+        all_res = []
         if len(als) == 1:
-            yield als[0]
-            return
-        als = sorted(als, key = lambda al: (al.seg_from.contig.id, al.seg_to.contig.id))
+            return als
+        als = sorted(als, key = lambda al: al.seg_to.contig.id)
         for k, iter in itertools.groupby(als, key=lambda al: (al.seg_from.contig.id, al.seg_to.contig.id)):
             res = [] # type: List[AlignmentPiece]
             iter = sorted(iter, key = lambda al: al.seg_from.left)
@@ -315,8 +313,14 @@ class Aligner:
                             break
                 if ok:
                     res.append(al)
-            for al in res:
-                yield al
+            all_res.extend(res)
+        return all_res
+
+    def filterOverlaps(self, als):
+        # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
+        als = filter(lambda al: not al.contradictingRTC(tail_size=params.bad_end_length), als)
+        return self.filterLocal(als)
+
 
 if __name__ == "__main__":
     dir = sys.argv[1]
@@ -324,7 +328,7 @@ if __name__ == "__main__":
     target = sys.argv[3]
     aln = Aligner(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"))
-    for al in aln.alignClean(ReadCollection().loadFromFasta(open(query, "r")), contigs):
+    for al in aln.localAlign(ReadCollection().loadFromFasta(open(query, "r")), contigs):
         print al
 
 

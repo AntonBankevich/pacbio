@@ -73,7 +73,7 @@ class Polisher:
     def polishQuiver(self, reads, base_start, pos_start, min_new_len = 3000):
         # type: (ReadCollection, str, int, int) -> Optional[Consensus]
         cc = ContigCollection([Contig(base_start, "base_start")])
-        reads_to_base = ReadCollection().extendClean(reads).fillFromSam(self.aligner.align(reads, cc), cc)
+        reads_to_base = ReadCollection().extendClean(reads).fillFromSam(self.aligner.align(reads, cc, "overlap"), cc)
         # for read in reads:
         #     print read
         #     if read.id in reads_to_base.reads:
@@ -170,7 +170,7 @@ class Polisher:
         if polished is None:
             sys.stdout.log(params.LogPriority.warning, "Warning", seg, "could not be corrected even though some reads cover it.")
             polished = seg.asContig()
-        al = self.aligner.alignClean([polished], ContigStorage([base])).next()
+        al = self.aligner.overlapAlign([polished], ContigStorage([base])).next()
         mapping = AlignmentPiece.Identical(base.segment(len(start), len(base) - len(end)), seg)
         return al.compose(mapping)
 
@@ -209,7 +209,7 @@ class Polisher:
                 for read in reduced_read_list:
                     read.clean()
                 polished_base = Contig(self.polish(reduced_reads, base), "polished_base")
-                for al in self.aligner.alignAndSplit(reduced_reads, ContigStorage().addAll([polished_base])):
+                for al in self.aligner.overlapAlign(reduced_reads, ContigStorage().addAll([polished_base])):
                     reduced_reads.reads[al.seg_from.contig.id].addAlignment(al)
                 # self.aligner.alignReadCollection(reduced_reads, [polished_base])
                 candidate_alignments = []

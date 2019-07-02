@@ -49,7 +49,7 @@ def main(args):
     ref = ContigCollection().loadFromFasta(open(rf, "r"), False)
     good = set()
     print "Good"
-    for al in aligner.alignClean(contigs, ref):
+    for al in aligner.dotplotAlign(contigs, ref):
         if len(al) > 20000:
             al = al.reduce(target=al.seg_to.shrink(10000))
         print al, len(al), al.percentIdentity()
@@ -57,7 +57,7 @@ def main(args):
         good.add(al.seg_from.contig.id)
     contigs = contigs.filter(lambda contig: contig.id not in good)
     print "Bad"
-    for al in aligner.alignAndSplit(contigs, ref):
+    for al in aligner.localAlign(contigs, ref):
         print al
 
 

@@ -90,7 +90,7 @@ class DotPlot:
 
     def construct(self, aligner):
         # type: (Aligner) -> None
-        for al in aligner.alignAndSplit(self.lines.unique(), self.lines):
+        for al in aligner.dotplotAlign(self.lines.unique(), self.lines):
             # print al, len(al) > params.k, al.percentIdentity() > 0.8, al.seg_from.contig.id < al.seg_to.contig.id, al.seg_from <= al.seg_to
             if len(al) > params.k and al.percentIdentity() > 0.8:
                 if al.seg_from.contig.id == al.seg_to.contig.id:
@@ -279,7 +279,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
         new_seg = line.asSegment().suffix(length=min(len(line), len(seq) + params.k + 500))
         # print "Aligning new extension"
-        for al in self.aligner.alignAndSplit([new_seg.asContig()], self.lines):
+        for al in self.aligner.dotplotAlign([new_seg.asContig()], self.lines):
             if len(al.seg_to) >= params.k:
                 al = al.queryAsSegment(new_seg)
                 self.addAndMergeRight(al)

@@ -92,7 +92,7 @@ class ExtensionHandler(LineListener):
             line.read_alignments.clean()
             line.read_alignments.addAll(tmp)
         new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + 1000))
-        for al in self.aligner.alignAndSplit([new_seg.asContig()], self.disjointigs):
+        for al in self.aligner.dotplotAlign([new_seg.asContig()], self.disjointigs):
             al = al.reverse().targetAsSegment(new_seg)
             line.disjointig_alignments.addAndMergeRight(al)
 

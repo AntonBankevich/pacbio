@@ -75,7 +75,7 @@ def countStats(reads, lines, disjointigs, aligner, dir):
     # type: (ReadCollection, NewLineStorage, DisjointigCollection, Aligner, str) -> None
     tmp = AlignmentStorage()
     cnt = 0
-    for al in aligner.alignClean(reads, lines):
+    for al in aligner.overlapAlign(reads, lines):
         line = al.seg_to.contig # type: NewLine
         line.addReadAlignment(al)
         tmp.addAll(al.split())
@@ -101,7 +101,7 @@ def ExtendShortLines(contigs, reads, aligner, polisher):
             short_contigs.add(contig)
             als[contig.id] = []
             als[contig.rc.id] = []
-    for al in aligner.alignClean(reads, short_contigs):
+    for al in aligner.overlapAlign(reads, short_contigs):
         als[al.seg_to.contig.id].append(al)
         als[al.seg_to.contig.rc.id].append(al.rc)
     for contig in short_contigs.unique():
@@ -235,7 +235,7 @@ def main(args):
         bad_reads = reads.cleanCopy()
         tlen0 = sum(map(len, bad_reads))
         good_reads = set()
-        for al in aligner.alignAndSplit(reads, disjointigs):
+        for al in aligner.localAlign(reads, disjointigs):
             if not al.contradictingRTC(al.seg_to.contig.asSegment(), 500):
                 good_reads.add(al.seg_from.contig.id)
         sys.stdout.info("Fraction of reads without full alignment to disjointigs:", 1 - float(len(good_reads)) / len(reads))
@@ -251,7 +251,7 @@ def main(args):
         disjointigs.loadFromFasta(open(df, "r"))
 
         sys.stdout.info("Aligning reads to disjointigs")
-        disjointigs.addAlignments(aligner.alignClean(reads, disjointigs))
+        disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
 
         sys.stdout.info("Creating contig collection")
         unique = [str(val[0]) for val in DotParser(open(cl_params.graph_file, "r")).parse() if val[4].unique]

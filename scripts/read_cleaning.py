@@ -50,7 +50,7 @@ def main(args):
     tlen0 = sum(map(len, reads))
     for i in range(10):
         good_reads = set()
-        for al in aligner.alignAndSplit(reads, disjointigs):
+        for al in aligner.localAlign(reads, disjointigs):
             if not al.contradictingRTC(al.seg_to.contig.asSegment(), 500):
                 good_reads.add(al.seg_from.contig.id)
         rf = os.path.join(dir, "reads" + str(i) + ".fasta")

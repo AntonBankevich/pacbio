@@ -81,7 +81,7 @@ class NewLineStorage(ContigStorage):
     def alignDisjointigs(self):
         for line in self:
             line.disjointig_alignments.clean()
-        for al in self.aligner.alignAndSplit(self.disjointigs.unique(), self):
+        for al in self.aligner.dotplotAlign(self.disjointigs.unique(), self):
             line = al.seg_to.contig # type: NewLine
             line.disjointig_alignments.add(al)
 

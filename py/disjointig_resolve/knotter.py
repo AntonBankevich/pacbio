@@ -52,7 +52,7 @@ class LineMerger:
         for al1 in read_alignments:
             read = al1.seg_from.contig # type: AlignedRead
             for al2 in read.alignments:
-                if al1.canMergeTo(al2):
+                if al1.canMergeTo(al2) and al1.deepInter(al2):
                     continue
                 new_rec = self.Record(al1, al2)
                 if len(line) + new_rec.gap > 0:
@@ -106,9 +106,11 @@ class LineMerger:
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)
             if line == other:
+                gap = -line_alignment.rc.seg_from.right - line_alignment.seg_to.left + line.correct_segments[0].left + line.rc.correct_segments[0].left
+                assert gap <= 0
                 line.cutRight(line.correct_segments[-1].right)
                 line.rc.cutRight(line.rc.correct_segments[-1].right)
-                line.tie(line, 0, "")
+                line.tie(line, gap, "")
                 line.setCircular()
                 print line, "is circular"
                 return line
