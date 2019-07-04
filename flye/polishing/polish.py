@@ -54,7 +54,7 @@ def polish(contig_seqs, read_seqs, work_dir, num_iters, num_threads, error_mode,
     logger_state = logger.disabled
     if not output_progress:
         logger.disabled = True
-
+    print "oppa1"
     subs_matrix = os.path.join(cfg.vals["pkg_root"],
                                cfg.vals["err_modes"][error_mode]["subs_matrix"])
     hopo_matrix = os.path.join(cfg.vals["pkg_root"],
@@ -64,7 +64,9 @@ def polish(contig_seqs, read_seqs, work_dir, num_iters, num_threads, error_mode,
     prev_assembly = contig_seqs
     contig_lengths = None
     coverage_stats = None
+    print "oppa2"
     for i in xrange(num_iters):
+        print "oppa3"
         logger.info("Polishing genome ({0}/{1})".format(i + 1, num_iters))
 
         #split into 1Mb chunks to reduce RAM usage
@@ -73,6 +75,7 @@ def polish(contig_seqs, read_seqs, work_dir, num_iters, num_threads, error_mode,
         chunks_file = os.path.join(work_dir, "chunks_{0}.fasta".format(i + 1))
         chunks = split_into_chunks(fp.read_sequence_dict(prev_assembly),
                                        CHUNK_SIZE)
+        print "oppa4"
         fp.write_fasta_dict(chunks, chunks_file)
 
         ####
@@ -83,6 +86,7 @@ def polish(contig_seqs, read_seqs, work_dir, num_iters, num_threads, error_mode,
                        reference_mode=True, sam_output=True)
 
         #####
+        print "oppa5"
         logger.info("Separating alignment into bubbles")
         contigs_info = get_contigs_info(chunks_file)
         bubbles_file = os.path.join(work_dir,
@@ -92,47 +96,61 @@ def polish(contig_seqs, read_seqs, work_dir, num_iters, num_threads, error_mode,
                          error_mode, num_threads,
                          bubbles_file)
 
+        print "oppa6"
         logger.info("Alignment error rate: {0}".format(mean_aln_error))
         consensus_out = os.path.join(work_dir, "consensus_{0}.fasta".format(i + 1))
         polished_file = os.path.join(work_dir, "polished_{0}.fasta".format(i + 1))
+        print "oppa7"
         if os.path.getsize(bubbles_file) == 0:
+            print "oppa1"
             logger.info("No reads were aligned during polishing")
             if not output_progress:
+                print "oppa1"
                 logger.disabled = logger_state
             open(stats_file, "w").write("seq_name\tlength\tcoverage\n")
             open(polished_file, "w")
+            print "oppa8", polished_file, stats_file
             return polished_file, stats_file
 
         #####
         logger.info("Correcting bubbles")
+        print "oppa9"
         _run_polish_bin(bubbles_file, subs_matrix, hopo_matrix,
                         consensus_out, num_threads, output_progress)
+        print "oppa10"
         polished_fasta, polished_lengths = _compose_sequence(consensus_out)
         merged_chunks = merge_chunks(polished_fasta)
         fp.write_fasta_dict(merged_chunks, polished_file)
+        print "oppa11"
 
         #Cleanup
         os.remove(chunks_file)
         os.remove(bubbles_file)
         os.remove(consensus_out)
         os.remove(alignment_file)
+        print "oppa12"
 
         contig_lengths = polished_lengths
         prev_assembly = polished_file
+        print "oppa13"
 
     #merge information from chunks
+    print "oppa14"
     contig_lengths = merge_chunks(contig_lengths, fold_function=sum)
     coverage_stats = merge_chunks(coverage_stats,
                                   fold_function=lambda l: sum(l) / len(l))
 
+    print "oppa15"
     with open(stats_file, "w") as f:
         f.write("seq_name\tlength\tcoverage\n")
         for ctg_id in contig_lengths:
             f.write("{0}\t{1}\t{2}\n".format(ctg_id,
                     contig_lengths[ctg_id], coverage_stats[ctg_id]))
 
+    print "oppa16"
     if not output_progress:
         logger.disabled = logger_state
+    print "oppa17", prev_assembly, stats_file
 
     return prev_assembly, stats_file
 

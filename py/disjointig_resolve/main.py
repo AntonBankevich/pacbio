@@ -9,6 +9,7 @@ from typing import Iterable, List, Dict
 
 
 sys.path.append("py")
+sys.path.append(".")
 
 from common.basic import CreateLog
 from disjointig_resolve.accurate_line import NewLine

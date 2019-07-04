@@ -3,6 +3,7 @@ import sys
 
 
 sys.path.append("py")
+sys.path.append(".")
 from common.basic import CreateLog
 from typing import Optional, List, Iterable, Tuple
 from alignment.align_tools import Aligner, DirDistributor
@@ -13,7 +14,7 @@ from common.sequences import Consensus, Contig, ContigCollection, Segment, Conti
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from flye_tools.polish import PolishException
 from flye_tools.polysh_job import JobPolishing
-
+import flye.polishing.polish
 
 class Polisher:
     def __init__(self, aligner, dir_distributor):
@@ -23,7 +24,6 @@ class Polisher:
 
     def polishMany(self, reads, sequences):
         # type: (Iterable[AlignedRead], List[Contig]) -> List[Contig]
-        import flye.polishing.polish
         dir, new_files, same = self.dir_distributor.fillNextDir([(sequences, "ref.fasta"), (reads, "reads.fasta")])
         work_dir = os.path.join(dir, "work")
         basic.ensure_dir_existance(work_dir)
