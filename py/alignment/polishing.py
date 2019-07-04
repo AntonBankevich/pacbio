@@ -27,7 +27,7 @@ class Polisher:
         dir, new_files, same = self.dir_distributor.fillNextDir([(sequences, "ref.fasta"), (reads, "reads.fasta")])
         work_dir = os.path.join(dir, "work")
         basic.ensure_dir_existance(work_dir)
-        polished_file, stats = flye.polishing.polish.polish(new_files[0], new_files[1], work_dir, 1, params.threads, "pacbio", False)
+        polished_file, stats = flye.polishing.polish.polish(new_files[0], [new_files[1]], work_dir, 1, params.threads, "pacbio", False)
         return map(lambda rec: Contig(rec.seq, rec.id), SeqIO.parse_fasta(open(polished_file, "r")))
 
     def polish(self, reads, consensus):
