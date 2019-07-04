@@ -2,6 +2,8 @@ import heapq
 import random
 import shutil
 import os
+import sys
+import time
 
 from typing import Callable, Union, List
 
@@ -226,3 +228,16 @@ def parseLineName(name):
     if rc:
         seq = map(Reverse, seq[::-1])
     return seq
+
+
+def CreateLog(dir):
+    old_logs_dir = os.path.join(dir, "old")
+    ensure_dir_existance(old_logs_dir)
+    log_file = os.path.join(dir, "log.info")
+    if os.path.isfile(log_file):
+        num = len(os.listdir(old_logs_dir))
+        shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
+    log = open(log_file, "w")
+    sys.stdout = OStreamWrapper(sys.stdout, log)
+    sys.stdout.prefix = lambda s: time.strftime("%I:%M:%S") + "  "
+    sys.stderr = sys.stdout

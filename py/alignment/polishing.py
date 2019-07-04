@@ -1,8 +1,10 @@
 import os
 import sys
 
-from typing import Optional, List, Iterable, Tuple
 
+sys.path.append("py")
+from common.basic import CreateLog
+from typing import Optional, List, Iterable, Tuple
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic, SeqIO, params
 from common.line_align import Scorer
@@ -18,6 +20,13 @@ class Polisher:
         # type: (Aligner, DirDistributor) -> Polisher
         self.aligner = aligner
         self.dir_distributor = dir_distributor
+
+    def polishMany(self, reads, sequences):
+        # type: (Iterable[AlignedRead], List[Contig]) -> List[Contig]
+        import flye.polishing.polish
+        dir, new_files, same = self.dir_distributor.fillNextDir([(sequences, "ref.fasta"), (reads, "reads.fasta")])
+        polished_file, stats = flye.polishing.polish.polish(new_files[0], new_files[1], os.path.join(dir, "work"), 1, params.threads, "pacbio", False)
+        return map(lambda rec: Contig(rec.seq, rec.id), SeqIO.parse_fasta(open(polished_file, "r")))
 
     def polish(self, reads, consensus):
         # type: (Iterable[NamedSequence], Contig) -> str
@@ -275,9 +284,25 @@ class Polisher:
                 break
         return new_contig, relevant_als + finished_als
 
-
 class FakePolishingArgs:
     def __init__(self):
         self.num_iters = params.num_iters
         self.platform = "pacbio"
-        self.threads = 8
+        self.threads = params.threads
+
+if __name__ == "__main__":
+    reads_file = sys.argv[1]
+    consensus_file = sys.argv[2]
+    dir = sys.argv[3]
+    CreateLog(dir)
+    dd = DirDistributor(dir)
+    aligner = Aligner(dd)
+    polisher = Polisher(aligner, dd)
+    reads = ContigStorage().loadFromFasta(open(reads_file, "r"), num_names=False)
+    ref = list(ContigStorage().loadFromFasta(open(consensus_file, "r"), num_names=False).unique())[0]
+    res = polisher.polish(reads, ref)
+    res_file = os.path.join(dir, "res.fasta")
+    rf = open(res_file, "w")
+    SeqIO.write(NamedSequence(res, "polished"), rf, "fasta")
+    rf.close()
+    aligner.align_files(res_file, [reads_file], 16, "pacbio", "overlap", os.path.join(dir, "res.sam"))

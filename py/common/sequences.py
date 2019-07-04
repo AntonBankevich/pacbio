@@ -87,6 +87,8 @@ class ContigStorage:
         # type: (str) -> Optional[Contig]
         if item in self.items:
             return self.items[item]
+        elif not self.add_rc and basic.Reverse(item) in self.items:
+            return self.items[basic.Reverse(item)].rc
         return None
 
     def __iter__(self):

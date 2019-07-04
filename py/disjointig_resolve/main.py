@@ -1,6 +1,5 @@
 import itertools
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -8,41 +7,28 @@ import traceback
 
 from typing import Iterable, List, Dict
 
+
 sys.path.append("py")
 
-
-from common.line_align import Scorer
+from common.basic import CreateLog
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.smart_storage import AlignmentStorage
 from common.dot_parser import DotParser
 from disjointig_resolve.unique_marker import UniqueMarker
 from alignment.align_tools import Aligner, DirDistributor
 from alignment.polishing import Polisher
-from common import basic, SeqIO, sam_parser, params
+from common import basic, SeqIO, params
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.tests import Tester
 from disjointig_resolve.line_extender import LineExtender
 from common.save_load import TokenReader, SaveHandler
 from common.sequences import ContigCollection, Contig, ContigStorage
-from common.alignment_storage import ReadCollection, AlignmentPiece, AlignedRead
+from common.alignment_storage import ReadCollection, AlignmentPiece
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params
-
-
-def CreateLog(dir):
-    old_logs_dir = os.path.join(dir, "old")
-    basic.ensure_dir_existance(old_logs_dir)
-    log_file = os.path.join(dir, "log.info")
-    if os.path.isfile(log_file):
-        num = len(os.listdir(old_logs_dir))
-        shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
-    log = open(log_file, "w")
-    sys.stdout = basic.OStreamWrapper(sys.stdout, log)
-    sys.stdout.prefix = lambda s: time.strftime("%I:%M:%S") + "  "
-    sys.stderr = sys.stdout
 
 
 def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
@@ -259,6 +245,10 @@ def main(args):
         contigs.loadFromFasta(open(cl_params.contigs_file, "r"), num_names=True)
         contigs = contigs.filter(lambda contig: contig.id in unique)
         sys.stdout.info("Created", len(contigs), "initial contigs")
+
+        sys.stdout.info("Polishing contigs")
+        polished_contigs = polisher.polishMany(reads, list(contigs.unique()))
+        contigs = ContigCollection().addAll(polished_contigs)
 
         sys.stdout.info("Extending short lines")
         ExtendShortLines(contigs, reads, aligner, polisher)
