@@ -4,6 +4,7 @@ import sys
 
 from typing import List
 
+from common import params
 from common.save_load import TokenWriter, TokenReader
 
 
@@ -20,7 +21,7 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats flye-dir= graph= focus= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats clean flye-dir= graph= focus= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:h"
         self.stats = False
         self.new_disjointigs = False
@@ -63,6 +64,8 @@ class Params:
                 # self.disjointigs_file = os.path.join(self.flye_dir, "0-assembly", "draft_assembly.fasta")
             elif key == "--stats":
                 self.stats = True
+            elif key == "--clean":
+                params.clean = True
             elif key == "--graph":
                 self.graph_file = value
             elif key == "--reads":
