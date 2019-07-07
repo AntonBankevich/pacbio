@@ -91,10 +91,11 @@ class DirDistributor:
         hashs = list(self.calculateHash(content))
         if os.path.isfile(hash_file) and self.compareHash(open(hash_file, "r"), hashs) and not params.redo_alignments:
             return dir, content_files, True
-        self.printHash(open(hash_file, "w"), hashs)
+        basic.recreate(dir)
         for reads, f_name in content:
             f_name = os.path.join(dir, f_name)
             self.WriteSequences(reads, f_name)
+        self.printHash(open(hash_file, "w"), hashs)
         return dir, content_files, False
 
     def save(self, handler):

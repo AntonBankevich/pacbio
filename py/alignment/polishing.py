@@ -22,15 +22,31 @@ class Polisher:
         self.aligner = aligner
         self.dir_distributor = dir_distributor
 
+    # def polishMany(self, reads, sequences):
+    #     # type: (Iterable[AlignedRead], List[Contig]) -> List[Contig]
+    #     dir, new_files, same = self.dir_distributor.fillNextDir([(sequences, "ref.fasta"), (reads, "reads.fasta")])
+    #     work_dir = os.path.join(dir, "work")
+    #     basic.ensure_dir_existance(work_dir)
+    #     tmp = flye.polishing.polish.polish(new_files[0], [new_files[1]], work_dir, 1, params.threads, "pacbio", True)
+    #     print "TMP:", tmp
+    #     polished_file, stats = tmp
+    #     return map(lambda rec: Contig(rec.seq, rec.id), SeqIO.parse_fasta(open(polished_file, "r")))
+
     def polishMany(self, reads, sequences):
         # type: (Iterable[AlignedRead], List[Contig]) -> List[Contig]
-        dir, new_files, same = self.dir_distributor.fillNextDir([(sequences, "ref.fasta"), (reads, "reads.fasta")])
-        work_dir = os.path.join(dir, "work")
-        basic.ensure_dir_existance(work_dir)
-        tmp = flye.polishing.polish.polish(new_files[0], [new_files[1]], work_dir, 1, params.threads, "pacbio", True)
-        print "TMP:", tmp
-        polished_file, stats = tmp
+        dir, new_files, same = self.dir_distributor.fillNextDir([(list(sequences), "ref.fasta"), (reads, "reads.fasta")])
+        consensus_file_name = new_files[0]
+        reads_file_name = new_files[1]
+        args = FakePolishingArgs()
+        basic.ensure_dir_existance(os.path.join(dir, "work"))
+        job = JobPolishing(args, os.path.join(dir, "work"), os.path.join(dir, "log.info"), [reads_file_name], consensus_file_name, "polish")
+        polished_file = job.out_files["contigs"]
+        if same and not params.clean and os.path.exists(polished_file):
+            print "Polishing reused:", polished_file
+        else:
+            job.run()
         return map(lambda rec: Contig(rec.seq, rec.id), SeqIO.parse_fasta(open(polished_file, "r")))
+        # return SeqIO.parse_fasta(open(polished_file, "r"))
 
     def polish(self, reads, consensus):
         # type: (Iterable[NamedSequence], Contig) -> str
@@ -303,10 +319,11 @@ if __name__ == "__main__":
     aligner = Aligner(dd)
     polisher = Polisher(aligner, dd)
     reads = ContigStorage().loadFromFasta(open(reads_file, "r"), num_names=False)
-    ref = list(ContigStorage().loadFromFasta(open(consensus_file, "r"), num_names=False).unique())[0]
-    res = polisher.polish(reads, ref)
+    ref = list(ContigStorage().loadFromFasta(open(consensus_file, "r"), num_names=False).unique())
+    res = polisher.polishMany(reads, ref)
     res_file = os.path.join(dir, "res.fasta")
     rf = open(res_file, "w")
-    SeqIO.write(NamedSequence(res, "polished"), rf, "fasta")
+    for c in res:
+        SeqIO.write(c, rf, "fasta")
     rf.close()
     aligner.align_files(res_file, [reads_file], 16, "pacbio", "overlap", os.path.join(dir, "res.sam"))

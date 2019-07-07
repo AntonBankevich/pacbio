@@ -22,7 +22,7 @@ from flye.utils.utils import which
 import flye.config.py_cfg as cfg
 
 
-POLISH_BIN = "flye-polish"
+POLISH_BIN = "bin/flye-polish"
 
 logger = logging.getLogger()
 

@@ -21,7 +21,7 @@ import flye.config.py_cfg as cfg
 
 
 logger = logging.getLogger()
-MINIMAP_BIN = "flye-minimap2"
+MINIMAP_BIN = "bin/flye-minimap2"
 
 Alignment = namedtuple("Alignment", ["qry_id", "trg_id", "qry_start", "qry_end",
                                      "qry_sign", "qry_len", "trg_start",
@@ -435,8 +435,9 @@ def _run_minimap(reference_file, reads_files, num_proc, mode, out_file,
         subprocess.check_call(cmdline, stderr=devnull,
                               stdout=open(out_file, "w"))
     except (subprocess.CalledProcessError, OSError) as e:
-        if e.returncode == -9:
-            logger.error("Looks like the system ran out of memory")
+        print "Ref:", reference_file
+        print "reads:", reads_files
+        print cmdline
         raise AlignmentException(str(e))
 
 
