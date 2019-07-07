@@ -5,12 +5,12 @@ import traceback
 
 from typing import Iterable
 
-from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
-    CreateReadColection
 
 sys.path.append("py")
 sys.path.append(".")
 
+from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
+    CreateReadColection
 from common.basic import CreateLog
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.smart_storage import AlignmentStorage
