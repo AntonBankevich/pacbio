@@ -51,6 +51,7 @@ def polish(contig_seqs, read_seqs, work_dir, num_iters, num_threads, error_mode,
     """
     High-level polisher interface
     """
+    print "oppa0"
     logger_state = logger.disabled
     if not output_progress:
         logger.disabled = True
