@@ -9,8 +9,6 @@ from typing import Iterable
 sys.path.append("py")
 sys.path.append(".")
 
-from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
-    CreateReadColection
 from common.basic import CreateLog
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.smart_storage import AlignmentStorage
@@ -26,6 +24,8 @@ from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params
+from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
+    CreateReadColection
 
 
 def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
