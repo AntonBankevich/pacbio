@@ -385,6 +385,7 @@ class SegmentStorage(SmartStorage):
                 yield seg1
 
 
+# TODO: Extract version without listening to use with disjointigs. Otherwise it is cyclic dependancy.
 class AlignmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[AlignmentStorage]) -> None

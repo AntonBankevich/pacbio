@@ -88,6 +88,8 @@ class LineMerger:
             return None
         else:
             print "Merging", line, "with", final[1], "with gap", final[0]
+            print "Alignments:"
+            print "\n".join(map(str, final[2]))
             other = final[1]
             assert line != other.rc
             assert other.rc.knot is None
