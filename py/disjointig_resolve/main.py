@@ -93,10 +93,11 @@ def main(args):
     sys.stdout.info("Preparing initial state")
     save_handler = SaveHandler(cl_params.save_dir)
     if cl_params.load_from is not None:
-        tmp = cl_params.focus
+        # tmp = cl_params.focus
         sys.stdout.info("Loading initial state from saves")
         cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot = loadAll(TokenReader(open(cl_params.load_from, "r")))
-        cl_params.focus = tmp
+        cl_params.parse(args)
+        # cl_params.focus = tmp
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         dot_plot.printAll(sys.stdout)

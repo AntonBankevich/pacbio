@@ -21,7 +21,7 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats clean flye-dir= graph= focus= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats clean flye-dir= graph= focus= nofocus output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:h"
         self.stats = False
         self.new_disjointigs = False
@@ -81,6 +81,8 @@ class Params:
                 self.threads = int(value)
             elif key == "--focus":
                 self.focus = value.split(",")
+            elif key == "--nofocus":
+                self.focus = None
             elif key == "--help" or key == "-h":
                 self.print_usage_and_exit(0)
             else:
