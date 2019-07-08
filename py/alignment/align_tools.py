@@ -332,6 +332,7 @@ if __name__ == "__main__":
     contigs = ContigCollection().loadFromFasta(open(target, "r"))
     for al in aln.localAlign(ReadCollection().loadFromFasta(open(query, "r")), contigs):
         print al
+        print "\n".join(al.asMatchingStrings())
 
 
 

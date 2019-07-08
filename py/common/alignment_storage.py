@@ -320,7 +320,7 @@ class AlignmentPiece:
         return False
 
     def contradictingRTC(self,
-                         seg=None, tail_size = 500):  # contradiction between read and consensus sequence. Stricter consensus condition
+                         seg=None, tail_size = params.bad_end_length):  # contradiction between read and consensus sequence. Stricter consensus condition
         # type: (Segment, int) -> bool
         if seg is None:
             seg = self.seg_to.contig.asSegment()
