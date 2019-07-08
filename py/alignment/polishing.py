@@ -213,7 +213,7 @@ class Polisher:
         while True:
             tmp = []
             for al in relevant_als:
-                if al.seg_to.inter(new_contig.asSegment().suffix(length=20)) and al.rc.seg_from.left > 100:
+                if al.seg_to.inter(new_contig.asSegment().suffix(length=100)) and al.rc.seg_from.left > 100:
                     tmp.append(al)
                 else:
                     finished_als.append(al)

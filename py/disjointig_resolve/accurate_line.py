@@ -89,6 +89,8 @@ class ExtensionHandler(LineListener):
         line = line # type: NewLine
         if relevant_als is not None:
             tmp = line.read_alignments.merge(AlignmentStorage().addAll(relevant_als).targetAsSegment(line.asSegment()))
+            print "Prolongations of read alignments:"
+            print "\n".join(map(str, relevant_als))
             line.read_alignments.clean()
             line.read_alignments.addAll(tmp)
         new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + 1000))

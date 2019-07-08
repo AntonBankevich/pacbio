@@ -327,7 +327,8 @@ if __name__ == "__main__":
     dir = sys.argv[1]
     query = sys.argv[2]
     target = sys.argv[3]
-    aln = Aligner(dir)
+    aln = Aligner(DirDistributor(dir))
+    basic.CreateLog(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"))
     for al in aln.localAlign(ReadCollection().loadFromFasta(open(query, "r")), contigs):
         print al
