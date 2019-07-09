@@ -300,7 +300,7 @@ class LineExtender:
             else:
                 winner = c1
         else:
-            if s12 < 25 or (s12 < 40 and abs(s1 - s2) < sprint12 * 0.8) or (s12 < 100 and abs(s1 - s2) < s12 * 0.5) or abs(s1 - s2) < s12 * 0.3:
+            if s12 < 25 or (s12 < 40 and abs(s1 - s2) < s12 * 0.8) or (s12 < 100 and abs(s1 - s2) < s12 * 0.5) or abs(s1 - s2) < s12 * 0.3:
                 winner = None
             elif s1 > s2:
                 winner = c2
