@@ -155,7 +155,7 @@ def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, re
                     continue
                 else:
                     for key in lines.items.keys():
-                        if basic.parseLineName(key)[-1].startswith(line_id) and lines[key].knot is None:
+                        if str(basic.parseNegativeNumber(basic.parseLineName(key)[-1])) == line_id and lines[key].knot is None:
                             line_id = key
                             break
                     if line_id not in lines.items.keys():

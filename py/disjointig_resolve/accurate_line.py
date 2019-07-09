@@ -258,6 +258,15 @@ class NewLine(Contig):
         # type: (Iterable[AlignmentPiece]) -> None
         sys.stdout.info("Line operation Correct:", alignments)
         alignments = list(alignments)
+        new_alignments = []
+        for al in alignments:
+            if al.seg_from.Seq() == al.seg_to.Seq():
+                sys.stdout.info("Skipping trivial correction alignment", al)
+            else:
+                new_alignments.append(al)
+        if len(new_alignments) == 0:
+            sys.stdout.info("Skipping trivial correction operation")
+            return
         assert len(alignments) > 0
         correction = Correction.constructCorrection(alignments)
         self.notifyBeforeCorrect(correction)
