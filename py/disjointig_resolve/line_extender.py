@@ -111,7 +111,8 @@ class LineExtender:
         print "Expanding resolved segments:"
         records = self.collectRecords(corrected) # type: List[LineExtender.Record]
         for rec in records:
-            print rec.line, rec.correct, rec.resolved
+            print "Record:", rec.line, rec.correct, rec.resolved
+            print "Reads from record:"
             for al in rec:
                 print al, al.seg_from.contig.alignments
         # Update resolved segments on all relevant contig positions
@@ -299,7 +300,7 @@ class LineExtender:
             else:
                 winner = c1
         else:
-            if s12 < 25 or (s12 < 40 and abs(s1 - s2) < s12 * 0.8) or (s12 < 100 and abs(s1 - s2) < s12 * 0.5) or abs(s1 - s2) < s12 * 0.3:
+            if s12 < 25 or (s12 < 40 and abs(s1 - s2) < sprint12 * 0.8) or (s12 < 100 and abs(s1 - s2) < s12 * 0.5) or abs(s1 - s2) < s12 * 0.3:
                 winner = None
             elif s1 > s2:
                 winner = c2
@@ -496,8 +497,10 @@ class LineExtender:
                 else:
                     break
         if len(bad_reads) < 3:
+            print "No resolved bound for", rec.resolved
             return len(rec.line)
         else:
+            print "Resolved bound for", rec.resolved, ":", bad_reads[0].seg_to.left
             return bad_reads[0].seg_to.left
 
     def attemptProlongResolved(self, rec):
@@ -514,12 +517,13 @@ class LineExtender:
         bound = min(rec.correct.right, rec.next_resolved_start + params.k - 1, bound0)
         res = rec.resolved.right
         if bound > rec.resolved.right:
-            # print "Prolonging resolved"
+            print "Checking resolved bound against known copies"
             candidates = self.segmentsWithGoodCopies(rec.line.segment(max(0, rec.resolved.right - sz), bound), sz)
-            # print "Candidates:", candidates
+            print "Candidates:", candidates
             for candidate in candidates:
                 if candidate.left == rec.resolved.right - sz and candidate.right > rec.resolved.right:
                     res = candidate.right
+        print "Resolved bound for", rec.resolved, ":", res
         return res
 
     # TODO: filter chimeric reads
@@ -561,8 +565,9 @@ class LineExtender:
                 matching = al.matchingSequence()
                 # print line, incorrect
                 for seg1 in incorrect:
-                    segs.add(matching.mapSegDown(seg.contig, seg1))
-                    # print "incorrect", segs
+                    seg2 = matching.mapSegDown(seg.contig, seg1)
+                    segs.add(seg2)
+                    print "Relevant segment alignment:", seg1, seg2
         segs.mergeSegments()
         # print "incorrect", segs
         return list(segs.reverse().reduce(seg).filterBySize(min=inter_size))
