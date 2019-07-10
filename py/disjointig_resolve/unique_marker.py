@@ -77,11 +77,13 @@ class UniqueMarker:
         print "out:", out
         segs1 = inc.orderedCap(out)
         print "segs1:", segs1
+        print "Line alignments:"
         line_als = AlignmentStorage().addAll(dot_plot.allInter(line.asSegment()))
         print "als:", line_als
         segs2 = line_als.filterByCoverage(1, 2)
         print "segs2:", segs2
-        segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
+        # segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
+        segs = segs1.expand(params.k / 2).filterBySize(min = params.k)
         line.cleanReadAlignments()
         line.read_alignments.clean()
         all = 0
