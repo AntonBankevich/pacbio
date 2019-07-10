@@ -107,8 +107,14 @@ class NewLineStorage(ContigStorage):
         storage.add(alignment)
         if alignment.seg_from.right < len(line1):
             line1.cutRight(alignment.seg_from.right)
+            print "Cut right"
+            print list(storage.content)[0]
+            print "\n".join(list(storage.content)[0].asMatchingStrings())
         if alignment.seg_to.left > 0:
             line2.rc.cutRight(len(line2) - alignment.seg_to.left)
+            print "Cut left"
+            print list(storage.content)[0]
+            print "\n".join(list(storage.content)[0].asMatchingStrings())
         alignment = list(storage.content)[0] # type: AlignmentPiece
         line2.removeListener(storage)
         line1.removeListener(storage.reverse)
@@ -116,7 +122,9 @@ class NewLineStorage(ContigStorage):
         # Making sure line sequences match on the overlap
         new_seq = Contig(line1.asSegment().prefix(pos=alignment.seg_from.left).Seq() + line2.seq, "new_seq")
         al2 = AlignmentPiece.Identical(line2.asSegment(), new_seq.asSegment().suffix(length=len(line2)))
+        print "Al2:", al2
         alignment = alignment.compose(al2).reverse()
+        print "Composed alignment", alignment
         assert alignment.seg_to.right == len(line1)
         assert alignment.seg_from.left == al2.seg_to.left
         line1.correctSequence([alignment])

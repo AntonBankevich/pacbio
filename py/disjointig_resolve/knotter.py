@@ -109,6 +109,8 @@ class LineMerger:
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)
+            print "Polished alignment:", line_alignment
+            print "\n".join(line_alignment.asMatchingStrings())
             if line == other:
                 gap = -line_alignment.rc.seg_from.right - line_alignment.seg_to.left + line.correct_segments[0].left + line.rc.correct_segments[0].left
                 assert gap <= 0
