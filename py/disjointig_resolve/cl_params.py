@@ -21,8 +21,9 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats clean flye-dir= graph= focus= nofocus output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats clean min-cov= flye-dir= graph= focus= nofocus output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:h"
+        self.min_cov = 0
         self.stats = False
         self.new_disjointigs = False
         self.focus = None
@@ -72,6 +73,8 @@ class Params:
                 self.reads_file = value
             elif key == "--contigs":
                 self.contigs_file = value
+            elif key == "--min-cov":
+                self.min_cov = float(value)
             elif key == "--disjointigs":
                 self.disjointigs_file_list.append(value)
                 self.new_disjointigs = True

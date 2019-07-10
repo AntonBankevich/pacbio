@@ -107,7 +107,7 @@ def main(args):
 
         reads = CreateReadColection(cl_params.reads_file)
 
-        contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, aligner, polisher, reads)
+        contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads)
 
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
