@@ -11,6 +11,7 @@ from common import params
 from common.alignment_storage import ReadCollection, AlignmentPiece
 from common.dot_parser import DotParser
 from common.sequences import ContigCollection, ContigStorage, Contig
+from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger

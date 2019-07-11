@@ -89,6 +89,8 @@ class LineExtender:
             seg_to_resolve = line.completely_resolved.find(bound.suffix(), params.k)
             if seg_to_resolve is None:
                 break
+            if line.knot is not None and seg_to_resolve.right == len(line):
+                break
             result = self.attemptCleanResolution(seg_to_resolve)
             total = sum([len(arr) for seg, arr in result])
             new_recruits += total
@@ -244,6 +246,7 @@ class LineExtender:
                 correct_segments.append(new_copy)
                 read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
             else:
+                print "Warning: alignment of resolved segment to uncorrected segment"
                 print ltl, new_copy, line.correct_segments
         read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.id)
         print "Potential alignments:", read_alignments
@@ -335,6 +338,7 @@ class LineExtender:
         # type: (NewLine) -> bool
         print "Attempting to extend:", line
         if line.knot is not None:
+            print "Blocked by knot"
             return False
         relevant_reads = list(line.read_alignments.allInter(line.asSegment().suffix(length=min(1000, len(line)))))
         print "Relevent reads for extending", relevant_reads
@@ -559,9 +563,10 @@ class LineExtender:
         als = [al for al in self.dot_plot.allInter(seg) if al.seg_from.left > 20 or al.rc.seg_to.left > 20 or al.isIdentical()]
         segs = SegmentStorage()
         for al in als:
-            if len(al.seg_to) >= inter_size:
-                line = al.seg_from.contig # type: NewLine
-                incorrect = line.correct_segments.reverse().reduce(al.seg_from)
+            line = al.seg_from.contig # type: NewLine
+            if len(al.seg_to) >= inter_size and al.seg_from.right > line.initial[0].seg_to.left:
+                cap = al.seg_from.cap(line.suffix(pos=line.initial[0].seg_to.left))
+                incorrect = line.correct_segments.reverse().reduce(cap)
                 matching = al.matchingSequence()
                 # print line, incorrect
                 for seg1 in incorrect:

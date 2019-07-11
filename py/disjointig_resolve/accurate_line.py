@@ -177,7 +177,6 @@ class NewLine(Contig):
             if len(alDL.seg_to) < params.k:
                 continue
             # print "Using disjointig alignment", alDL
-            dt = alDL.seg_from.contig # type: Disjointig
             reduced = alDL.reduce(target=seg)
             dt = alDL.seg_from.contig # type: Disjointig
             cnt = 0

@@ -120,6 +120,10 @@ class UniqueMarker:
         sys.stdout.info("Marking unique regions in lines")
         for line in lines.unique():
             self.markUniqueInLine(line, dot_plot)
+        for line in lines.unique():  # type:NewLine
+            line.initial.clean()
+            for seg in line.completely_resolved:
+                line.initial.add(AlignmentPiece.Identical(seg.asContig().asSegment(), seg))
 
     def medianCoverage(self, covs, line):
         clen = 0
