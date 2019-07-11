@@ -255,7 +255,7 @@ class Aligner:
             seq_to = ref_storage[rec.tname]
             tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
             if tmp is not None:
-                if tmp.indelLength * 8 > tmp.matchingPositionsCount:
+                if not mode == "overlap" and tmp.indelLength * 8 > tmp.matchingPositionsCount:
                     for al in tmp.split():
                         als.append(al)
                 else:
