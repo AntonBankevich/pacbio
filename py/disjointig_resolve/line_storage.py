@@ -110,11 +110,13 @@ class NewLineStorage(ContigStorage):
             print "Cut right"
             print list(storage.content)[0]
             print "\n".join(list(storage.content)[0].asMatchingStrings())
+            print list(storage.content)[0].cigar
         if alignment.seg_to.left > 0:
             line2.rc.cutRight(len(line2) - alignment.seg_to.left)
             print "Cut left"
             print list(storage.content)[0]
             print "\n".join(list(storage.content)[0].asMatchingStrings())
+            print list(storage.content)[0].cigar
         alignment = list(storage.content)[0] # type: AlignmentPiece
         line2.removeListener(storage)
         line1.removeListener(storage.reverse)
@@ -125,6 +127,8 @@ class NewLineStorage(ContigStorage):
         print "Al2:", al2
         alignment = alignment.compose(al2).reverse()
         print "Composed alignment", alignment
+        print "\n".join(alignment.asMatchingStrings())
+        print alignment.cigar
         assert alignment.seg_to.right == len(line1)
         assert alignment.seg_from.left == al2.seg_to.left
         line1.correctSequence([alignment])
