@@ -98,6 +98,7 @@ class LineMerger:
             line_alignment = final[2][0].al1.composeTargetDifference(final[2][0].al2)
             print "Alignment:", line_alignment
             print "\n".join(line_alignment.asMatchingStrings())
+            print line_alignment.cigar
             print list(self.dot_plot.getAlignmentsToFrom(other, line))
             tmp = None
             if final[0] < -params.k - 200:
@@ -111,6 +112,7 @@ class LineMerger:
             line_alignment = Scorer().polyshAlignment(line_alignment)
             print "Polished alignment:", line_alignment
             print "\n".join(line_alignment.asMatchingStrings())
+            print line_alignment.cigar
             if line == other:
                 gap = -line_alignment.rc.seg_from.right - line_alignment.seg_to.left + line.correct_segments[0].left + line.rc.correct_segments[0].left
                 assert gap <= 0
