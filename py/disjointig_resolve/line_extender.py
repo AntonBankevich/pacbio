@@ -121,13 +121,17 @@ class LineExtender:
         self.updateResolved(records)
 
     def updateResolved(self, records):
-        # type: (List[Record]) -> None
+        # type: (List[LineExtender.Record]) -> None
         ok = True
         while ok:
+            print "Good reads:"
+            rec = records[0] # type: LineExtender.Record
+            for read_name in rec.good_reads:
+                print read_name, rec.read_bounds[read_name]
             ok = False
             for rec in records:
                 if self.attemptProlongResolved(rec):
-                    print "Prolonged resolved", rec.line, rec.line.initial, rec.resolved, rec.line.completely_resolved
+                    print "Finished prolonging resolved:", rec.line, rec.line.initial, rec.resolved, rec.line.completely_resolved
                     ok = True
             if not ok:
                 for rec in records: # type:LineExtender.Record
@@ -143,7 +147,7 @@ class LineExtender:
 
     def collectRecords(self, corrected):
         # type: (List[Segment]) -> List[LineExtender.Record]
-        print "Collcting records", corrected
+        print "Collecting records", corrected
         read_bounds = dict()
         records = dict()  # type: Dict[Segment, LineExtender.Record]
         good_reads = set()
@@ -436,17 +440,17 @@ class LineExtender:
             res = []
             while len(res) < num and len(self.reads) > 0 and self.reads[-1].seg_to.left < right:
                 al = self.reads.pop()
-                necessary_contig_support = min(len(al.seg_from.contig), al.seg_from.left + params.k * 3 / 2)
+                necessary_contig_support = min(len(al.seg_from.contig), al.seg_from.left + params.k + 100)
                 if al.seg_from.contig.id not in self.good_reads or necessary_contig_support > self.read_bounds[al.seg_from.contig.id]:
                     popped.append(al)
                     if len(al.seg_to) >= min_inter:
                         res.append(al)
-            self.reads.extend(popped)
+            self.reads.extend(popped[::-1])
             return res
 
         def __iter__(self):
             for al in self.reads[::-1]:
-                necessary_contig_support = min(len(al.seg_from.contig), al.seg_from.left + params.k * 3 / 2)
+                necessary_contig_support = min(len(al.seg_from.contig), al.seg_from.left + params.k + 100)
                 if al.seg_from.contig.id not in self.good_reads or necessary_contig_support > self.read_bounds[al.seg_from.contig.id]:
                     yield al
 
@@ -455,11 +459,15 @@ class LineExtender:
             while len(self.reads) > 0 and self.reads[-1].seg_to.left <= self.resolved.right - params.k:
                 al = self.reads.pop()
                 if al.seg_to.interSize(self.resolved) >= params.k:
-                    self.good_reads.add(al.seg_from.contig.id)
+                    if al.seg_from.contig.id not in self.good_reads:
+                        print "New good read:", al
+                        self.good_reads.add(al.seg_from.contig.id)
             while len(self.potential_good) > 0 and self.potential_good[-1].seg_to.left <= self.resolved.right - params.k:
                 al = self.potential_good.pop()
                 if al.seg_to.interSize(self.resolved) >= params.k:
-                    self.good_reads.add(al.seg_from.contig.id)
+                    if al.seg_from.contig.id not in self.good_reads:
+                        print "New good read from potential:", al
+                        self.good_reads.add(al.seg_from.contig.id)
 
         def pop(self):
             return self.reads.pop()
@@ -505,14 +513,17 @@ class LineExtender:
             return len(rec.line)
         else:
             print "Resolved bound for", rec.resolved, ":", bad_reads[0].seg_to.left
+            print "Bound caused by read alignments:", map(str, bad_reads)
             return bad_reads[0].seg_to.left
 
     def attemptProlongResolved(self, rec):
         # type: (Record) -> bool
-        # print "Walking", rec.resolved, rec.line
+        print "Werking on prolonging", rec.resolved
         res = self.findAndFilterResolvedBound(rec, params.k)
         if res <= rec.resolved.right:
+            print "No luck with", rec.resolved
             return False
+        print "Prolonged", rec.resolved, "to", res
         rec.setResolved(rec.resolved.contig.segment(rec.resolved.left, res))
         return True
 
