@@ -422,6 +422,15 @@ class AlignmentPiece:
         cur_tar = self.seg_to.left
         for n, c in easy_cigar.CigarToList(self.cigar):
             if c == 'M':
+                if cur_query + n > len(self.seg_from.contig) or cur_tar + n > len(self.seg_to.contig):
+                    print "Incorrect blocking result"
+                    print self.seg_from
+                    print self.seg_to
+                    print self.cigar
+                    print list(self.matchingPositions(False))
+                    print cur_query, cur_tar, n
+                    print n, c
+                    assert False
                 tmp = (Segment(self.seg_from.contig, cur_query, cur_query + n), Segment(self.seg_to.contig, cur_tar, cur_tar + n))
                 yield tmp
                 # self.blocks.append(tmp)
