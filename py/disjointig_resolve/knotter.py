@@ -106,7 +106,10 @@ class LineMerger:
                     if len(list(al.matchingSequence().common(line_alignment.matchingSequence()))) > 0:
                         tmp = al
                         break
-                assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
+                if (tmp.seg_to.left < 20 and tmp.rc.seg_to.left < 20) or (tmp.seg_from.left < 20 and tmp.seg_from.right < 20):
+                    print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
+                else:
+                    assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)
