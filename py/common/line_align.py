@@ -129,8 +129,8 @@ class Scorer:
         cur_i = alignment[-1][0]
         cur_j = alignment[-1][1]
         matches = [(cur_i, cur_j)]
-        prev_i = -1
-        prev_j = - 1
+        prev_i = cur_i
+        prev_j = cur_j
         while cur_i != alignment[0][0] or cur_j != alignment[0][1]:
             cur_i, cur_j = storage.get(cur_i).get(cur_j)
             if cur_i != prev_i and cur_j != prev_j and alignment.seq_from[cur_i] == alignment.seq_to[cur_j]:
