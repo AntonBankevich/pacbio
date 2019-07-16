@@ -243,11 +243,14 @@ class LineExtender:
         line_alignments = [al.reduce(target=resolved) for al in line_alignments]
         read_alignments = [] # type: List[Tuple[AlignmentPiece, Segment]]
         correct_segments = []
+        active_segments = set()
         for ltl in line_alignments:
             line = ltl.seg_from.contig # type: NewLine
             new_copy = line.correct_segments.find(ltl.seg_from)
             if new_copy is not None and new_copy.contains(ltl.seg_from):
                 correct_segments.append(new_copy)
+                if ltl.percentIdentity() > 0.95:
+                    active_segments.add(new_copy)
                 read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
             else:
                 print "Warning: alignment of resolved segment to uncorrected segment"
@@ -285,6 +288,8 @@ class LineExtender:
             winner, seg = self.tournament(als) #type: AlignmentPiece, Segment
             print "Winner:", winner, seg
             if winner is not None:
+                if seg not in active_segments:
+                    print "Winner ignored since winning segment is too different from investigated segment"
                 line = winner.seg_to.contig # type: NewLine
                 line.addReadAlignment(winner)
                 new_recruits.append((seg, winner))
