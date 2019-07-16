@@ -259,6 +259,12 @@ class AlignmentPiece:
         for n, c in easy_cigar.CigarToList(self.cigar):
             if c == 'M':
                 for i in range(n):
+                    if cur_query > len(self.seg_from.contig) or cur_tar > len(self.seg_to.contig):
+                        print self.seg_from, self.seg_to
+                        print cur_query, cur_tar
+                        print self.cigar
+                        print n, c
+                        assert False
                     if not equalOnly or self.seg_from.contig[cur_query] == self.seg_to.contig[cur_tar]:
                         yield (cur_query, cur_tar)
                     cur_tar += 1
@@ -427,9 +433,11 @@ class AlignmentPiece:
                     print self.seg_from
                     print self.seg_to
                     print self.cigar
-                    print list(self.matchingPositions(False))
                     print cur_query, cur_tar, n
                     print n, c
+                    print "Matching positions"
+                    for pos1, pos2 in self.matchingPositions(False):
+                        print pos1, pos2
                     assert False
                 tmp = (Segment(self.seg_from.contig, cur_query, cur_query + n), Segment(self.seg_to.contig, cur_tar, cur_tar + n))
                 yield tmp
