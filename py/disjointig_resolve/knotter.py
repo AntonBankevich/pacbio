@@ -115,6 +115,8 @@ class LineMerger:
                     print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
                 else:
                     assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
+            print "Switched to line alignment:", tmp
+            line_alignment = tmp
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)
