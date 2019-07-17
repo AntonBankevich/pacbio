@@ -64,9 +64,14 @@ class LineMerger:
         final_candidates = []
         for other_line, iter in itertools.groupby(candidates, lambda rec: rec.other): # type: NewLine, Iterator[LineMerger.Record]
             recs = list(iter)
-            if (recs[-1].gap - recs[0].gap) > min(100, abs(recs[-1].gap) / 8):
+            if recs[-1].gap - recs[0].gap > min(100, abs(recs[-1].gap) / 8):
                 print "\n".join(map(str, candidates))
-                assert False, "Ambiguous knotting to the same line" + str(recs[0])
+                print "WARNING: Ambiguous knotting to the same line"
+                if len(recs) >= 5 and recs[-2].gap - recs[1].gap < min(10, abs(recs[-2].gap) / 10):
+                    recs = recs[1:-1]
+                else:
+                    return None
+                # assert False, "Ambiguous knotting to the same line" + str(recs[0])
             avg = sum([rec.gap for rec in recs]) / len(recs)
             final_candidates.append((avg, recs[0].other, recs))
         if len(final_candidates) == 0:
