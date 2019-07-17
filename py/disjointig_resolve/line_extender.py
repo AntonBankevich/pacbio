@@ -290,9 +290,10 @@ class LineExtender:
             if winner is not None:
                 if seg not in active_segments:
                     print "Winner ignored since winning segment is too different from investigated segment"
-                line = winner.seg_to.contig # type: NewLine
-                line.addReadAlignment(winner)
-                new_recruits.append((seg, winner))
+                else:
+                    line = winner.seg_to.contig # type: NewLine
+                    line.addReadAlignment(winner)
+                    new_recruits.append((seg, winner))
         new_recruits = sorted(new_recruits, key = lambda rec: (rec[0].contig.id, rec[0].left, rec[0].right))
         # print "New recruits:"
         # print new_recruits
