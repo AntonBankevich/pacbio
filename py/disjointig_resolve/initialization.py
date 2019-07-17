@@ -20,11 +20,13 @@ from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.unique_marker import UniqueMarker
 
 
-def CreateLineCollection(aligner, contigs, disjointigs, reads):
+def CreateLineCollection(aligner, contigs, disjointigs, reads, split):
     sys.stdout.info("Creating line collection")
     lines = NewLineStorage(disjointigs, aligner)
-    # lines.fillFromContigs(contigs)
-    lines.splitFromContigs(contigs)
+    if split:
+        lines.splitFromContigs(contigs)
+    else:
+        lines.fillFromContigs(contigs)
     lines.alignDisjointigs()
     # lines.fillFromDisjointigs()
     sys.stdout.info("Constructing line dot plot")

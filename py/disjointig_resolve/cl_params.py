@@ -21,12 +21,13 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats clean min-cov= flye-dir= graph= focus= nofocus output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats clean min-cov= nosplit flye-dir= graph= focus= nofocus output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:h"
         self.min_cov = 0
         self.stats = False
         self.new_disjointigs = False
         self.focus = None
+        self.split = True
 
     def check(self):
         if self.dir is None:
@@ -65,6 +66,8 @@ class Params:
                 # self.disjointigs_file = os.path.join(self.flye_dir, "0-assembly", "draft_assembly.fasta")
             elif key == "--stats":
                 self.stats = True
+            elif key == "--nosplit":
+                self.split = False
             elif key == "--clean":
                 params.clean = True
             elif key == "--graph":
