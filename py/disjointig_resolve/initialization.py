@@ -37,6 +37,26 @@ def CreateLineCollection(aligner, contigs, disjointigs, reads, split):
     UniqueMarker(aligner).markAllUnique(lines, dot_plot, reads)
     for line in lines.unique():
         print line, line.completely_resolved
+    if not split:
+        line_list = list(lines.unique()) # type: List[NewLine]
+        while len(line_list) > 0:
+            line = line_list.pop()
+            if len(line.completely_resolved) > 1:
+                left = line.completely_resolved[1].left
+                right = line.completely_resolved[0].right
+                if left >= right:
+                    right = left + 1
+                line1, line2 = lines.splitLine(line.segment(left, right))
+                line_list.extend([line1, line2])
+            elif len(line.completely_resolved[0]) > 40000:
+                line1, line2 = lines.splitLine(line.completely_resolved[0].prefix(length=1000))
+                line2, line3 = lines.splitLine(line2.completely_resolved[0].suffix(length=1000))
+                line1.tie(line2, -1000, "")
+                line2.tie(line3, -1000, "")
+        line_list = sorted(lines.unique(), key = lambda line: line.id)
+        print "Final list of lines:"
+        for line in line_list:
+            print line, line.completely_resolved
     sys.stdout.info("Updating sequences and resolved segments.")
     knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
     extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
