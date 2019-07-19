@@ -106,7 +106,7 @@ class LineMerger:
             print line_alignment.cigar
             print list(self.dot_plot.getAlignmentsToFrom(other, line))
             tmp = None
-            if final[0] < -params.k - 200:
+            if final[0] < -params.k - 100:
                 for al in self.dot_plot.getAlignmentsToFrom(other, line):
                     if len(list(al.matchingSequence().common(line_alignment.matchingSequence()))) > 0:
                         tmp = al
@@ -115,8 +115,8 @@ class LineMerger:
                     print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
                 else:
                     assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
-            print "Switched to line alignment:", tmp
-            line_alignment = tmp
+                print "Switched to line alignment:", tmp
+                line_alignment = tmp
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment)

@@ -11,7 +11,7 @@ from common.sequences import Segment, ContigCollection, Contig, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
-from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener
+from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener, ReadAlignmentStorage
 
 
 class ReadAlignmentListener(LineListener):
@@ -114,7 +114,7 @@ class NewLine(Contig):
             self.correct_segments = SegmentStorage()
             self.completely_resolved = SegmentStorage()
             self.disjointig_alignments = AlignmentStorage()
-            self.read_alignments = AlignmentStorage()
+            self.read_alignments = ReadAlignmentStorage()
             self.listeners = [self.initial, self.correct_segments, self.completely_resolved, self.disjointig_alignments, self.read_alignments, extension_handler] # type: List[LineListener]
             rc = NewLine(basic.RC(seq), basic.Reverse(self.id), extension_handler.rc, self) #type: NewLine
             self.rc = rc

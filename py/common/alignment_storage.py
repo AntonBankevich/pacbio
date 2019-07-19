@@ -977,6 +977,22 @@ class AlignedRead(Contig):
         len = min(len, self.__len__())
         return Segment(self, 0, len)
 
+    def replaceAlignment(self, old_al, new_al):
+        if new_al is None:
+            self.removeAlignment(old_al)
+            return
+        for i, al in enumerate(self.alignments):
+            if al == old_al:
+                self.alignments[i] = new_al
+        for i, al in enumerate(self.rc.alignments):
+            if al == old_al.rc:
+                self.rc.alignments[i] = new_al.rc
+
+    def removeAlignment(self, al):
+        self.alignments = [al1 for al1 in self.alignments if al1 != al]
+        alrc = al.rc
+        self.rc.alignments = [al1 for al1 in self.rc.alignments if al1 != alrc]
+
 
 class ReadCollection:
     def __init__(self, reads=None):

@@ -4,7 +4,7 @@ import sys
 from typing import Optional, Iterator, List, Any, Iterable, Generator, Tuple, Callable
 
 from common import params
-from common.alignment_storage import AlignmentPiece
+from common.alignment_storage import AlignmentPiece, AlignedRead
 from disjointig_resolve.correction import Correction
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
@@ -435,6 +435,33 @@ class AlignmentStorage(SmartStorage):
         else:
             self.rc.add(al.rc)
 
+    def addAndMergeRight(self, al):
+        # type: (AlignmentPiece) -> None
+        if self.isCanonical():
+            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
+                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left <= al.seg_from.left:
+                    tmp = AlignmentPiece.MergeOverlappingAlignments([al1, al])
+                    if tmp is not None:
+                        self.items[i] = tmp
+                        return
+            self.add(al)
+
+        else:
+            self.rc.addAndMergeLeft(al.rc)
+
+    def addAndMergeLeft(self, al):
+        # type: (AlignmentPiece) -> None
+        if self.isCanonical():
+            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
+                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left >= al.seg_from.left:
+                    tmp = AlignmentPiece.MergeOverlappingAlignments([al, al1])
+                    if tmp is not None:
+                        self.items[i] = tmp
+                        return
+            self.add(al)
+        else:
+            self.rc.addAndMergeRight(al.rc)
+
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (accurate_line.NewLine, Contig, str) -> None
         self.makeCanonical()
@@ -529,33 +556,6 @@ class AlignmentStorage(SmartStorage):
         for al in self:
             res.add(al.reverse())
         return res
-
-    def addAndMergeRight(self, al):
-        # type: (AlignmentPiece) -> None
-        if self.isCanonical():
-            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
-                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left <= al.seg_from.left:
-                    tmp = AlignmentPiece.MergeOverlappingAlignments([al1, al])
-                    if tmp is not None:
-                        self.items[i] = tmp
-                        return
-            self.add(al)
-
-        else:
-            self.rc.addAndMergeLeft(al.rc)
-
-    def addAndMergeLeft(self, al):
-        # type: (AlignmentPiece) -> None
-        if self.isCanonical():
-            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
-                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left >= al.seg_from.left:
-                    tmp = AlignmentPiece.MergeOverlappingAlignments([al, al1])
-                    if tmp is not None:
-                        self.items[i] = tmp
-                        return
-            self.add(al)
-        else:
-            self.rc.addAndMergeRight(al.rc)
 
     # This works in square time in worst case bu should work fast if alignments are to left and right sides of the contig
     def merge(self, other):
@@ -692,5 +692,103 @@ class AlignmentStorage(SmartStorage):
     def filter(self, condition):
         # type: (Callable[[AlignmentPiece], bool]) -> AlignmentStorage
         return AlignmentStorage().addAll(filter(condition, self))
+
+class ReadAlignmentStorage(AlignmentStorage):
+    def __init__(self, rc=None):
+        # type: (Optional[ReadAlignmentStorage]) -> None
+        items = None  # type: List[AlignmentPiece]
+        if rc is None:
+            rc = ReadAlignmentStorage(self)
+            items = []
+        AlignmentStorage.__init__(self, rc)
+        self.items = items # type: List[AlignmentPiece]
+        self.rc = rc # type: ReadAlignmentStorage
+
+    def add(self, al):
+        if self.isCanonical():
+            self.items.append(al)
+            read = al.seg_from.contig #type: AlignedRead
+            read.addAlignment(al)
+            self.sorted = False
+        else:
+            self.rc.add(al.rc)
+
+    def addAndMergeRight(self, al):
+        # type: (AlignmentPiece) -> None
+        if self.isCanonical():
+            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
+                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left <= al.seg_from.left:
+                    tmp = AlignmentPiece.MergeOverlappingAlignments([al1, al])
+                    if tmp is not None:
+                        read = al.seg_from.contig #type: AlignedRead
+                        read.replaceAlignment(self.items[i], al)
+                        self.items[i] = tmp
+                        return
+            self.add(al)
+
+        else:
+            self.rc.addAndMergeLeft(al.rc)
+
+    def addAndMergeLeft(self, al):
+        # type: (AlignmentPiece) -> None
+        if self.isCanonical():
+            for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
+                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left >= al.seg_from.left:
+                    tmp = AlignmentPiece.MergeOverlappingAlignments([al, al1])
+                    if tmp is not None:
+                        read = al.seg_from.contig #type: AlignedRead
+                        read.replaceAlignment(self.items[i], al)
+                        self.items[i] = tmp
+                        return
+            self.add(al)
+        else:
+            self.rc.addAndMergeRight(al.rc)
+
+    def replaceAlignments(self, als):
+        self.makeCanonical()
+        for al1, al2 in zip(self.items, als):
+            read = al1.seg_from.contig # type: AlignedRead
+            read.replaceAlignment(al1, al2)
+        self.items = filter(lambda al: al is not None, als)
+
+    def fireBeforeExtendRight(self, line, new_seq, seq):
+        # type: (accurate_line.NewLine, Contig, str) -> None
+        self.makeCanonical()
+        self.replaceAlignments([al.targetAsSegment(Segment(new_seq, 0, len(line))) for al in self])
+
+    def fireAfterExtendRight(self, line, seq, relevant_als = None):
+        # type: (accurate_line.NewLine, str, Optional[List[AlignmentPiece]]) -> None
+        self.makeCanonical()
+        self.replaceAlignments([al.targetAsSegment(line.asSegment()) for al in self.items])
+
+    def fireBeforeCutRight(self, line, new_seq, pos):
+        # type: (accurate_line.NewLine, Contig, int) -> None
+        self.makeCanonical()
+        new_items = []
+        for al in self.items: # type: AlignmentPiece
+            if al.seg_to.right <= pos:
+                new_items.append(al.changeTargetContig(new_seq))
+            elif al.seg_to.left <= pos - params.k:
+                new_items.append(al.reduce(target=Segment(line, line.left(), pos)).changeTargetContig(new_seq))
+            else:
+                new_items.append(None)
+        self.replaceAlignments(new_items)
+
+    def fireAfterCutRight(self, line, pos):
+        # type: (accurate_line.NewLine, int) -> None
+        self.makeCanonical()
+        self.replaceAlignments([al.changeTargetContig(line) for al in self.items])
+
+    # alignments from new sequence to new sequence
+    def fireBeforeCorrect(self, correction):
+        # type: (Correction) -> None
+        self.makeCanonical()
+        self.replaceAlignments(correction.composeQueryDifferences(self.items))
+
+    def fireAfterCorrect(self, line):
+        # type: (accurate_line.NewLine) -> None
+        self.makeCanonical()
+        assert len(self) == 0 or len(self.items[0].seg_to.contig) == len(line), str([self.items[0].seg_to.contig, line])
+        self.replaceAlignments([al.targetAsSegment(line.asSegment()) for al in self.items])
 
 
