@@ -978,6 +978,7 @@ class AlignedRead(Contig):
         return Segment(self, 0, len)
 
     def replaceAlignment(self, old_al, new_al):
+        # type: (AlignmentPiece, AlignmentPiece) -> None
         if new_al is None:
             self.removeAlignment(old_al)
             return
@@ -989,6 +990,7 @@ class AlignedRead(Contig):
                 self.rc.alignments[i] = new_al.rc
 
     def removeAlignment(self, al):
+        # type: (AlignmentPiece) -> None
         self.alignments = [al1 for al1 in self.alignments if al1 != al]
         alrc = al.rc
         self.rc.alignments = [al1 for al1 in self.rc.alignments if al1 != alrc]

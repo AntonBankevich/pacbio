@@ -92,35 +92,37 @@ class Correction:
     def composeQueryDifferences(self, als):
         # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
         # TODO: make parallel
-        als = sorted(als, key = lambda al: al.seg_to.left)
+        order = sorted(range(len(als)), key = lambda i: als[i].seg_to.left)
         # Sorting alignments into those that intersect corrections (complex) and those that do not (easy)
-        easy = []
-        complex = []
+        easy = [] # type: List[int]
+        complex = [] # type: List[int]
         cur = 0
         for al in self.alignments:
-            while cur < len(als) and als[cur].seg_to.left < al.seg_to.left:
-                if als[cur].seg_to.right >= al.seg_to.left:
-                    complex.append(als[cur])
+            while cur < len(als) and als[order[cur]].seg_to.left < al.seg_to.left:
+                if als[order[cur]].seg_to.right >= al.seg_to.left:
+                    complex.append(order[cur])
                 else:
-                    easy.append(als[cur])
+                    easy.append(order[cur])
                 cur += 1
-            while cur < len(als) and als[cur].seg_to.left < al.seg_to.right:
-                complex.append(als[cur])
+            while cur < len(als) and als[order[cur]].seg_to.left < al.seg_to.right:
+                complex.append(order[cur])
                 cur += 1
-        easy.extend(als[cur:])
+        while cur < len(als):
+            easy.append(order[cur])
 
-        res = []
+        res = [None] * len(als) # type: List[AlignmentPiece]
         # Mapping alignments that do not intersect corrections
-        new_easy_segs = self.mapSegmentsUp([al.seg_to for al in easy])
-        for seg, al in zip(new_easy_segs, easy):
-            res.append(al.changeTargetSegment(seg))
+        new_easy_segs = self.mapSegmentsUp([als[i].seg_to for i in easy])
+        for seg, i in zip(new_easy_segs, easy):
+            res[i] = als[i].changeTargetSegment(seg)
         # Mapping alignments that intersect corrections
         func = lambda items: self.mapPositionsUp(items, True)
-        matchings = [al.matchingSequence(True) for al in complex]
+        matchings = [als[i].matchingSequence(True) for i in complex]
         positions = map(lambda matching: map(lambda pair: pair[1], matching), matchings)
         generator = self.continuousMapping(func, itertools.chain.from_iterable(positions))
         # TODO: parallel
-        for al, matching in zip(complex, matchings):
+        for i, matching in zip(complex, matchings):
+            al = als[i]
             new_pairs = []
             for pos_from, pos_to in matching.matches:
                 new_pos = generator.next()
@@ -129,8 +131,8 @@ class Correction:
                     new_pairs.append((pos_from, new_pos))
             new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
             corrected_matching = self.scorer.polyshMatching(new_matching)
-            res.append(corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from))
-        return sorted(res, key = lambda al: al.seg_to.left)
+            res[i] = corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from)
+        return res
 
 
     @staticmethod
