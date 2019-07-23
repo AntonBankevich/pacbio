@@ -1,9 +1,10 @@
-from typing import Dict, List, Iterator, Optional, Iterable, BinaryIO, Tuple
+from typing import Dict, List, Iterator, Optional, Iterable, BinaryIO, Tuple, Generator
 
 from alignment.align_tools import Aligner
 from common import SeqIO, params, basic
 from common.alignment_storage import AlignmentPiece, ReadCollection
 from common.save_load import TokenWriter, TokenReader
+from common.seq_records import NamedSequence
 from common.sequences import ContigStorage, UniqueList, Contig, ContigCollection, Segment
 from disjointig_resolve.accurate_line import NewLine, ExtensionHandler, Knot
 from disjointig_resolve.disjointigs import DisjointigCollection
@@ -73,7 +74,7 @@ class NewLineStorage(ContigStorage):
                 line2 = self.addNew(contig.seq[-cut_size:], contig.id + "r")
                 line1.initial.add(AlignmentPiece.Identical(contig.asSegment().prefix(length=cut_size), line1.asSegment()))
                 line2.initial.add(AlignmentPiece.Identical(contig.asSegment().suffix(length=cut_size), line2.asSegment()))
-                line1.tie(line2, 0, "")
+                line1.tie(line2, len(contig) - 2 * cut_size, contig.seq[cut_size:-cut_size])
             else:
                 line = self.addNew(contig.seq, contig.id)
                 line.initial.add(AlignmentPiece.Identical(contig.asSegment(), contig.asSegment()))
@@ -211,6 +212,46 @@ class NewLineStorage(ContigStorage):
         # type: (BinaryIO) -> None
         for line in UniqueList(self.items.values()):
             SeqIO.write(line, handler, "fasta")
+
+    def printKnottedToFasta(self, handler):
+        # type: (BinaryIO) -> None
+        for chain in self.chains():
+            seq = []
+            id = []
+            if chain[-1].knot is not None:
+                id.append("Circular")
+            for line in chain:
+                id.append(line.id)
+                if line.knot is not None:
+                    id.append(line.knot.gap)
+                    if line.knot.gap < 0:
+                        seq.append(line.seq[:line.knot.gap])
+                    else:
+                        seq.append(line.seq)
+                        seq.append(line.knot.gap_seq)
+                else:
+                    seq.append(line.seq)
+            SeqIO.write(NamedSequence("".join(seq), ";".join(id)), handler, "fasta")
+
+    def chains(self):
+        # type: () -> Generator[List[NewLine]]
+        printed = set()
+        for line in self.items.values():
+            if line.id in printed or line.rc.knot is not None:
+                continue
+            res = [line]
+            while line.knot is not None:
+                line = line.knot.line_right
+                res.append(line)
+            yield res
+        for line in self.items.values():
+            if line.id in printed or line.rc.knot is not None:
+                continue
+            res = [line]
+            while line != res[0]:
+                line = line.knot.line_right
+                res.append(line)
+            yield res
 
     def save(self, handler):
         # type: (TokenWriter) -> None

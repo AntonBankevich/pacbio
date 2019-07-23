@@ -439,7 +439,7 @@ class AlignmentStorage(SmartStorage):
         # type: (AlignmentPiece) -> None
         if self.isCanonical():
             for i, al1 in enumerate(self.items): # type: int, AlignmentPiece
-                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.left <= al.seg_from.left:
+                if al.seg_from.inter(al1.seg_from) and al.seg_to.inter(al1.seg_to) and al1.seg_from.right <= al.seg_from.right:
                     tmp = AlignmentPiece.MergeOverlappingAlignments([al1, al])
                     if tmp is not None:
                         self.items[i] = tmp

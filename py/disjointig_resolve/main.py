@@ -135,6 +135,15 @@ def main(args):
     for line in lines:
         print line 
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
+    lines.printKnottedToFasta(open(os.path.join(cl_params.dir, "lines_knotted.fasta"), "w"))
+    print "Final result:"
+    for chain in lines.chains():
+        if chain[-1].knot is not None:
+            print "->" + "->".join([line.id for line in lines]) + "->"
+        else:
+            print "->".join([line.id for line in lines])
+
+
     # print "Disjointig alignments"
     # for line in lines
     sys.stdout.info("Finished")
