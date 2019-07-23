@@ -522,6 +522,14 @@ class AlignmentPiece:
                     return True
         return False
 
+    def analysis(self):
+        res = []
+        preva = self.seg_from.left
+        prevb = self.seg_to.left
+        for a, b in self.matchingPositions(True):
+            if a == preva:
+                continue
+
 
 
 class MatchingSequence:

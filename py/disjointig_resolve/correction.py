@@ -109,6 +109,7 @@ class Correction:
                 cur += 1
         while cur < len(als):
             easy.append(order[cur])
+            cur += 1
 
         res = [None] * len(als) # type: List[AlignmentPiece]
         # Mapping alignments that do not intersect corrections
