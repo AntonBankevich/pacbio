@@ -13,7 +13,7 @@ from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener, ReadAlignmentStorage
 
-
+# TODO: Check that it is no longer needed and remove
 class ReadAlignmentListener(LineListener):
     def __init__(self, line, rc = None):
         # type: (NewLine, Optional[ReadAlignmentListener]) -> None
@@ -293,8 +293,6 @@ class NewLine(Contig):
     def addReadAlignment(self, al):
         # type: (AlignmentPiece) -> AlignmentPiece
         self.read_alignments.add(al)
-        read = al.seg_from.contig # type: AlignedRead
-        read.addAlignment(al)
         return al
 
     def addListener(self, listener):
