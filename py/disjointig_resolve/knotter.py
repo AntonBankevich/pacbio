@@ -125,11 +125,12 @@ class LineMerger:
             print line_alignment.cigar
             if line == other:
                 gap = -line_alignment.rc.seg_from.right - line_alignment.seg_to.left + line.correct_segments[0].left + line.rc.correct_segments[0].left
-                assert gap <= 0
+                if gap > 0:
+                    print "Line is circular but not ready for completion. Skipping."
+                    return None
                 line.cutRight(line.correct_segments[-1].right)
                 line.rc.cutRight(line.rc.correct_segments[-1].right)
                 line.tie(line, gap, "")
-                line.setCircular()
                 print line, "is circular"
                 return line
             new_line = self.storage.mergeLines(line_alignment, params.k)
