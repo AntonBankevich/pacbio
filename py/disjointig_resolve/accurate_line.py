@@ -93,7 +93,7 @@ class ExtensionHandler(LineListener):
             print "\n".join(map(str, relevant_als))
             line.read_alignments.clean()
             line.read_alignments.addAll(tmp)
-        new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + 1000))
+        new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + params.k + 100))
         for al in self.aligner.dotplotAlign([new_seg.asContig()], self.disjointigs):
             al = al.reverse().targetAsSegment(new_seg)
             line.disjointig_alignments.addAndMergeRight(al)
@@ -125,7 +125,7 @@ class NewLine(Contig):
             self.correct_segments = rc.correct_segments.rc # type: SegmentStorage
             self.completely_resolved = rc.completely_resolved.rc # type: SegmentStorage
             self.disjointig_alignments = rc.disjointig_alignments.rc # type: AlignmentStorage
-            self.read_alignments = rc.read_alignments.rc # type: AlignmentStorage
+            self.read_alignments = rc.read_alignments.rc # type: ReadAlignmentStorage
             self.listeners = [listener.rc for listener in rc.listeners] # type: List[LineListener]
         Contig.__init__(self, seq, id, rc)
         self.rc = rc #type: NewLine

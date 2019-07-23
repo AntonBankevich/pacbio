@@ -791,4 +791,14 @@ class ReadAlignmentStorage(AlignmentStorage):
         assert len(self) == 0 or len(self.items[0].seg_to.contig) == len(line), str([self.items[0].seg_to.contig, line])
         self.replaceAlignments([al.targetAsSegment(line.asSegment()) for al in self.items])
 
+    def clean(self):
+        if not self.isCanonical():
+            self.rc.clean()
+        else:
+            for al in self.items:
+                read = al.seg_from.contig # type: AlignedRead
+                read.removeAlignment(al)
+            self.items = []
+
+
 
