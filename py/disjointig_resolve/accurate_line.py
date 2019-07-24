@@ -172,7 +172,7 @@ class NewLine(Contig):
     def getRelevantAlignmentsFor(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
         sys.stdout.info("Requesting read alignments for", seg)
-        print "Disjointig alignments:", list(self.disjointig_alignments.allInter(seg))
+        # print "Disjointig alignments:", list(self.disjointig_alignments.allInter(seg))
         # print "All disjointig alignments:", list(self.disjointig_alignments)
         result = []
         for alDL in self.disjointig_alignments.allInter(seg):
@@ -192,7 +192,7 @@ class NewLine(Contig):
                 #     print cnt
         sys.stdout.info("Request for read alignments for", seg, " collecting finished. Started filtering")
         result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
-        print "Unfiltered alignments:", result
+        # print "Unfiltered alignments:", result
         for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig): # type: AlignedRead, Generator[AlignmentPiece]
             readRes = []
             for al in iter:
