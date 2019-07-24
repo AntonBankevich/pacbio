@@ -12,6 +12,7 @@ from common.alignment_storage import ReadCollection, AlignmentPiece
 from common.dot_parser import DotParser
 from common.sequences import ContigCollection, ContigStorage, Contig
 from disjointig_resolve.accurate_line import NewLine
+from disjointig_resolve.analysis import CoverageAnalyser
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger
@@ -57,6 +58,9 @@ def CreateLineCollection(aligner, contigs, disjointigs, reads, split):
         print "Final list of lines:"
         for line in line_list:
             print line, line.completely_resolved
+    analyser = CoverageAnalyser(aligner, reads)
+    sys.stdout.info("Analysing k-mer coverage by reads.")
+    analyser.printAnalysis(analyser.analyseLines(lines))
     sys.stdout.info("Updating sequences and resolved segments.")
     knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
     extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
