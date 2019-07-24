@@ -364,6 +364,8 @@ class LineExtender:
         print "Extended line", line, "for", tmp
         print "Disjointigs:"
         print line.disjointig_alignments
+        print "RC Disjointigs:"
+        print line.rc.disjointig_alignments
         print "Reads:"
         print list(line.read_alignments.allInter(line.asSegment().suffix(length=min(len(line), 2000))))
         print "Sequence:"
@@ -542,7 +544,7 @@ class LineExtender:
             candidates = self.segmentsWithGoodCopies(rec.line.segment(max(0, rec.resolved.right - sz), bound), sz)
             print "Candidates:", candidates
             for candidate in candidates:
-                if candidate.left == rec.resolved.right - sz and candidate.right > rec.resolved.right:
+                if candidate.left == max(0, rec.resolved.right - sz) and candidate.right > rec.resolved.right:
                     res = candidate.right
         print "Resolved bound for", rec.resolved, ":", res
         return res

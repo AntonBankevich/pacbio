@@ -532,6 +532,14 @@ class AlignmentStorage(SmartStorage):
             for al in self.rc.allInter(seg.RC(), min_inter):
                 yield al.rc
 
+    def sort(self):
+        # type: () -> None
+        if self.isCanonical() and self.isSorted():
+            return
+        self.makeCanonical()
+        self.items = sorted(self.items, key=self.key)
+
+
     def removeInter(self, seg):
         # type: (Segment) -> None
         if not self.isCanonical():

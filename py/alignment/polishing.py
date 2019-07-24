@@ -199,9 +199,12 @@ class Polisher:
         if polished is None:
             sys.stdout.log(params.LogPriority.warning, "Warning", seg, "could not be corrected even though some reads cover it.")
             polished = seg.asContig()
-        al = self.aligner.overlapAlign([polished], ContigStorage([base])).next()
-        mapping = AlignmentPiece.Identical(base.segment(len(start), len(base) - len(end)), seg)
-        return al.compose(mapping)
+        als = list(self.aligner.overlapAlign([polished], ContigStorage([base])))
+        for al in als:
+            if al.seg_from.left < 10 and al.rc.seg_from.left < 10:
+                mapping = AlignmentPiece.Identical(base.segment(len(start), len(base) - len(end)), seg)
+                return al.compose(mapping)
+        assert False, "No alignment from polished to base: " + str(als)
 
     def polishEnd(self, als, min_cov = 4):
         # type: (List[AlignmentPiece], int) -> Tuple[Contig, List[AlignmentPiece]]

@@ -172,6 +172,8 @@ class NewLine(Contig):
     def getRelevantAlignmentsFor(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
         sys.stdout.info("Requesting read alignments for", seg)
+        print "Disjointig alignments:", list(self.disjointig_alignments.allInter(seg))
+        # print "All disjointig alignments:", list(self.disjointig_alignments)
         result = []
         for alDL in self.disjointig_alignments.allInter(seg):
             if len(alDL.seg_to) < params.k:
@@ -190,6 +192,7 @@ class NewLine(Contig):
                 #     print cnt
         sys.stdout.info("Request for read alignments for", seg, " collecting finished. Started filtering")
         result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
+        print "Unfiltered alignments:", result
         for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig): # type: AlignedRead, Generator[AlignmentPiece]
             readRes = []
             for al in iter:
@@ -268,10 +271,12 @@ class NewLine(Contig):
             return
         assert len(alignments) > 0
         correction = Correction.constructCorrection(alignments)
+        # print "Disjointigs before:", list(self.disjointig_alignments)
         self.notifyBeforeCorrect(correction)
         self.seq = correction.seq_from.seq
         self.rc.seq = basic.RC(self.seq)
         self.notifyAfterCorrect()
+        # print "Disjointigs after:", list(self.disjointig_alignments)
 
     def notifyBeforeCorrect(self, alignments):
         # type: (Correction) -> None
