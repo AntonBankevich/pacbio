@@ -346,11 +346,11 @@ class AlignmentCompositionTest(SimpleTest):
         al1 = AlignmentPiece.Identical(contig1.asSegment(), contig2.asSegment())
         al2 = AlignmentPiece.Identical(contig2.asSegment(), contig3.asSegment())
         al3 = al1.compose(al2)
-        assert str(al3) == "(c1[0:12-0]->c3[0:12-0]:0.92)"
+        assert al3.__repr__() == "(c1[0:12-0]->c3[0:12-0]:0.92)"
         assert al3.cigar == "12M"
         al4 = al1.reverse()
         al5 = al4.composeTargetDifference(al2)
-        assert str(al5) == "(c1[0:12-0]->c3[0:12-0]:0.92)"
+        assert al5.__repr__() == "(c1[0:12-0]->c3[0:12-0]:0.92)"
         assert al5.cigar == "12M"
 
 

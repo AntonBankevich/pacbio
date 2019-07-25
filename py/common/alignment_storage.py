@@ -165,21 +165,35 @@ class AlignmentPiece:
 
     def __str__(self):
         # type: () -> str
+        res = [self.__repr__()]
+        if len(self) < 20000:
+            res.append(":")
+            preva = self.seg_from.left
+            prevb = self.seg_to.left
+            cnt = 0
+            for a, b in self.matchingPositions(True):
+                cnt += 1
+                if a > preva + 100 or a == self.seg_from.right - 1:
+                    pi = max(a - preva, b - prevb) + 1 - cnt
+                    res.append(min(pi, 9))
+                    cnt = 1
+                    preva = a
+                    prevb = b
+        return "".join(map(str, res))
+
+    def __repr__(self):
         if len(self) < 20000:
             pid = self.percentIdentity()
+            if pid > 0.99:
+                spid = "%0.3f" % pid
+            else:
+                spid = "%0.2f" % pid
         else:
-            pid = 1
-        if pid > 0.99:
-            spid = "%0.3f" % pid
-        else:
-            spid = "%0.2f" % pid
+            spid = "NA"
         suffix = ""
         if self.contradicting():
             suffix = "!!!"
         return "(" + str(self.seg_from) + "->" + str(self.seg_to) + ":" + spid + suffix + ")"
-
-    def __repr__(self):
-        return self.__str__()
 
     def changeQueryContig(self, read):
         return AlignmentPiece(self.seg_from.changeContig(read), self.seg_to, self.cigar)
