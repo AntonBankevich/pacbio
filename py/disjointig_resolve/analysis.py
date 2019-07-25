@@ -48,7 +48,7 @@ class CoverageAnalyser:
                     cur_cov -= diff
                 assert cur_cov == 0
                 if prev < len(contig) - 1000 - k + 1:
-                    covs[0] += len(contig) - 1000 - k + 1 - prev
+                    covs[i][0] += len(contig) - 1000 - k + 1 - prev
         return covs
 
     def analyseLines(self, lines):

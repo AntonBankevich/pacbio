@@ -1,5 +1,6 @@
 import itertools
 import os
+import shutil
 import subprocess
 import sys
 
@@ -224,6 +225,8 @@ class Aligner:
             sys.stdout.log(params.LogPriority.alignment_files, "Alignment reused:", alignment_file)
             pass
         else:
+            if os.path.isfile(alignment_file):
+                shutil.rmtree(alignment_file)
             sys.stdout.log(params.LogPriority.alignment_files, "Performing alignment:", alignment_file)
             self.align_files(contigs_file, [reads_file], self.threads, "pacbio", mode, alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
