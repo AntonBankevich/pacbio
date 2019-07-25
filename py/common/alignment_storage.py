@@ -174,8 +174,19 @@ class AlignmentPiece:
             for a, b in self.matchingPositions(True):
                 cnt += 1
                 if a > preva + 100 or a == self.seg_from.right - 1:
-                    pi = max(a - preva, b - prevb) + 1 - cnt
-                    res.append(min(pi, 9))
+                    diff = max(a - preva, b - prevb) + 1 - cnt
+                    da = a - preva
+                    db = b - prevb
+                    if da - db > 40:
+                        res.append("I")
+                    elif da - db > 20:
+                        res.append("i")
+                    elif db - da > 40:
+                        res.append("D")
+                    elif db - da > 20:
+                        res.append("d")
+                    else:
+                        res.append(min(diff, 9))
                     cnt = 1
                     preva = a
                     prevb = b
