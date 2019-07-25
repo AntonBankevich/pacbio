@@ -35,7 +35,7 @@ class CoverageAnalyser:
                 k = 500 + i * 100
                 tmp = []
                 for seg in segs:
-                    if not seg.interSize(shrink) >= k:
+                    if seg.interSize(shrink) >= k:
                         seg = seg.cap(shrink)
                         tmp.append((seg.left, -1))
                         tmp.append((seg.right - k + 1, 1))
