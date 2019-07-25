@@ -58,12 +58,12 @@ class Params:
                 self.test = True
             elif key == "--flye-dir":
                 self.flye_dir = value
+                graph_file, contigs_file, disjointigs_file = self.parseFlyeDir(self.flye_dir)
                 if self.graph_file is None:
-                    self.graph_file = os.path.join(self.flye_dir, "assembly_graph.gv")
+                    self.graph_file = graph_file
                 if self.contigs_file is None:
-                    self.contigs_file = os.path.join(self.flye_dir, "3-polishing", "polished_edges.fasta")
-                self.disjointigs_file_list.append(os.path.join(self.flye_dir, "1-consensus", "consensus.fasta"))
-                # self.disjointigs_file = os.path.join(self.flye_dir, "0-assembly", "draft_assembly.fasta")
+                    self.contigs_file = contigs_file
+                self.disjointigs_file_list.append(disjointigs_file)
             elif key == "--stats":
                 self.stats = True
             elif key == "--nosplit":
@@ -93,6 +93,7 @@ class Params:
                 self.print_usage_and_exit(0)
             else:
                 self.print_usage_and_exit(1)
+        self.disjointigs_file_list = list(set(self.disjointigs_file_list))
         return self
 
     def alignmentDir(self):
@@ -125,3 +126,12 @@ class Params:
         self.load_from = handler.readToken()
         self.dir = handler.readToken()
         self.save_dir = handler.readToken()
+
+    def parseFlyeDir(self, flye_dir):
+        if "00-assembly" in os.listdir(flye_dir):
+            res = os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta"), s.path.join(self.flye_dir, "10-consensus", "consensus.fasta")
+        else:
+            res = os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.fasta"), s.path.join(self.flye_dir, "1-consensus", "consensus.fasta")
+        for f in res:
+            assert os.path.isfile(f), f
+        return res
