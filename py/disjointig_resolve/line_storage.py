@@ -223,7 +223,7 @@ class NewLineStorage(ContigStorage):
             for line in chain:
                 id.append(line.id)
                 if line.knot is not None:
-                    id.append(line.knot.gap)
+                    id.append(str(line.knot.gap))
                     if line.knot.gap < 0:
                         seq.append(line.seq[:line.knot.gap])
                     else:
