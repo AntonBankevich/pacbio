@@ -248,6 +248,8 @@ class Aligner:
             if len(als) > 0 and rec.query_name != als[0].seg_from.contig.id:
                 cnt += len(als)
                 res = list(filter(als))
+                print "Als:", als
+                print "Res:", res
                 cnt_out += len(res)
                 for al in res:
                     yield al
