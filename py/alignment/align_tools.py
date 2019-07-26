@@ -214,6 +214,7 @@ class Aligner:
 
     def align(self, reads, reference, mode):
         # type: (Iterable[NamedSequence], Iterable[Contig], str) -> sam_parser.Samfile
+        reference = list(reference)
         dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (list(reads), "reads.fasta")])
         contigs_file = new_files[0]
         reads_file = new_files[1]
@@ -227,7 +228,7 @@ class Aligner:
         else:
             if os.path.isfile(alignment_file):
                 os.remove(alignment_file)
-            sys.stdout.log(params.LogPriority.alignment_files, "Performing alignment:", alignment_file)
+            sys.stdout.log(params.LogPriority.alignment_files, "Performing alignment:", alignment_file, str([(c.id, len(c)) for c in reference]))
             self.align_files(contigs_file, [reads_file], self.threads, "pacbio", mode, alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 

@@ -92,6 +92,9 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
                            "--no-trestle"])
     df = os.path.join(assembly_dir, "10-consensus", "consensus.fasta")
     disjointigs.loadFromFasta(open(df, "r"))
+    print "Disjointigs:"
+    for dis in disjointigs:
+        print dis.id, len(dis)
     sys.stdout.info("Aligning reads to disjointigs")
     disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
     return disjointigs
