@@ -226,7 +226,7 @@ class Aligner:
             pass
         else:
             if os.path.isfile(alignment_file):
-                shutil.rmtree(alignment_file)
+                os.remove(alignment_file)
             sys.stdout.log(params.LogPriority.alignment_files, "Performing alignment:", alignment_file)
             self.align_files(contigs_file, [reads_file], self.threads, "pacbio", mode, alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
