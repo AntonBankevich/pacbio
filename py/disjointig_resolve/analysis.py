@@ -61,4 +61,4 @@ class CoverageAnalyser:
 
     def printAnalysis(self, covs):
         for i in range(len(covs)):
-            print 500 + i * 100, ":", map(lambda cov: cov / sum(covs), covs[i])
+            print 500 + i * 100, ":", map(lambda cov: cov / sum(covs[i]), covs[i])
