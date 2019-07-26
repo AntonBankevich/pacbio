@@ -139,7 +139,7 @@ def main(args):
     print "Final result:"
     for chain in lines.chains():
         if chain[-1].knot is not None:
-            print "->" + "->".join([line.id for line in lines]) + "->"
+            print "->" + "->".join([line.id for line in chain]) + "->"
         else:
             print "->".join([line.id for line in lines])
 
