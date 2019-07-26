@@ -235,22 +235,26 @@ class NewLineStorage(ContigStorage):
 
     def chains(self):
         # type: () -> Generator[List[NewLine]]
-        printed = set()
+        visited = set()
         for line in self.items.values():
-            if line.id in printed or line.rc.knot is not None:
+            if line.id in visited or line.rc.knot is not None:
                 continue
             res = [line]
+            visited.add(line.id)
             while line.knot is not None:
                 line = line.knot.line_right
                 res.append(line)
+                visited.add(line.id)
             yield res
         for line in self.items.values():
-            if line.id in printed or line.rc.knot is not None:
+            if line.id in visited or line.rc.knot is not None:
                 continue
             res = [line]
+            visited.add(line.id)
             while line != res[0]:
                 line = line.knot.line_right
                 res.append(line)
+                visited.add(line.id)
             yield res
 
     def save(self, handler):
