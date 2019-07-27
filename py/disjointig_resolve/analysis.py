@@ -51,6 +51,7 @@ class CoverageAnalyser:
                     assert pos >= prev
                     covs[i][min(cur_cov, len(covs[i]) - 1)] += pos - prev
                     cur_cov -= diff
+                    prev = pos
                 assert cur_cov == 0
                 if prev < len(contig) - 1000 - k + 1:
                     covs[i][0] += len(contig) - 1000 - k + 1 - prev
@@ -66,4 +67,4 @@ class CoverageAnalyser:
 
     def printAnalysis(self, covs):
         for i in range(len(covs)):
-            print 500 + i * 100, ":", map(lambda cov: cov / sum(covs[i]), covs[i])
+            print 500 + i * 100, ":", map(lambda cov: "%0.3f" % (float(cov) / sum(covs[i])), covs[i])
