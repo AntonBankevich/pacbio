@@ -30,9 +30,9 @@ class CoverageAnalyser:
         covs = [[0] * 20 for i in range(100)]
         for contig, it in itertools.groupby(res, key = lambda seg: seg.contig):
             segs = list(it)
+            shrink = contig.asSegment().shrink(1000)
             print shrink
             print segs
-            shrink = contig.asSegment().shrink(1000)
             for i in range(len(covs)):
                 k = 500 + i * 100
                 tmp = []
