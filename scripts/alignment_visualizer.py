@@ -13,10 +13,10 @@ def printAlignments(sam_handler, reference_handler, reads_handler):
     for rec in sam_parser.Samfile(sam_handler):
         if rec.query_name in reads.items and cc[rec.tname] is not None:
             al = AlignmentPiece.FromSamRecord(reads[rec.query_name], cc[rec.tname], rec)
-            if al.seg_to.contig in cc:
+            if al.seg_to.contig not in cc:
                 al = al.rc
             res.append(al)
-    res = sorted(res, key = lambda al: al.seg_to.left)
+#    res = sorted(res, key = lambda al: al.seg_to.left)
     for al in res:
         print al, list(al.split())
         s1, s2 = al.asMatchingStrings()
