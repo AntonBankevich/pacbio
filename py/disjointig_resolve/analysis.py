@@ -27,7 +27,6 @@ class CoverageAnalyser:
             else:
                 res.append(al.seg_to.RC())
         res = sorted(res, key=lambda seg: (seg.contig.id, seg.left))
-        print res
         covs = [[0] * 20 for i in range(100)]
         for contig, it in itertools.groupby(res, key = lambda seg: seg.contig):
             segs = list(it)
