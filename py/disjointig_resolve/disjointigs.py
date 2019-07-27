@@ -68,10 +68,10 @@ class DisjointigCollection(ContigStorage):
 
     def addNew(self, seq, name = None):
         # type: (str, Optional[str]) -> Disjointig
-        print "New disjointig:", name, len(seq)
         if name is None:
             name = "D" + str(self.cnt)
             self.cnt += 1
+        print "New disjointig:", name, len(seq)
         new_disjointig = Disjointig(seq, name)
         self.add(new_disjointig)
         return new_disjointig

@@ -226,7 +226,7 @@ class Polisher:
                 break
             start = basic.randomSequence(params.flanking_size) + new_contig.asSegment().suffix(length=params.flanking_size).Seq()
             reduced_read_list = [
-                AlignedRead.new(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), str(i) + "_" + al.seg_from.contig.id)
+                AlignedRead.new("ACGTTCGA" + start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), str(i) + "_" + al.seg_from.contig.id)
                 for i, al in enumerate(relevant_als)]
             # print "RRL:", reduced_read_list
             reduced_reads = ReadCollection(reduced_read_list)
@@ -234,7 +234,7 @@ class Polisher:
             for base_al in relevant_als:
                 if base_al.rc.seg_from.left < params.flanking_size:
                     continue
-                # Base consists of copy of the previous 200 nucleotides and a segment of read of length at most 500
+                # Base consists 500 random nucleotides and 500 last nucls from the polished sequence a segment of read of length at most 500
                 base_segment = base_al.seg_from.contig.segment(base_al.seg_from.right,
                                                      min(len(base_al.seg_from.contig), base_al.seg_from.right + params.window_size))
                 base = Contig(start + base_segment.Seq(), "base")
