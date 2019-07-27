@@ -139,6 +139,10 @@ def ExtendShortLines(contigs, reads, aligner, polisher):
         r = len(tmp_contig) - len(contig)
         tmp_contig, new_als = polisher.polishEnd([al.rc for al in new_als], params.reliable_coverage)
         l = len(tmp_contig) - len(contig) - r
+        if l > params.k / 2 and r > params.k / 2:
+            tmp_contig.seq = tmp_contig.seq[l - params.k / 2:-r + params.k / 2]
+        else:
+            tmp_contig.seq = tmp_contig.seq[max(0, l - params.k):-max(1, r - params.k)]
         if len(tmp_contig) > params.k + 500:
             sys.stdout.info("Prolonged contig", contig.id, "for", l, "and", r, "nucleotides from left and right")
             contigs.add(Contig(tmp_contig.seq, contig.id))
