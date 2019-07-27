@@ -30,16 +30,21 @@ class CoverageAnalyser:
         covs = [[0] * 20 for i in range(100)]
         for contig, it in itertools.groupby(res, key = lambda seg: seg.contig):
             segs = list(it)
+            print shrink
+            print segs
             shrink = contig.asSegment().shrink(1000)
             for i in range(len(covs)):
                 k = 500 + i * 100
                 tmp = []
                 for seg in segs:
+                    print seg, seg.interSize(shrink)
                     if seg.interSize(shrink) >= k:
                         seg = seg.cap(shrink)
                         tmp.append((seg.left, -1))
                         tmp.append((seg.right - k + 1, 1))
+                print tmp
                 tmp = sorted(tmp)
+                print tmp
                 cur_cov = 0
                 prev = 1000
                 for pos, diff in tmp:
