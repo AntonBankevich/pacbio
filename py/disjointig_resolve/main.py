@@ -141,7 +141,7 @@ def main(args):
         if chain[-1].knot is not None:
             print "->" + "->".join([line.id for line in chain]) + "->"
         else:
-            print "->".join([line.id for line in lines])
+            print "->".join([line.id for line in chain])
 
 
     # print "Disjointig alignments"
