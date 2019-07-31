@@ -67,4 +67,7 @@ class CoverageAnalyser:
 
     def printAnalysis(self, covs):
         for i in range(len(covs)):
-            print 500 + i * 100, ":", map(lambda cov: "%0.3f" % (float(cov) / sum(covs[i])), covs[i])
+            if sum(covs[i]) > 0:
+                print 500 + i * 100, ":", map(lambda cov: "%0.3f" % (float(cov) / sum(covs[i])), covs[i])
+            else:
+                print 500 + i * 100, ":", "contigs too short"
