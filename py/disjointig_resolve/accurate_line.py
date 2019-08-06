@@ -344,8 +344,11 @@ class NewLine(Contig):
         if self.name_printer is not None:
             return self.name_printer(self)
         points = [self.left()]
-        points.append(self.initial[0].seg_to.left)
-        points.append(self.initial[-1].seg_to.right)
+        if len(self.initial) == 0:
+            points.append("NA")
+        else:
+            points.append(self.initial[0].seg_to.left)
+            points.append(self.initial[-1].seg_to.right)
         points.append(self.right())
         points = map(str, points)
         return "Line:" + str(self.id) + ":" + "[" + ":".join(points) +"]"

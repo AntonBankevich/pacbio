@@ -183,8 +183,8 @@ class NewLineStorage(ContigStorage):
         line2 = self.addNew(seg2.Seq(), line.id + "r")
         al1 = AlignmentPiece.Identical(seg1, line1.asSegment())
         al2 = AlignmentPiece.Identical(seg2, line2.asSegment())
-        line1.initial.addAll([al.compose(al1) for al in line.initial.allInter(seg1, params.k)])
-        line2.initial.addAll([al.compose(al2) for al in line.initial.allInter(seg2, params.k)])
+        line1.initial.addAll([al.compose(al1) for al in line.initial.allInter(seg1)])
+        line2.initial.addAll([al.compose(al2) for al in line.initial.allInter(seg2)])
         line1.correct_segments.addAll(line.correct_segments.cap(seg=seg1, min_inter=params.k).map(al1))
         line2.correct_segments.addAll(line.correct_segments.cap(seg=seg2, min_inter=params.k).map(al2))
         line1.completely_resolved.addAll(line.completely_resolved.cap(seg=seg1, min_inter=params.k).map(al1).filterBySize(min=params.k))
@@ -209,7 +209,7 @@ class NewLineStorage(ContigStorage):
 
     def printToFile(self, handler):
         # type: (BinaryIO) -> None
-        for line in self.items:
+        for line in self.items:# type: NewLine
             handler.write(line.__str__() + "\n")
 
     def printToFasta(self, handler):
