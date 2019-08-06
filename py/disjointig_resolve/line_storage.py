@@ -52,7 +52,11 @@ class NewLineStorage(ContigStorage):
         if name is None:
             name = str(self.cnt)
             self.cnt += 1
-        new_line = NewLine(seq, name, ExtensionHandler(self.disjointigs, self.aligner))
+        if not basic.isCanonocal(name):
+            name = basic.Reverse("L" + basic.Reverse(name))
+        else:
+            name = "L" + name
+        new_line = NewLine(seq, str(name), ExtensionHandler(self.disjointigs, self.aligner))
         self.add(new_line)
         new_line.name_printer = self.name_printer
         new_line.rc.name_printer = self.name_printer

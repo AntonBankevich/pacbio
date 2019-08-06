@@ -48,6 +48,8 @@ class UniqueMarker:
     def markUniqueInLine(self, line, dot_plot):
         # type: (NewLine, LineDotPlot) -> None
         print "Finding unique in", line
+
+
         alignments = list(line.read_alignments) # type: List[AlignmentPiece]
         # for i in range(len(alignments)):
         #     for j in range(len(alignments)):
@@ -76,7 +78,7 @@ class UniqueMarker:
         print "inc:", inc
         print "out:", out
         segs1 = inc.orderedCap(out)
-        print "segs1:", segs1
+        print "Expanded segs1:", segs1
         print "Line alignments:"
         line_als = AlignmentStorage().addAll(dot_plot.allInter(line.asSegment()))
         print "als:", line_als
@@ -137,7 +139,7 @@ class UniqueMarker:
 
     def splitBad(self, line, lines):
         # type: (NewLine, NewLineStorage) -> None
-        segs = list(line.read_alignments.filterByCoverage(mi=params.reliable_coverage)) # type: List[Segment]
+        segs = list(line.read_alignments.filterByCoverage(mi=params.reliable_coverage, k=params.k)) # type: List[Segment]
         assert len(segs) > 0, "No part of a unique edge is covered by reads"
         if len(segs) == 1 and len(segs[0]) > len(line) - 10:
             print "Whole line", line.id, "is covered by reads"

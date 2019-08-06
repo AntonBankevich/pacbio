@@ -283,7 +283,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
             if len(al.seg_to) >= params.k:
                 al = al.queryAsSegment(new_seg)
                 self.addAndMergeRight(al)
-        print "Updated line alignments:", list(self.allInter(line.asSegment()))
+        print "Updated line alignments:", map(str, self.allInter(line.asSegment()))
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None

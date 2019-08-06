@@ -635,11 +635,11 @@ class AlignmentStorage(SmartStorage):
         else:
             return self.rc.queryAsSegment(seg.RC())
 
-    def filterByCoverage(self, mi = 0, ma = 1000000):
-        # type: (int, int) -> SegmentStorage
+    def filterByCoverage(self, mi = 0, ma = 1000000, k = 1):
+        # type: (int, int, int) -> SegmentStorage
         if len(self) == 0:
             return SegmentStorage()
-        segs = self.calculateCoverage()
+        segs = self.calculateCoverage(k)
         last = None
         contig = self[0].seg_to.contig
         res = SegmentStorage()
@@ -653,12 +653,12 @@ class AlignmentStorage(SmartStorage):
             res.add(Segment(contig, last, len(contig)))
         return res
 
-    def calculateCoverage(self):
-        # type: () -> Generator[Tuple[Segment, int]]
+    def calculateCoverage(self, k = 1):
+        # type: (int) -> Generator[Tuple[Segment, int]]
         positions = []
         for al in self:
             positions.append((al.seg_to.left, 1))
-            positions.append((al.seg_to.right, -1))
+            positions.append((al.seg_to.right - k + 1, -1))
         positions = sorted(positions)
         positions = [(pos, sum(delta for pos, delta in iter)) for pos, iter in
                      itertools.groupby(positions, key=lambda pos: pos[0])]
@@ -667,7 +667,7 @@ class AlignmentStorage(SmartStorage):
         last = 0
         for pos, delta in positions:
             if delta != 0 and last < pos:
-                yield contig.segment(last, pos), cur
+                yield contig.segment(last, pos + k - 1), cur
                 last = pos
             cur += delta
         if positions[-1][0] < len(contig):
