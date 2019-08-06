@@ -26,6 +26,7 @@ class AlignmentPiece:
         assert len(seg_to) == easy_cigar.CigarLen(cigar), str([len(seg_to), easy_cigar.CigarLen(cigar)])
         assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left], str(self) + " " + self.seg_from.contig[self.seg_from.left]+ " " + self.seg_to.contig[self.seg_to.left]
         assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1], str(self) + " " + self.seg_from.contig[self.seg_from.right - 1]+ " " + self.seg_to.contig[self.seg_to.right - 1]
+        self.pi = None
         if params.assert_pi:
             pi = self.percentIdentity()
             if pi < params.min_pi:
@@ -321,12 +322,15 @@ class AlignmentPiece:
         return "".join(l1), "".join(l2)
 
     def percentIdentity(self):
-        res = 0
-        for seg1, seg2 in self.matchingBlocks():
-            for i in range(len(seg1)):
-               if seg1.contig[seg1.left + i] == seg2.contig[seg2.left + i]:
-                   res += 1
-        return float(res) / max(len(self.seg_from), len(self.seg_to))
+        if self.pi is None:
+            res = 0
+            for seg1, seg2 in self.matchingBlocks():
+                for i in range(len(seg1)):
+                   if seg1.contig[seg1.left + i] == seg2.contig[seg2.left + i]:
+                       res += 1
+
+            self.pi = float(res) / max(len(self.seg_from), len(self.seg_to))
+        return self.pi
 
     def matchingPercentIdentity(self):
         res = len(list(self.matchingPositions(True)))

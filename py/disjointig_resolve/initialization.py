@@ -122,6 +122,7 @@ def CreateReadColection(reads_file):
     return reads
 
 
+# TODO: many short edges are not really unique. Need to address it properly
 def ExtendShortLines(contigs, reads, aligner, polisher):
     # type: (ContigStorage, ReadCollection, Aligner, Polisher) -> None
     short_contigs = ContigStorage()
@@ -132,8 +133,18 @@ def ExtendShortLines(contigs, reads, aligner, polisher):
             als[contig.id] = []
             als[contig.rc.id] = []
     for al in aligner.overlapAlign(reads, short_contigs):
-        als[al.seg_to.contig.id].append(al)
-        als[al.seg_to.contig.rc.id].append(al.rc)
+        if al.seg_to.left <= 20 and al.rc.seg_to.left <= 20:
+            added = False
+            for i, al1 in enumerate(als[al.seg_to.contig.id]):
+                if al1.seg_from.contig.id == al.seg_from.contig.id:
+                    added = True
+                    if al.percentIdentity() > al1.percentIdentity():
+                        als[al.seg_to.contig.id][i] = al
+                        als[al.seg_to.contig.rc.id][i] = al.rc
+                    break
+            if not added:
+                als[al.seg_to.contig.id].append(al)
+                als[al.seg_to.contig.rc.id].append(al.rc)
     for contig in short_contigs.unique():
         tmp_contig, new_als = polisher.polishEnd(als[contig.id], params.reliable_coverage)
         r = len(tmp_contig) - len(contig)

@@ -210,6 +210,7 @@ class Polisher:
         # type: (List[AlignmentPiece], int) -> Tuple[Contig, List[AlignmentPiece]]
         scorer = Scorer()
         contig = als[0].seg_to.contig
+        print "Polishing end of", als[0].seg_to.contig
         new_contig = contig.asSegment().asContig()
         relevant_als = [al.changeTargetContig(new_contig) for al in als if al.rc.seg_to.left < 100]
         finished_als = []
@@ -286,7 +287,11 @@ class Polisher:
                         if al1.seg_from.right <= len(start) + 5:
                             embedded_alignments.append(None)
                         else:
-                            embedded_alignments.append(al2.compose(al1).compose(embedding))
+                            tmp = al2.compose(al1)
+                            if tmp.seg_to.left >= embedding.seg_from.right:
+                                embedded_alignments.append(None)
+                            else:
+                                embedded_alignments.append(al2.compose(al1).compose(embedding))
                     # candidate_alignments = [al2.compose(al1).compose(embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
                     corrected_relevant_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in relevant_als]
                     relevant_als = []
