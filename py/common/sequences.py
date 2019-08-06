@@ -217,7 +217,7 @@ class Segment:
 
     def cup(self, other):
         # type: (Segment) -> Segment
-        assert self.inter(other)
+        assert self.interSize(other) >= 0
         return Segment(self.contig, min(self.left, other.left), max(self.right, other.right))
 
     def RC(self):

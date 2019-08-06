@@ -639,7 +639,8 @@ class AlignmentStorage(SmartStorage):
         # type: (int, int, int) -> SegmentStorage
         if len(self) == 0:
             return SegmentStorage()
-        segs = self.calculateCoverage(k)
+        segs = list(self.calculateCoverage(k))
+        print segs
         last = None
         contig = self[0].seg_to.contig
         res = SegmentStorage()
