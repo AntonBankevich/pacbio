@@ -219,7 +219,7 @@ class Scorer:
             p = p2 - p1
         s1 = (full_scores[0] + correct_scores[0] * 9) / 10 + p1
         s2 = (full_scores[1] + correct_scores[1] * 9) / 10 + p2
-        s12 = (full_scores[2] + correct_scores[2] * 9) / 10 + p
+        s12 = (full_scores[2] + correct_scores[2] * 9) / 10 + abs(p)
         print (p1, p2), full_scores, correct_scores, (s1, s2, s12)
         return s1, s2, s12
 
