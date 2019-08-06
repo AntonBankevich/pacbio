@@ -644,21 +644,25 @@ class AlignmentStorage(SmartStorage):
         contig = self[0].seg_to.contig
         res = SegmentStorage()
         for seg, cov in segs:
-            if last is None and (mi <= cov < ma):
-                last = seg.left
+            if mi <= cov < ma:
+                if last is None:
+                    last = seg
+                else:
+                    last = last.cup(seg)
             elif last is not None and (cov < mi or cov >= ma):
-                res.add(Segment(contig, last, seg.left))
+                res.add(last)
                 last = None
         if last is not None:
-            res.add(Segment(contig, last, len(contig)))
+            res.add(last)
         return res
 
     def calculateCoverage(self, k = 1):
         # type: (int) -> Generator[Tuple[Segment, int]]
         positions = []
         for al in self:
-            positions.append((al.seg_to.left, 1))
-            positions.append((al.seg_to.right - k + 1, -1))
+            if len(al.seg_to) >= k:
+                positions.append((al.seg_to.left, 1))
+                positions.append((al.seg_to.right - k + 1, -1))
         positions = sorted(positions)
         positions = [(pos, sum(delta for pos, delta in iter)) for pos, iter in
                      itertools.groupby(positions, key=lambda pos: pos[0])]
