@@ -384,6 +384,12 @@ class SegmentStorage(SmartStorage):
             if seg1.inter(seg):
                 yield seg1
 
+    def expandTo(self, k):
+        if self.isCanonical():
+            return SegmentStorage().addAll([seg.expandToSize(k) for seg in self.items])
+        else:
+            return self.rc.expand(k).rc
+
 
 # TODO: Extract version without listening to use with disjointigs. Otherwise it is cyclic dependancy.
 class AlignmentStorage(SmartStorage):
