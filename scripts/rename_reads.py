@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+sys.path.append("py")
 
 from common import SeqIO
 
