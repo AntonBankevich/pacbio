@@ -222,13 +222,12 @@ def parseLineName(name):
         name = name[1:]
     else:
         rc = False
-    if name.startswith("("):
-        name = name[1:-1]
+    if name.find("(") != -1:
+        name = name[name.find("(") + 1: -1]
     seq = name.split(",")
     if rc:
         seq = map(Reverse, seq[::-1])
     return seq
-
 
 def CreateLog(dir):
     old_logs_dir = os.path.join(dir, "old")

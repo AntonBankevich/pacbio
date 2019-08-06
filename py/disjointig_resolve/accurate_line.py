@@ -235,8 +235,8 @@ class NewLine(Contig):
             listener.fireAfterExtendRight(self, seq, relevant_als)
 
     def cutRight(self, pos):
-        assert pos > 0 and pos <= len(self)
         sys.stdout.info("Line operation Cut:", self, pos)
+        assert pos > 0 and pos <= len(self)
         cut_length = len(self) - pos
         if cut_length == 0:
             return

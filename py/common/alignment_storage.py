@@ -73,6 +73,8 @@ class AlignmentPiece:
             new_cigar.append(num)
             new_cigar.append(s)
         new_cigar = "".join(map(str, new_cigar))
+        assert 0 <= rec.pos - 1 + lrefs < rec.pos - 1 + rec.alen - rrefs <= len(seq_to), str([0, rec.pos - 1 + lrefs, rec.pos - 1 + rec.alen - rrefs, len(seq_to),
+                                                                                              seq_from, seq_to, rec.rc, rec.pos, rec.query_name, rec.tname, new_cigar])
         seg_to = Segment(seq_to, rec.pos - 1 + lrefs, rec.pos - 1 + rec.alen - rrefs)
         if rec.rc:
             seg_from = Segment(seq_from.rc, ls, len(seq_from) - rs).RC()

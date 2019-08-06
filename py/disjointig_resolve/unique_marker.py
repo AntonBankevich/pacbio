@@ -147,10 +147,15 @@ class UniqueMarker:
         segs = filter(lambda seg: len(seg) >= params.k, segs)
         print "Line", line.id, "has poorly covered regions. Splitting into", len(segs), "parts"
         print segs
-        for seg in list(segs)[:0:-1]:
-            line, new_line = lines.splitLine(line.segment(seg.left, seg.left))
-            new_line.cutRight(len(seg))
-        line.cutRight(segs[0].right)
+        next_left = segs[-1].left
+        line.cutRight(segs[-1].right)
+        for seg in list(segs)[-2:0:-1]:
+            if next_left < seg.right:
+                line, new_line = lines.splitLine(line.segment(next_left, seg.right))
+            else:
+                line, new_line = lines.splitLine(line.segment(next_left, next_left))
+                line.cutRight(seg.right)
+            next_left = seg.left
         line.rc.cutRight(len(segs[0]))
 
 
