@@ -131,10 +131,12 @@ class LineExtender:
             ok = False
             for rec in records:
                 if self.attemptProlongResolved(rec):
-                    print "Finished prolonging resolved:", rec.line, rec.line.initial, rec.resolved, rec.line.completely_resolved
+                    print "Successfully prolonged resolved:", rec.line, rec.line.initial, rec.resolved, rec.line.completely_resolved
                     ok = True
             if not ok:
+                print "Jumping attempts"
                 for rec in records: # type:LineExtender.Record
+                    print "Attempting to jump", rec
                     if self.attemptJump(rec):
                         print "Jumped", rec.line, rec.line.initial, len(rec.line), rec.next_resolved_start, str(rec.old_resolved), rec.resolved
                         ok = True
@@ -235,7 +237,7 @@ class LineExtender:
         # type: (Segment) -> List[Tuple[Segment, List[AlignmentPiece]]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
         resolved = resolved.suffix(length = min(len(resolved), params.k * 2))
-        print "Attempting recruitment:", resolved
+        print "Attempting recruitment:", resolved, str(resolved.contig)
         line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k / 2,
                                  self.dot_plot.allInter(resolved)) # type: List[AlignmentPiece]
         line_alignments = [al for al in line_alignments if al.rc.seg_to.left > 20 or al.seg_from.left > 20 or al.isIdentical()]

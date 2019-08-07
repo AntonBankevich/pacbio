@@ -1,12 +1,12 @@
 1
-LineExtensionTest 9
+LineExtensionTest 1
+List aaabacadaeafagahaiaj 5 0 b
 List abbbcdefBBBghij 5 0 ja de
 List abCDEFGHijklcdemnodgfp 5 0 pa jk mn
 List abcdefghijaklDEFGmnopaqrsDeFgHtuv 5 0 ab ij no
 List abbBbbcdefBBbBBghij 5 2 ja de
 List abcdefghCDEFij 5 0 ab gh
 List abcdefaghCDEFij 5 0 ab gh
-List aaabacadaeafagahaiaj 5 0 b
 List abcdefghijaklmnopaqrstuvwxyz 5 0 b
 List abcdefghijaklmnEFGHIopaqr 5 0 abcde klmnEF
 

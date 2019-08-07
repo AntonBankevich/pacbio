@@ -93,6 +93,9 @@ class UniqueMarker:
         inter = 0
         contradicting = 0
         print "Unique segments:", segs
+        if len(segs) == 0:
+            print "WARNING: line with no resolved segments. Removing", line
+            return
         for al in alignments:
             all += 1
             if segs.inter(al.seg_to, params.k):
@@ -123,10 +126,13 @@ class UniqueMarker:
         sys.stdout.info("Marking unique regions in lines")
         for line in lines.unique():
             self.markUniqueInLine(line, dot_plot)
-        for line in lines.unique():  # type:NewLine
-            line.initial.clean()
-            for seg in line.completely_resolved:
-                line.initial.add(AlignmentPiece.Identical(seg.asContig().asSegment(), seg))
+        for line in list(lines.unique()):  # type:NewLine
+            if len(line.completely_resolved) == 0:
+                lines.remove(line)
+            else:
+                line.initial.clean()
+                for seg in line.completely_resolved:
+                    line.initial.add(AlignmentPiece.Identical(seg.asContig().asSegment(), seg))
 
     def medianCoverage(self, covs, line):
         clen = 0
