@@ -10,7 +10,7 @@ def main(contigs_file, parts_file, dir):
     parts = ContigCollection().loadFromFasta(open(parts_file, "r"))
     aligner = Aligner(DirDistributor(dir))
     res = dict()
-    for al in aligner.localAlign(parts_file, contigs_file):
+    for al in aligner.localAlign(parts, contigs):
         if al.seg_to.contig.id not in res:
             res[al.seg_to.contig.id] = []
             res[al.seg_to.contig.rc.id] = []
