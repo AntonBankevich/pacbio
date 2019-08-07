@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import time
 import traceback
@@ -82,6 +83,9 @@ def main(args):
     print " ".join(cl_params.args)
     sys.stdout.info("Started")
     sys.stdout.info("Params:", " ".join(args))
+    sys.stdout.info("Version:", subprocess.check_output(["git", "rev-parse", "HEAD"]))
+    sys.stdout.info("Modifications:")
+    print subprocess.check_output(["git", "diff"])
     if cl_params.test:
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         Tester(aligner).testAll("tests/cases.txt")
