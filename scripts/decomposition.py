@@ -1,9 +1,9 @@
 import sys
 
-from common import basic
 
 sys.path.append("py")
 
+from common import basic
 from alignment.align_tools import Aligner, DirDistributor
 from common.sequences import ContigCollection
 
