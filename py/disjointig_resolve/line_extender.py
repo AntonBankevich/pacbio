@@ -76,7 +76,7 @@ class LineExtender:
         self.dot_plot = dot_plot
         self.scorer = Scorer()
 
-    def tryExtend(self, line):
+    def processLine(self, line):
         # type: (NewLine) -> int
         line.completely_resolved.mergeSegments(params.k)
         bound = LinePosition(line, line.left())
@@ -85,6 +85,7 @@ class LineExtender:
         if new_line is not None:
             self.updateAllStructures(list(new_line.completely_resolved))
             return 1
+        self.updateAllStructures(line.completely_resolved)
         while True:
             seg_to_resolve = line.completely_resolved.find(bound.suffix(), params.k)
             if seg_to_resolve is None:

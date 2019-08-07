@@ -171,7 +171,7 @@ def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, re
                         continue
             line = lines[line_id]
             sys.stdout.info("Investigating", line)
-            extended = extender.tryExtend(line)
+            extended = extender.processLine(line)
             if extended > 0:
                 cnt += 1
                 stop = False

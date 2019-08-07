@@ -578,7 +578,7 @@ class LineExtensionTest(SimpleTest):
                     continue
                 line = lines[line_id]
                 dp.printAll(sys.stdout)
-                extended = extender.tryExtend(line)
+                extended = extender.processLine(line)
                 if extended:
                     stop = False
             if stop:
@@ -617,7 +617,7 @@ class LineExtensionTest(SimpleTest):
                     continue
                 line = lines[line_id]
                 dp.printAll(sys.stdout)
-                extended = extender.tryExtend(line)
+                extended = extender.processLine(line)
                 if extended:
                     stop = False
             if stop:
