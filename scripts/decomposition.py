@@ -1,4 +1,7 @@
 import sys
+
+from common import basic
+
 sys.path.append("py")
 
 from alignment.align_tools import Aligner, DirDistributor
@@ -8,6 +11,7 @@ from common.sequences import ContigCollection
 def main(contigs_file, parts_file, dir):
     contigs = ContigCollection().loadFromFasta(open(contigs_file, "r"))
     parts = ContigCollection().loadFromFasta(open(parts_file, "r"))
+    basic.CreateLog(dir)
     aligner = Aligner(DirDistributor(dir))
     res = dict()
     for al in aligner.localAlign(parts, contigs):
