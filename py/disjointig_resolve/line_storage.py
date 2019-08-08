@@ -251,7 +251,7 @@ class NewLineStorage(ContigStorage):
                 visited.add(line.id)
             yield res
         for line in self.items.values():
-            if line.id in visited or line.rc.knot is not None:
+            if line.id in visited:
                 continue
             res = [line]
             visited.add(line.id)
