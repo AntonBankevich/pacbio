@@ -192,7 +192,7 @@ class NewLineStorage(ContigStorage):
 
         line1.disjointig_alignments.addAll([al.compose(al1) for al in line.disjointig_alignments.allInter(seg1, params.k)])
         line2.disjointig_alignments.addAll([al.compose(al2) for al in line.disjointig_alignments.allInter(seg2, params.k)])
-        for al in line1.read_alignments:
+        for al in line.read_alignments:
             if al.seg_to.interSize(seg1) > params.k:
                 line1.addReadAlignment(al.compose(al1))
             if al.seg_to.interSize(seg2) > params.k:
