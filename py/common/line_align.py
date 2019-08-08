@@ -177,7 +177,7 @@ class Scorer:
             print "Triangle inequality failed: " + \
                   str(accurate1) + " " + str(accurate2) + " " + \
                   str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" + str(accurate1 + accurate2)
-        return self.accurateScore(matches1), self.accurateScore(matches2), self.accurateScore(composite)
+        return accurate1, accurate2, self.accurateScore(composite)
 
     def scoreInCorrectSegments(self, al1, seg1, al2, seg2):
         # type: (AlignmentPiece, Segment, AlignmentPiece, Segment) -> Tuple[Optional[int], Optional[int], Optional[int]]
@@ -202,8 +202,16 @@ class Scorer:
             p2 += min(al1.seg_from.right - al2.seg_from.right, len(al2.seg_to.contig) - al2.seg_to.right) * alignment_length_penalty
         else:
             p1 += min(al2.seg_from.right - al1.seg_from.right, len(al1.seg_to.contig) - al1.seg_to.right) * alignment_length_penalty
-
         full_scores = self.scoreCommon(al1, al2)
+        if al1.seg_from.contig.id == "-NCTC11962/54272/33188_38592":
+            print "DO for 11962"
+            print al1
+            print "\n".join(al1.asMatchingStrings())
+            print al2
+            print "\n".join(al2.asMatchingStrings())
+            print al1.composeTargetDifference(al2)
+            print "\n".join(al1.composeTargetDifference(al2).asMatchingStrings())
+            print full_scores
 
         # On this segment both alignments go to correct sequences. We place larger weight on differences in this segment.
         q1 = al1.reduce(target=seg1).seg_from
@@ -229,7 +237,7 @@ class Scorer:
             print m1.matches
             print m2.matches
             return None, None
-        a, b =  m1.common_from(m2).next()
+        # a, b =  m1.common_from(m2).next()
         # print m1[a], m2[b]
         for a, b in m1.common_from(m2):
             p1 = m1[a][1]
