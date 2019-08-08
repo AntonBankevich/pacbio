@@ -85,7 +85,7 @@ class UniqueMarker:
         segs2 = line_als.filterByCoverage(1, 2)
         print "segs2:", segs2
         # segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
-        segs = segs1.filterBySize(min = params.max_allowed_unaligned).expandTo(params.k + 100).filterBySize(min=params.k)
+        segs = segs1.filterBySize(min = params.max_allowed_unaligned).expand(params.k / 2).expandTo(params.k + 50).filterBySize(min=params.k)
         # segs = segs1.expand(params.k / 2).filterBySize(min = params.k)
         line.cleanReadAlignments()
         line.read_alignments.clean()

@@ -306,7 +306,9 @@ class Segment:
 
     def expandToSize(self, sz):
         # type: (int) -> Segment
-        d = min(sz, len(self.contig) - len(self))
+        if len(self) >= sz:
+            return self
+        d = min(sz, len(self.contig)) - len(self)
         right = min(max((d + 1) / 2, d - self.left), len(self.contig) - self.right)
         left = min(max((d + 1) / 2, d - (len(self.contig) - self.right)), self.left)
         return Segment(self.contig, self.left - left, self.right + right)
