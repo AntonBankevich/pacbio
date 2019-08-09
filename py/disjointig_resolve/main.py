@@ -105,6 +105,7 @@ def main(args):
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         dot_plot.printAll(sys.stdout)
+        printState(lines)
     else:
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         polisher = Polisher(aligner, aligner.dir_distributor)
@@ -136,21 +137,27 @@ def main(args):
     EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, reads, save_handler)
 
     dot_plot.printAll(sys.stdout)
-    for line in lines:
-        print line 
+
+    print "Final result:"
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
     lines.printKnottedToFasta(open(os.path.join(cl_params.dir, "lines_knotted.fasta"), "w"))
-    print "Final result:"
+    printState(lines)
+
+    # print "Disjointig alignments"
+    # for line in lines
+    sys.stdout.info("Finished")
+
+
+def printState(lines):
+    print "Lines:"
+    for line in lines:
+        print line
+    print "Chains:"
     for chain in lines.chains():
         if chain[-1].knot is not None:
             print "->" + "->".join([line.id for line in chain]) + "->"
         else:
             print "->".join([line.id for line in chain])
-
-
-    # print "Disjointig alignments"
-    # for line in lines
-    sys.stdout.info("Finished")
 
 
 def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, reads, save_handler):
@@ -181,6 +188,7 @@ def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, re
                 stop = False
             if cnt > 10:
                 cnt = 0
+                printState(lines)
                 print "Saving current state"
                 writer = save_handler.getWriter()
                 print "Save details:", writer.info
@@ -189,3 +197,4 @@ def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, re
 
 if __name__ == "__main__":
     main(sys.argv)
+# 56 73 77 167 76 12 84 1 78
