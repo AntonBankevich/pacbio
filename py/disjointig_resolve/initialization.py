@@ -50,8 +50,8 @@ def CreateLineCollection(aligner, contigs, disjointigs, reads, split):
                 line1, line2 = lines.splitLine(line.segment(left, right))
                 line_list.extend([line1, line2])
             elif len(line.completely_resolved[0]) > 40000:
-                line1, line2 = lines.splitLine(line.completely_resolved[0].prefix(length=1000))
-                line2, line3 = lines.splitLine(line2.completely_resolved[0].suffix(length=1000))
+                line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=10000).prefix(length=1000))
+                line1, line2 = lines.splitLine(line12.completely_resolved[0].prefix(length=10000).suffix(length=1000))
                 line1.tie(line2, -1000, "")
                 line2.tie(line3, -1000, "")
         line_list = sorted(lines.unique(), key = lambda line: line.id)

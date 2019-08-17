@@ -7,18 +7,28 @@ from common.alignment_storage import AlignmentPiece
 
 
 def printAlignments(sam_handler, reference_handler, reads_handler):
+    print "Loading reference"
     cc = ContigStorage(add_rc=False).loadFromFasta(reference_handler, False)
+    print "Loading query"
     reads = ContigStorage().loadFromFasta(reads_handler, False)
+    print "Loading result"
     res = []
     for rec in sam_parser.Samfile(sam_handler):
         if rec.query_name in reads.items and cc[rec.tname] is not None:
             al = AlignmentPiece.FromSamRecord(reads[rec.query_name], cc[rec.tname], rec)
+            if al is None:
+                print rec.query_name, rec.tname
+                continue
             if al.seg_to.contig not in cc:
                 al = al.rc
             res.append(al)
+    print "Printing result", len(res)
 #    res = sorted(res, key = lambda al: al.seg_to.left)
+    res = sorted(res, key = lambda al: len(al))[::-1]
     for al in res:
-        print al, list(al.split())
+        print al
+        print list(al.split())
+        continue
         s1, s2 = al.asMatchingStrings()
         s = []
         if len(list(al.split())) > 1:
