@@ -257,9 +257,9 @@ class NewLineStorage(ContigStorage):
             visited.add(line.id)
             line = line.knot.line_right
             while line != res[0]:
-                line = line.knot.line_right
                 res.append(line)
                 visited.add(line.id)
+                line = line.knot.line_right
             yield res
 
     def save(self, handler):
