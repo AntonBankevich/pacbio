@@ -2,7 +2,6 @@ MINIMAP_BIN = "bin/flye-minimap2"
 
 clean = False
 reliable_coverage = 10
-redo_alignments = False
 radius = 8
 alignment_correction_radius = 10
 full_stats = False

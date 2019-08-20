@@ -58,17 +58,17 @@ class DirDistributor:
         return res
 
     def calculateHash(self, content):
-        # type: (list[Tuple[Iterable[NamedSequence], str]]) -> Generator[Tuple[str, str, str]]
+        # type: (List[Tuple[Iterable[NamedSequence], str]]) -> Generator[Tuple[str, str, str]]
         for reads, f_name in content:
             yield f_name, str(self.hash(reads)), str(len(reads))
 
     def printHash(self, handler, hashs):
-        # type: (BinaryIO, list[Tuple[str, str, str]]) -> None
+        # type: (BinaryIO, List[Tuple[str, str, str]]) -> None
         for rec in hashs:
             handler.write(" ".join(rec) + "\n")
 
     def compareHash(self, handler, hashs):
-        # type: (BinaryIO, list[Tuple[str, str, str]]) -> bool
+        # type: (BinaryIO, List[Tuple[str, str, str]]) -> bool
         lines = handler.readlines()
         if len(lines) != len(hashs):
             return False
@@ -82,7 +82,7 @@ class DirDistributor:
         return True
 
     def fillNextDir(self, content):
-        # type: (list[Tuple[Iterable[NamedSequence], str]]) -> Tuple[str, list[str], bool]
+        # type: (List[Tuple[Iterable[NamedSequence], str]]) -> Tuple[str, list[str], bool]
         same = True
         dir = self.nextDir()
         content_files = []
@@ -90,7 +90,7 @@ class DirDistributor:
             content_files.append(os.path.join(dir, f_name))
         hash_file = os.path.join(dir, "hashs.txt")
         hashs = list(self.calculateHash(content))
-        if os.path.isfile(hash_file) and self.compareHash(open(hash_file, "r"), hashs) and not params.redo_alignments:
+        if os.path.isfile(hash_file) and self.compareHash(open(hash_file, "r"), hashs) and not params.clean:
             return dir, content_files, True
         basic.recreate(dir)
         for reads, f_name in content:
