@@ -293,7 +293,10 @@ class LineExtender:
             if skip:
                 continue
             winner, seg = self.tournament(als) #type: AlignmentPiece, Segment
-            print "Winner:", winner, seg
+            if winner is None:
+                print "No winner"
+            else:
+                print "Winner for", winner.seg_from.contig.id, ":", winner, seg
             if winner is not None:
                 if seg not in active_segments:
                     print "Winner ignored since winning segment is too different from investigated segment"
