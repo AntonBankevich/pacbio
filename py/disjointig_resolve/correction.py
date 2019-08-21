@@ -130,6 +130,13 @@ class Correction:
                 if new_pos is not None:
                     # print pos_to, pos_from, new_pos, al.seg_to.contig[pos_to], al.seg_from.contig[pos_from], self.seq_from[new_pos]
                     new_pairs.append((pos_from, new_pos))
+            if len(new_pairs) == 0:
+                print al
+                print matching
+                print self.alignments
+                for al in self.alignments:
+                    print al
+                    print al.matchingSequence(True)
             new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
             corrected_matching = self.scorer.polyshMatching(new_matching)
             res[i] = corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from)
