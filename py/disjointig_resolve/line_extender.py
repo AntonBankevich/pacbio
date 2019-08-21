@@ -242,7 +242,11 @@ class LineExtender:
         line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k / 2,
                                  self.dot_plot.allInter(resolved)) # type: List[AlignmentPiece]
         line_alignments = [al for al in line_alignments if al.rc.seg_to.left > 20 or al.seg_from.left > 20 or al.isIdentical()]
-        print "Alternative lines:", line_alignments
+        print "Alternative lines:", map(str, line_alignments)
+        for al in line_alignments:
+            if not al.isIdentical():
+                print al
+                print "\n".join(al.asMatchingStrings())
         line_alignments = [al.reduce(target=resolved) for al in line_alignments]
         read_alignments = [] # type: List[Tuple[AlignmentPiece, Segment]]
         correct_segments = []
