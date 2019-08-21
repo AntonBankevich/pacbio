@@ -590,7 +590,7 @@ class AlignmentStorage(SmartStorage):
             # print als_right
             for al in als_left:
                 for j in range(len(als_right)): # type: int
-                    if als_left[j] is None:
+                    if als_right[j] is None:
                         continue
                     if als_right[j].seg_from.left >= al.seg_from.right:
                         break
