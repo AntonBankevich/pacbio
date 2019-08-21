@@ -102,7 +102,6 @@ class NewLineStorage(ContigStorage):
         line1 = alignment.seg_from.contig #type: NewLine
         line2 = alignment.seg_to.contig #type: NewLine
         assert line1 != line2
-
         # Cutting hanging tips of both lines
         al_storage = AlignmentStorage()
         al_storage.add(alignment)
@@ -127,7 +126,10 @@ class NewLineStorage(ContigStorage):
         line1.removeListener(storage.reverse)
 
         # Making sure line sequences match on the overlap
-        new_seq = Contig(line1.asSegment().prefix(pos=alignment.seg_from.left).Seq() + line2.seq, "new_seq")
+        if alignment.seg_from.left > 0:
+            new_seq = Contig(line1.asSegment().prefix(pos=alignment.seg_from.left).Seq() + line2.seq, "new_seq")
+        else:
+            new_seq = line2.seq
         al2 = AlignmentPiece.Identical(line2.asSegment(), new_seq.asSegment().suffix(length=len(line2)))
         print "Al2:", al2
         alignment = alignment.compose(al2).reverse()
