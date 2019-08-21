@@ -238,5 +238,5 @@ def CreateLog(dir):
         shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
     log = open(log_file, "w")
     sys.stdout = OStreamWrapper(sys.stdout, log)
-    sys.stdout.prefix = lambda s: time.strftime("%I:%M:%S") + "  "
+    sys.stdout.prefix = lambda s: time.strftime("%H:%M:%S") + "  "
     sys.stderr = sys.stdout
