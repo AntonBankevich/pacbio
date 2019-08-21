@@ -584,15 +584,16 @@ class AlignmentStorage(SmartStorage):
             als_left = sorted(als_left, key = lambda al: al.seg_from.right)
             als_right = [al for al, side in al_sides if side == 1] # type: List[AlignmentPiece]
             als_right = sorted(als_right, key = lambda al: al.seg_from.left)
-            curr = len(als_right)
             merged = []
             # print "Merging alignments from", c_from.id, "to", c_to.id
             # print als_left
             # print als_right
             for al in als_left:
-                while curr > 0 and ((als_right[curr - 1] is None or als_right[curr - 1].seg_from.left > al.seg_from.right)):
-                    curr -= 1
-                for j in range(curr): # type: int
+                for j in range(len(als_right)): # type: int
+                    if als_left[j] is None:
+                        continue
+                    if als_right[j].seg_from.left >= al.seg_from.right:
+                        break
                     # print "Attempting to merge", al, als_right[j]
                     if als_right[j] is not None and al.canMergeTo(als_right[j]):
                         # print "Passed first test"
