@@ -123,6 +123,7 @@ class Params:
         handler.writeTokenLine(self.load_from)
         handler.writeTokenLine(self.dir)
         handler.writeTokenLine(self.save_dir)
+        handler.writeToken(str(self.downsample))
 
     def load(self, handler):
         # type: (TokenReader) -> None
@@ -132,6 +133,7 @@ class Params:
         self.load_from = handler.readToken()
         self.dir = handler.readToken()
         self.save_dir = handler.readToken()
+        self.downsample = float(handler.readToken())
 
     def parseFlyeDir(self, flye_dir):
         if "00-assembly" in os.listdir(flye_dir):

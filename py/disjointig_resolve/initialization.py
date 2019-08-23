@@ -115,7 +115,7 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
     return contigs
 
 
-def CreateReadColection(reads_file, downsample):
+def CreateReadCollection(reads_file, downsample):
     sys.stdout.info("Creating read collection")
     num = params.downsample
     if downsample < 1:

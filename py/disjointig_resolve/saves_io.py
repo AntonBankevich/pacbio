@@ -7,6 +7,7 @@ from common import params
 from common.save_load import TokenReader, TokenWriter
 from common.sequences import ContigCollection
 from common.alignment_storage import ReadCollection
+from disjointig_resolve.initialization import CreateReadCollection
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
@@ -22,7 +23,7 @@ def loadAll(handler):
     contigs = ContigCollection()
     contigs.load(handler)
     sys.stdout.info("Loading reads")
-    reads = ReadCollection()
+    reads = CreateReadCollection(cl_params.reads_file, cl_params.downsample)
     reads.loadFromFasta(open(cl_params.reads_file, "r"), downsample=params.downsample)
     tmp_reads = reads.copy().addAllRC()
     sys.stdout.info("Loading disjointigs")

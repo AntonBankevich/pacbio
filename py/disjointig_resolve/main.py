@@ -26,7 +26,7 @@ from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params
 from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
-    CreateReadColection
+    CreateReadCollection
 
 
 def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
@@ -110,11 +110,13 @@ def main(args):
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         polisher = Polisher(aligner, aligner.dir_distributor)
 
-        reads = CreateReadColection(cl_params.reads_file, cl_params.downsample)
+        reads = CreateReadCollection(cl_params.reads_file, cl_params.downsample)
 
         if cl_params.contigs_file is None:
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
-            subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", "8", "--pacbio-raw", cl_params.reads_file, "--genome-size", str(5000000)])
+            reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
+            reads.print_fasta(open(reads_file, "w"))
+            subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", "8", "--pacbio-raw", reads_file, "--genome-size", str(5000000)])
             cl_params.set_flye_dir(assembly_dir)
 
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads)
