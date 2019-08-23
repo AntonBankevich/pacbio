@@ -113,7 +113,7 @@ def main(args):
         reads = CreateReadColection(cl_params.reads_file, cl_params.downsample)
 
         if cl_params.contigs_file is None:
-            assembly_dir = os.path.join(dir, "assembly_initial")
+            assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", "8", "--pacbio-raw", cl_params.reads_file, "--genome-size", str(5000000)])
             cl_params.set_flye_dir(assembly_dir)
 
