@@ -22,7 +22,7 @@ class Params:
         self.threads = 8
         self.test = False
         self.long_params = "test stats clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
-        self.short_params = "o:t:h"
+        self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
         self.new_disjointigs = False
@@ -80,6 +80,10 @@ class Params:
                 self.load_from = value
             elif key == "-t":
                 self.threads = int(value)
+            elif key == "-k":
+                params.k = int(value)
+            elif key == "-l":
+                params.l = int(value)
             elif key == "--focus":
                 self.focus = value.split(",")
             elif key == "--nofocus":

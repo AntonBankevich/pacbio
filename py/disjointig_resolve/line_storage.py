@@ -129,7 +129,7 @@ class NewLineStorage(ContigStorage):
         if alignment.seg_from.left > 0:
             new_seq = Contig(line1.asSegment().prefix(pos=alignment.seg_from.left).Seq() + line2.seq, "new_seq")
         else:
-            new_seq = line2.seq
+            new_seq = Contig(line2.seq, "new_seq")
         al2 = AlignmentPiece.Identical(line2.asSegment(), new_seq.asSegment().suffix(length=len(line2)))
         print "Al2:", al2
         alignment = alignment.compose(al2).reverse()
