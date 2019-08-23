@@ -21,13 +21,14 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats clean min-cov= nosplit flye-dir= graph= focus= nofocus output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:h"
         self.min_cov = 0
         self.stats = False
         self.new_disjointigs = False
         self.focus = None
         self.split = True
+        self.downsample = 1.
 
     def check(self):
         if self.dir is None:
@@ -57,13 +58,7 @@ class Params:
             elif key == "--test":
                 self.test = True
             elif key == "--flye-dir":
-                self.flye_dir = value
-                graph_file, contigs_file, disjointigs_file = self.parseFlyeDir(self.flye_dir)
-                if self.graph_file is None:
-                    self.graph_file = graph_file
-                if self.contigs_file is None:
-                    self.contigs_file = contigs_file
-                self.disjointigs_file_list.append(disjointigs_file)
+                self.set_flye_dir(value)
             elif key == "--stats":
                 self.stats = True
             elif key == "--nosplit":
@@ -89,12 +84,23 @@ class Params:
                 self.focus = value.split(",")
             elif key == "--nofocus":
                 self.focus = None
+            elif key == "--downsample":
+                self.downsample = float(value)
             elif key == "--help" or key == "-h":
                 self.print_usage_and_exit(0)
             else:
                 self.print_usage_and_exit(1)
         self.disjointigs_file_list = list(set(self.disjointigs_file_list))
         return self
+
+    def set_flye_dir(self, value):
+        self.flye_dir = value
+        graph_file, contigs_file, disjointigs_file = self.parseFlyeDir(self.flye_dir)
+        if self.graph_file is None:
+            self.graph_file = graph_file
+        if self.contigs_file is None:
+            self.contigs_file = contigs_file
+        self.disjointigs_file_list.append(disjointigs_file)
 
     def alignmentDir(self):
         return os.path.join(self.dir, "alignment")

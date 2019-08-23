@@ -110,7 +110,12 @@ def main(args):
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         polisher = Polisher(aligner, aligner.dir_distributor)
 
-        reads = CreateReadColection(cl_params.reads_file)
+        reads = CreateReadColection(cl_params.reads_file, cl_params.downsample)
+
+        if cl_params.contigs_file is None:
+            assembly_dir = os.path.join(dir, "assembly_initial")
+            subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", "8", "--pacbio-raw", cl_params.reads_file, "--genome-size", str(5000000)])
+            cl_params.set_flye_dir(assembly_dir)
 
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads)
 

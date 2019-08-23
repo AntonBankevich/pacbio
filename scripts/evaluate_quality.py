@@ -1,29 +1,19 @@
 import itertools
 import os
 import shutil
-import subprocess
 import sys
 import time
 
+from typing import List, Tuple, Dict
 
 sys.path.append("py")
 
 from common.dot_parser import DotParser
-from disjointig_resolve.unique_marker import UniqueMarker
 from alignment.align_tools import Aligner, DirDistributor
-from alignment.polishing import Polisher
-from common import basic, SeqIO, sam_parser
-from disjointig_resolve.dot_plot import LineDotPlot
-from disjointig_resolve.knotter import LineMerger
-from disjointig_resolve.tests import Tester
-from disjointig_resolve.line_extender import LineExtender
-from common.save_load import TokenReader, SaveHandler
-from common.sequences import ContigCollection, Contig
-from common.alignment_storage import ReadCollection, AlignmentPiece
-from disjointig_resolve.line_storage import NewLineStorage
-from disjointig_resolve.saves_io import loadAll, saveAll
-from disjointig_resolve.disjointigs import DisjointigCollection
-from disjointig_resolve.cl_params import Params
+from common import basic
+from common.sequences import ContigCollection
+from common.alignment_storage import AlignmentPiece
+
 
 def CreateLog(dir):
     old_logs_dir = os.path.join(dir, "old")
@@ -37,50 +27,70 @@ def CreateLog(dir):
     sys.stdout.prefix = lambda s: time.strftime("%I:%M:%S") + "  "
     sys.stderr = sys.stdout
 
+def extract_transfers(contigs, als):
+    # type: (ContigCollection, List[AlignmentPiece]) -> Dict[Tuple[str, str], Tuple[AlignmentPiece, AlignmentPiece]]
+    als = als + map(lambda al: al.rc, als)
+    als = sorted(als, key= lambda al: (al.seg_to.contig.id, al.seg_to.left))
+    res = dict()
+    for id, it in itertools.groupby(als, lambda al: al.seg_to.contig.id):
+        contig_als = list(it)
+        print contig_als[0].seg_to.contig
+        print [al.seg_from.contig.id for al in contig_als]
+        print map(str, contig_als)
+        for al1, al2 in zip(contig_als[:-1], contig_als[1:]):
+            res[(al1.seg_from.contig.id, al2.seg_from.contig.id)] = (al1, al2)
+            res[(al2.rc.seg_from.contig.id, al1.rc.seg_from.contig.id)] = (al2.rc, al1.rc)
+    return res
 
 def main(args):
-    cf = args[1]
-    rf = args[2]
-    dir = args[3]
+    unique_file = sys.argv[1]
+    graph_file = sys.argv[2]
+    our_file = sys.argv[3]
+    their_file = sys.argv[4]
+    dir = sys.argv[5]
+    min_cov = int(sys.argv[6])
     CreateLog(dir)
-    basic.ensure_dir_existance(dir)
-    aligner = Aligner(DirDistributor(os.path.join(dir, "alignments")))
-    contigs=ContigCollection().loadFromFasta(open(cf, "r"), False)
-    ref = ContigCollection().loadFromFasta(open(rf, "r"), False)
-    good = set()
-    print "Good"
-    for al in aligner.dotplotAlign(contigs, ref):
-        if len(al) > 20000:
-            al = al.reduce(target=al.seg_to.shrink(10000))
-        print al, len(al), al.percentIdentity()
-        print "\n".join(al.asMatchingStrings())
-        good.add(al.seg_from.contig.id)
-    contigs = contigs.filter(lambda contig: contig.id not in good)
-    print "Bad"
-    for al in aligner.localAlign(contigs, ref):
-        print al
+    unique_ids = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if val[4].unique and val[4].cov >= min_cov]
+    unique = ContigCollection()
+    unique.loadFromFasta(open(unique_file, "r"), num_names=True)
+    unique = unique.filter(lambda contig: contig.id in unique_ids)
+    our = ContigCollection().loadFromFasta(open(our_file, "r"), False)
+    their = ContigCollection().loadFromFasta(open(their_file, "r"), False)
+    aligner = Aligner(DirDistributor(dir))
+    our_als = list(aligner.overlapAlign(unique.unique(), our))
+    their_als = list(aligner.overlapAlign(unique.unique(), their))
+    our_transfers = extract_transfers(our, our_als)
+    their_transfers = extract_transfers(their, their_als)
 
-
-if __name__ == "__main__":
-    main(sys.argv)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    out = open(os.path.join(dir, "res.txt"), "w")
+    for o1, o2 in our_transfers:#type: str, str
+        alo1, alo2 = our_transfers[(o1,o2)]# type: AlignmentPiece, AlignmentPiece
+        if (o1,o2) in their_transfers:
+            print "Common transition:", o1, o2
+            alt1, alt2 = their_transfers[(o1,o2)] # type: AlignmentPiece, AlignmentPiece
+            alot1 = alo1.composeTargetDifference(alt1)
+            alot2 = alo2.composeTargetDifference(alt2)
+            if alot1.seg_from.right < alot2.seg_from.left:
+                copyo = alot1.seg_from.contig.segment(alot1.seg_from.right - 1, alot2.seg_from.left + 1).asContig()
+                copyt = alot1.seg_to.contig.segment(alot1.seg_to.right - 1, alot2.seg_to.left + 1).asContig()
+            else:
+                copyo = alot1.seg_from.contig.segment(alot2.seg_from.left, alot1.seg_from.right).asContig()
+                copyt = alot1.seg_to.contig.segment(alot2.seg_to.left, alot2.seg_to.right).asContig()
+            diff = list(aligner.overlapAlign(ContigCollection([copyo]), ContigCollection([copyt])))
+            if len(diff) != 1:
+                print "Bad copy alignments"
+                print map(str, diff)
+            else:
+                diff = diff[0]
+                out.write(str(len(copyo)) + " " + str(len(copyt)) + " " + str(diff.percentIdentity()) + "\n")
+                print [diff.seg_from.left, diff.seg_from.right], diff.seg_to, len(diff), diff.percentIdentity()
+                print "\n".join(diff.asMatchingStrings())
+        else:
+            print "Our new transition:", o1, o2
+    for o1, o2 in their_transfers:#type: str, str
+        if (o1,o2) not in our_transfers:
+            print "Missing transition:", o1, o2
+    out.close()
 
 if __name__ == "__main__":
     main(sys.argv)
