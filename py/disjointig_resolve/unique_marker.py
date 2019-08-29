@@ -129,10 +129,10 @@ class UniqueMarker:
         for line in list(lines.unique()):  # type:NewLine
             if len(line.completely_resolved) == 0:
                 lines.remove(line)
-            else:
-                line.initial.clean()
-                for seg in line.completely_resolved:
-                    line.initial.add(AlignmentPiece.Identical(seg.asContig().asSegment(), seg))
+            # else:
+            #     line.initial.clean()
+            #     for seg in line.completely_resolved:
+            #         line.initial.add(AlignmentPiece.Identical(seg.asContig().asSegment(), seg))
 
     def medianCoverage(self, covs, line):
         clen = 0

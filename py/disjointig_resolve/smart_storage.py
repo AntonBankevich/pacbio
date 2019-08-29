@@ -525,15 +525,9 @@ class AlignmentStorage(SmartStorage):
                     # res.append(self.items[r])
                     yield self.items[l]
                 l -= 1
-            # tmp = []
             # for al in self: # type: AlignmentPiece
             #     if al.seg_to.interSize(seg) >= min_inter:
-            #         tmp.append(al)
-            # if len(res) != len(tmp):
-            #     print res
-            #     print tmp
-            #     sys.exit(1)
-
+            #         yield al
         else:
             for al in self.rc.allInter(seg.RC(), min_inter):
                 yield al.rc
