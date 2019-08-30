@@ -1,4 +1,5 @@
 import itertools
+import sys
 
 from typing import Optional, Tuple, List, Dict, Iterable, Set, Generator, Union, Iterator
 
@@ -108,6 +109,7 @@ class LineExtender:
     # input: a collection of segments that had reads recruited to.
     def updateAllStructures(self, interesting_segments):
         # type: (Iterable[Segment]) -> None
+        sys.stdout.info("Updating structures:", interesting_segments)
         # Correct contig sequences, update correct segment storages. Return segments that were corrected.
         corrected = self.correctSequences(interesting_segments)
         # Collect all relevant contig segments, collect all reads that align to relevant segments. Mark resolved bound for each read.

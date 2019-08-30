@@ -21,13 +21,14 @@ from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.unique_marker import UniqueMarker
 
 
-def CreateLineCollection(aligner, contigs, disjointigs, reads, split):
+def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     sys.stdout.info("Creating line collection")
     lines = NewLineStorage(disjointigs, aligner)
     if split:
         lines.splitFromContigs(contigs)
     else:
         lines.fillFromContigs(contigs)
+    lines.writeToFasta(open(os.path.join(dir, "initial_lines.fasta"), "w"))
     lines.alignDisjointigs()
     # lines.fillFromDisjointigs()
     sys.stdout.info("Constructing line dot plot")
@@ -65,6 +66,7 @@ def CreateLineCollection(aligner, contigs, disjointigs, reads, split):
     knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
     extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
     extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
+    lines.writeToFasta(open(os.path.join(dir, "initial_prolonged_lines.fasta"), "w"))
     return dot_plot, extender, lines
 
 
@@ -79,7 +81,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     tlen0 = sum(map(len, bad_reads))
     good_reads = set()
     for al in aligner.localAlign(reads, disjointigs):
-        if not al.contradictingRTC(al.seg_to.contig.asSegment(), 500):
+        if not al.contradictingRTC(al.seg_to.contig.asSegment(), params.bad_end_length) and len(al.seg_from.contig) > len(al) - 2 * params.bad_end_length:
             good_reads.add(al.seg_from.contig.id)
     sys.stdout.info("Fraction of reads without full alignment to disjointigs:", 1 - float(len(good_reads)) / len(reads))
     rf = os.path.join(dir, "badreads.fasta")
@@ -95,6 +97,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     print "Disjointigs:"
     for dis in disjointigs:
         print dis.id, len(dis)
+    disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta")), "w")
     sys.stdout.info("Aligning reads to disjointigs")
     disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
     return disjointigs

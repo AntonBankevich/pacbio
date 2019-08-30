@@ -122,7 +122,10 @@ class OStreamWrapper:
                     stream.write(line)
 
     def info(self, *strings):
-        self.log(params.LogPriority.main_parts, " ".join(map(str, strings)))
+        self.log(params.LogPriority.main_parts, "INFO: " + " ".join(map(str, strings)))
+
+    def substage(self, *strings):
+        self.log(params.LogPriority.main_parts, "SUBSTAGE: " + " ".join(map(str, strings)))
 
     def warn(self, *strings):
         self.log(params.LogPriority.warning, "WARNING: " + " ".join(map(str, strings)))

@@ -123,7 +123,7 @@ def main(args):
 
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
-        dot_plot, extender, lines = CreateLineCollection(aligner, contigs, disjointigs, reads, cl_params.split)
+        dot_plot, extender, lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split)
 
         print "Saving initial state"
         try:

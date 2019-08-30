@@ -123,6 +123,10 @@ class ContigStorage:
                 self.add(Contig(rec.seq, rec.id))
         return self
 
+    def writeToFasta(self, handler):
+        for contig in self.unique():
+            SeqIO.write(contig, handler, "fasta")
+
 
 #TODO: Merge with EasyContigStorage
 class ContigCollection(ContigStorage):
