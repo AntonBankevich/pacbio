@@ -97,7 +97,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     print "Disjointigs:"
     for dis in disjointigs:
         print dis.id, len(dis)
-    disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta")), "w")
+    disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta"), "w"))
     sys.stdout.info("Aligning reads to disjointigs")
     disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
     return disjointigs
