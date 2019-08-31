@@ -494,7 +494,7 @@ class AlignmentPiece:
     def split(self):
         res = [] # type: List[Tuple[Segment, Segment]]
         for seg_from, seg_to in self.matchingBlocks():
-            if len(res) > 0 and seg_from.left - res[-1][0].right > 20 or seg_to.left - res[-1][1] > 100:
+            if len(res) > 0 and (seg_from.left - res[-1][0].right > 20 or seg_to.left - res[-1][1] > 100):
                 yield AlignmentPiece.FromBlocks(res)
                 res = []
             res.append((seg_from, seg_to))
