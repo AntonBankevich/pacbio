@@ -89,7 +89,7 @@ class Params:
                 self.print_usage_and_exit(0)
             else:
                 late_options.append((key, value))
-        for (key, value) in options_list:
+        for (key, value) in late_options:
             if key == "--graph":
                 self.graph_file = value
             if key == "--mode":
