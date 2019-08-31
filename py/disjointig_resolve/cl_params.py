@@ -61,6 +61,9 @@ class Params:
                 self.test = True
             elif key == "--flye-dir":
                 self.set_flye_dir(value, self.mode)
+            elif key == "--mode":
+                self.mode = value
+                self.set_flye_dir(self.flye_dir, self.mode)
             elif key == "--stats":
                 self.stats = True
             elif key == "--nosplit":
@@ -89,12 +92,11 @@ class Params:
                 self.print_usage_and_exit(0)
             else:
                 late_options.append((key, value))
+        if self.flye_dir is not None:
+            self.set_flye_dir(self.flye_dir, self.mode)
         for (key, value) in late_options:
             if key == "--graph":
                 self.graph_file = value
-            if key == "--mode":
-                self.mode = value
-                self.set_flye_dir(self.flye_dir, self.mode)
             elif key == "--contigs":
                 self.contigs_file = value
             elif key == "--disjointigs":
