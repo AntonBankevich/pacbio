@@ -492,24 +492,11 @@ class AlignmentPiece:
 
 
     def split(self):
-        res = []
-        prev = 0
-        w = 100
+        res = [] # type: List[Tuple[Segment, Segment]]
         for seg_from, seg_to in self.matchingBlocks():
-            while prev + 1 < len(res) and res[prev + 1][1].left < seg_to.left - w:
-                prev += 1
-            if len(res) > 0:
-                if abs((seg_from.left - res[prev][0].left) - (seg_to.left - res[prev][1].left)) > 40:
-                    # print "New part:"
-                    # for b1, b2 in res:
-                    #     print b1.Seq()
-                    #     print b2.Seq()
-                    if max(res[-1][0].right - res[0][0].left, res[-1][1].right - res[0][1].left) < 2 * sum(map(lambda p: len(p[0]), res)) and \
-                            res[-1][0].right - res[0][0].left > 200:
-                        yield AlignmentPiece.FromBlocks(res)
-                    res = []
-                    prev = 0
-            res.append((seg_from, seg_to))
+            if len(res) > 0 and seg_from.left - res[-1][0].right > 20 or seg_to.left - res[-1][1] > 100:
+                yield AlignmentPiece.FromBlocks(res)
+                res = []
         if res[0][0].left == self.seg_from.left:
             yield self
         else:

@@ -21,7 +21,7 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats mode clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
@@ -29,6 +29,7 @@ class Params:
         self.focus = None
         self.split = True
         self.downsample = 1.
+        self.mode = "before"
 
     def check(self):
         if self.dir is None:
@@ -50,6 +51,7 @@ class Params:
             sys.stderr.write(str(exc) + "\n")
             self.print_usage_and_exit(1)
             return
+        late_options = []
         for (key, value) in options_list:
             if key == "--output-dir" or key == "-o":
                 self.dir = value
@@ -58,24 +60,17 @@ class Params:
             elif key == "--test":
                 self.test = True
             elif key == "--flye-dir":
-                self.set_flye_dir(value)
+                self.set_flye_dir(value, self.mode)
             elif key == "--stats":
                 self.stats = True
             elif key == "--nosplit":
                 self.split = False
             elif key == "--clean":
                 params.clean = True
-            elif key == "--graph":
-                self.graph_file = value
             elif key == "--reads":
                 self.reads_file = value
-            elif key == "--contigs":
-                self.contigs_file = value
             elif key == "--min-cov":
                 self.min_cov = float(value)
-            elif key == "--disjointigs":
-                self.disjointigs_file_list.append(value)
-                self.new_disjointigs = True
             elif key == "--load":
                 self.load_from = value
             elif key == "-t":
@@ -93,13 +88,30 @@ class Params:
             elif key == "--help" or key == "-h":
                 self.print_usage_and_exit(0)
             else:
+                late_options.append((key, value))
+        for (key, value) in options_list:
+            if key == "--graph":
+                self.graph_file = value
+            if key == "--mode":
+                self.mode = value
+                self.set_flye_dir(self.flye_dir, self.mode)
+            elif key == "--contigs":
+                self.contigs_file = value
+            elif key == "--disjointigs":
+                self.disjointigs_file_list.append(value)
+                self.new_disjointigs = True
+            else:
+                print "Unknown option", key, value
                 self.print_usage_and_exit(1)
         self.disjointigs_file_list = list(set(self.disjointigs_file_list))
         return self
 
-    def set_flye_dir(self, value):
+    def set_flye_dir(self, value, mode):
         self.flye_dir = value
-        graph_file, contigs_file, disjointigs_file = self.parseFlyeDir(self.flye_dir)
+        graph_file, contigs_file, disjointigs_file, graph_file_after, contigs_file_after = self.parseFlyeDir(self.flye_dir)
+        if mode == "after":
+            graph_file = graph_file_after
+            contigs_file = contigs_file_after
         if self.graph_file is None:
             self.graph_file = graph_file
         if self.contigs_file is None:
@@ -141,9 +153,10 @@ class Params:
 
     def parseFlyeDir(self, flye_dir):
         if "00-assembly" in os.listdir(flye_dir):
-            res = os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "10-consensus", "consensus.fasta")
+            res = os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "10-consensus", "consensus.fasta"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta")
         else:
             res = os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "1-consensus", "consensus.fasta")
+        res = res + (os.path.join(self.flye_dir, "assembly_graph.gv"), os.path.join(self.flye_dir, "scaffolds.fasta"))
         for f in res:
             assert os.path.isfile(f), f
         return res
