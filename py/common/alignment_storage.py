@@ -497,6 +497,7 @@ class AlignmentPiece:
             if len(res) > 0 and seg_from.left - res[-1][0].right > 20 or seg_to.left - res[-1][1] > 100:
                 yield AlignmentPiece.FromBlocks(res)
                 res = []
+            res.append((seg_from, seg_to))
         if res[0][0].left == self.seg_from.left:
             yield self
         else:
