@@ -23,13 +23,16 @@ def printAlignments(sam_handler, reference_handler, reads_handler):
                 al = al.rc
             res.append(al)
     print "Printing result", len(res)
-#    res = sorted(res, key = lambda al: al.seg_to.left)
-    res = sorted(res, key = lambda al: len(al))[::-1]
+    res = sorted(res, key = lambda al: al.seg_to.left)
+#    res = sorted(res, key = lambda al: len(al))[::-1]
+    up = 0
+    down = 0
     for al in res:
         print al
         print list(al.split())
-        continue
         s1, s2 = al.asMatchingStrings()
+        up += s1.count("-")
+        down += s2.count("-")
         s = []
         if len(list(al.split())) > 1:
             nums = []
@@ -56,6 +59,7 @@ def printAlignments(sam_handler, reference_handler, reads_handler):
             print "".join(s)
         print s1
         print s2
+    print up, down
 
 
 
