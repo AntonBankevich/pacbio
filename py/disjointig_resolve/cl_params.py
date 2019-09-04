@@ -155,7 +155,7 @@ class Params:
 
     def parseFlyeDir(self, flye_dir):
         if "00-assembly" in os.listdir(flye_dir):
-            res = os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "10-consensus", "consensus.fasta"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta")
+            res = os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "10-consensus", "consensus.fasta")
         else:
             res = os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "1-consensus", "consensus.fasta")
         res = res + (os.path.join(self.flye_dir, "assembly_graph.gv"), os.path.join(self.flye_dir, "scaffolds.fasta"))
