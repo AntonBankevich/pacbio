@@ -31,12 +31,8 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     lines.writeToFasta(open(os.path.join(dir, "initial_lines.fasta"), "w"))
     lines.alignDisjointigs()
     # lines.fillFromDisjointigs()
-    sys.stdout.info("Constructing line dot plot")
-    dot_plot = LineDotPlot(lines, aligner)
-    dot_plot.construct(aligner)
-    dot_plot.printAll(sys.stdout)
     sys.stdout.info("Marking unique regions")
-    UniqueMarker(aligner).markAllUnique(lines, dot_plot, reads)
+    UniqueMarker(aligner).markAllUnique(lines, reads)
     for line in lines.unique():
         print line, line.completely_resolved
     if not split:
@@ -62,6 +58,10 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     analyser = CoverageAnalyser(aligner, reads)
     sys.stdout.info("Analysing k-mer coverage by reads.")
     analyser.printAnalysis(analyser.analyseLines(lines))
+    sys.stdout.info("Constructing line dot plot")
+    dot_plot = LineDotPlot(lines, aligner)
+    dot_plot.construct(aligner)
+    dot_plot.printAll(sys.stdout)
     sys.stdout.info("Updating sequences and resolved segments.")
     knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
     extender = LineExtender(aligner, knotter, disjointigs, dot_plot)

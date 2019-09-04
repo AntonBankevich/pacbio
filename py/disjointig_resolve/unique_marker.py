@@ -45,8 +45,8 @@ class UniqueMarker:
         res.append((line.segment(left, prev), cur))
         return res
 
-    def markUniqueInLine(self, line, dot_plot):
-        # type: (NewLine, LineDotPlot) -> None
+    def markUniqueInLine(self, line):
+        # type: (NewLine) -> None
         print "Finding unique in", line
 
 
@@ -79,11 +79,6 @@ class UniqueMarker:
         print "out:", out
         segs1 = inc.orderedCap(out)
         print "segs1:", segs1
-        print "Line alignments:"
-        line_als = AlignmentStorage().addAll(dot_plot.allInter(line.asSegment()))
-        print "als:", line_als
-        segs2 = line_als.filterByCoverage(1, 2)
-        print "segs2:", segs2
         # segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
         segs = segs1.filterBySize(min = params.max_allowed_unaligned).expand(params.k / 2).expandTo(params.k + 50).filterBySize(min=params.k)
         # segs = segs1.expand(params.k / 2).filterBySize(min = params.k)
@@ -113,8 +108,8 @@ class UniqueMarker:
         segs = segs.cap(line.correct_segments, params.k)
         line.completely_resolved.addAll(segs)
 
-    def markAllUnique(self, lines, dot_plot, reads):
-        # type: (NewLineStorage, LineDotPlot, Iterable[AlignedRead]) -> None
+    def markAllUnique(self, lines, reads):
+        # type: (NewLineStorage, Iterable[AlignedRead]) -> None
         sys.stdout.info("Aligning reads to contigs")
         for al in self.aligner.localAlign(reads, lines):
             if len(al.seg_to) >= params.k:
@@ -125,7 +120,7 @@ class UniqueMarker:
             self.splitBad(line, lines)
         sys.stdout.info("Marking unique regions in lines")
         for line in lines.unique():
-            self.markUniqueInLine(line, dot_plot)
+            self.markUniqueInLine(line)
         for line in list(lines.unique()):  # type:NewLine
             if len(line.completely_resolved) == 0:
                 lines.remove(line)

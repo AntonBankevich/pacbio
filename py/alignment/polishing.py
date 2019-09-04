@@ -266,10 +266,10 @@ class Polisher:
                 num = max(min_cov, len(relevant_als)  * 8 / 10)
                 if num >= len(positions):
                     continue
-                print "Chose to use read", base_al, "Alignments:"
-                print map(str, reduced_read_list)
                 cutoff_pos = max(positions[num - 1], len(start))
                 if cutoff_pos > len(start) + 100:
+                    print "Chose to use read", base_al, "Alignments:"
+                    print map(str, reduced_read_list)
                     found = True
                     new_contig_candidate = Contig(new_contig.seq + polished_base[len(start):cutoff_pos], "candidate")
                     embedding = AlignmentPiece.Identical(polished_base.segment(len(start), cutoff_pos), new_contig_candidate.asSegment().suffix(pos=len(new_contig)))
@@ -308,6 +308,9 @@ class Polisher:
                     finished_als = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in finished_als]
                     new_contig = new_contig_candidate
                     break
+                else:
+                    print "Could not prolong with read", base_al, "Alignments:"
+                    print map(str, reduced_read_list)
             if not found:
                 break
         return new_contig, relevant_als + finished_als

@@ -34,6 +34,7 @@ class LineMerger:
             self.al1 = al1
             self.al2 = al2
             self.other = al2.seg_to.contig # type: NewLine
+            self.initial_gap = line.rc.initial[0].seg_to.left + self.gap + self.other.initial[0].seg_to.left
 
         def __repr__(self):
             return str([self.other, self.gap, self.al1, self.al2])
@@ -73,10 +74,11 @@ class LineMerger:
                     return None
                 # assert False, "Ambiguous knotting to the same line" + str(recs[0])
             avg = sum([rec.gap for rec in recs]) / len(recs)
-            final_candidates.append((avg, recs[0].other, recs))
+            avg_initial = sum([rec.initial_gap for rec in recs]) / len(recs)
+            final_candidates.append((avg, recs[0].other, recs, avg_initial))
         if len(final_candidates) == 0:
             return None
-        final_candidates = sorted(final_candidates)
+        final_candidates = sorted(final_candidates, key = lambda candidate: candidate[-1])
         final = final_candidates[0]
         if len(final_candidates) > 1:
             print "Extra candidates:"

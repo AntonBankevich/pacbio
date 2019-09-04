@@ -458,7 +458,7 @@ class UniqueRegionMarkingTest(SimpleTest):
         data = TokenReader(StringIO(" ".join(instance)))
         dataset = TestDataset.loadStructure(data)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
+        UniqueMarker(self.aligner).markAllUnique(lines, reads)
         ethalon1 = data.readToken()
         ethalon2 = data.readToken()
         line = lines[dataset.contigs[0].id]
@@ -501,7 +501,7 @@ class KnottingTest(SimpleTest):
         read1 = reads[read1]
         read2 = reads[read2]
         line1 = lines[name1]
-        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
+        UniqueMarker(self.aligner).markAllUnique(lines, reads)
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         dp.printAll(sys.stdout)
         res = knotter.tryMergeRight(line1)
@@ -523,7 +523,7 @@ class StructureUpdatingTest(SimpleTest):
         name2 = dataset.addContig("klmCDE")
         dataset.generateReads(4, 20, True)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
+        UniqueMarker(self.aligner).markAllUnique(lines, reads)
         line1 = lines[name1]
         line2 = lines[name2]
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
@@ -541,7 +541,7 @@ class StructureUpdatingTest(SimpleTest):
         name2 = dataset.addContig("klmCDE")
         dataset.generateReads(4, 20, True)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
+        UniqueMarker(self.aligner).markAllUnique(lines, reads)
         line1 = lines[name1]
         line2 = lines[name2]
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
@@ -568,7 +568,7 @@ class LineExtensionTest(SimpleTest):
         for s in instance[3:]:
             dataset.addContig(s)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
+        UniqueMarker(self.aligner).markAllUnique(lines, reads)
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         extender = LineExtender(self.aligner, knotter, lines.disjointigs, dp)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
@@ -603,7 +603,7 @@ class LineExtensionTest(SimpleTest):
         name2 = dataset.addContig("klmCDE")
         dataset.generateReads(5, 25, True)
         lines, dp, reads = dataset.genAll(self.aligner)
-        UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
+        UniqueMarker(self.aligner).markAllUnique(lines, reads)
         line1 = lines[name1]
         line2 = lines[name2]
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)

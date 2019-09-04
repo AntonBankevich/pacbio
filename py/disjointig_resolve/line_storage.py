@@ -64,7 +64,7 @@ class NewLineStorage(ContigStorage):
     def fillFromContigs(self, contigs):
         # type: (Iterable[Contig]) -> None
         for contig in UniqueList(contigs):
-            line = self.addNew(contig.seq, contig.id)
+            line = self.addNew(contig.seq, "L" + contig.id)
             line.initial.add(AlignmentPiece.Identical(contig.asSegment(), line.asSegment()))
 
     def splitFromContigs(self, contigs, max_contig = 40000, cut_size = 10000):
@@ -73,14 +73,14 @@ class NewLineStorage(ContigStorage):
             if not basic.isCanonocal(contig.id):
                 contig = contig.rc
             if len(contig) > max_contig:
-                line1 = self.addNew(contig.seq[:cut_size], contig.id + "l")
-                line2 = self.addNew(contig.seq[-cut_size:], contig.id + "r")
+                line1 = self.addNew(contig.seq[:cut_size], "L" + contig.id + "l")
+                line2 = self.addNew(contig.seq[-cut_size:], "L" + contig.id + "r")
                 line1.initial.add(AlignmentPiece.Identical(contig.asSegment().prefix(length=cut_size), line1.asSegment()))
                 line2.initial.add(AlignmentPiece.Identical(contig.asSegment().suffix(length=cut_size), line2.asSegment()))
                 line1.tie(line2, len(contig) - 2 * cut_size, contig.seq[cut_size:-cut_size])
             else:
-                line = self.addNew(contig.seq, contig.id)
-                line.initial.add(AlignmentPiece.Identical(contig.asSegment(), contig.asSegment()))
+                line = self.addNew(contig.seq, "L" + contig.id)
+                line.initial.add(AlignmentPiece.Identical(contig.asSegment(), line.asSegment()))
 
     def alignDisjointigs(self):
         for line in self:
