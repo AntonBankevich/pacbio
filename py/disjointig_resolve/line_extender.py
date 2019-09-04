@@ -394,7 +394,7 @@ class LineExtender:
         segs.sort()
         for seg in segs:
             corrections.add(self.polisher.polishSegment(seg, list(line.read_alignments.allInter(seg))))
-        line.correctSequence(corrections.items)
+        line.correctSequence(list(corrections))
         line.removeListener(segs)
         return list(segs)
 
@@ -538,7 +538,7 @@ class LineExtender:
 
     def attemptProlongResolved(self, rec):
         # type: (Record) -> bool
-        print "Werking on prolonging", rec.resolved
+        print "Working on prolonging", rec.resolved
         res = self.findAndFilterResolvedBound(rec, params.k)
         if res <= rec.resolved.right:
             print "No luck with", rec.resolved

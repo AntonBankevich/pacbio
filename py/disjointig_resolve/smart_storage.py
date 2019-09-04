@@ -403,6 +403,7 @@ class AlignmentStorage(SmartStorage):
         self.items = items # type: List[AlignmentPiece]
         self.rc = rc # type: AlignmentStorage
         self.key = lambda al: (al.seg_to.left, al.seg_to.right, al.seg_from.contig.id)
+        self.max_len = params.max_read_length
 
     def checkLine(self, line):
         for al in self:
@@ -438,6 +439,8 @@ class AlignmentStorage(SmartStorage):
         if self.isCanonical():
             self.items.append(al)
             self.sorted = False
+            self.max_len = max(self.max_len, len(al.seg_to))
+            self.rc.max_len = self.max_len
         else:
             self.rc.add(al.rc)
 
@@ -520,7 +523,7 @@ class AlignmentStorage(SmartStorage):
                 else:
                     l = m
             # res = []
-            while l >= 0 and self.items[l].seg_to.left >= seg.left - params.max_read_length:
+            while l >= 0 and self.items[l].seg_to.left >= seg.left - self.max_len:
                 if self.items[l].seg_to.interSize(seg) >= min_inter:
                     # res.append(self.items[r])
                     yield self.items[l]

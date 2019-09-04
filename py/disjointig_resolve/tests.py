@@ -188,7 +188,8 @@ class TestDataset:
         lines = NewLineStorage(disjointigs, aligner)
         lines.name_printer = lambda line: line.id + "_" + self.translateBack(line, aligner)
         for line in self.contigs:
-            lines.addNew(line.seq, line.id)
+            new_line = lines.addNew(line.seq, line.id)
+            new_line.initial.add(AlignmentPiece.Identical(new_line.asSegment().asContig().asSegment(), new_line.asSegment()))
         dp = LineDotPlot(lines, aligner)
         dp.construct(aligner)
         lines.alignDisjointigs()
@@ -320,7 +321,7 @@ class AlignmentStorageTest(SimpleTest):
         al3 = AlignmentPiece.Identical(contig1.segment(4, 8), contig2.segment(8, 12))
         storage = AlignmentStorage()
         storage.addAll([al1, al2, al3])
-        assert str(storage.items) == "[(from[0:4]->to[0:4]:1.000), (from[0:4]->to[4:12-4]:1.000), (from[4:12-4]->to[8:12-0]:1.000)]"
+        assert str(list(storage)) == "[(from[0:4]->to[0:4]:1.000), (from[0:4]->to[4:12-4]:1.000), (from[4:12-4]->to[8:12-0]:1.000)]"
         assert str(list(storage.rc)) == "[(-from[4:12-4]->-to[0:4]:1.000), (-from[8:12-0]->-to[4:12-4]:1.000), (-from[8:12-0]->-to[8:12-0]:1.000)]"
         assert str(list(storage.calculateCoverage())) == "[(to[0:12-0], 1)]"
         assert str(list(storage.filterByCoverage(0, 1))) == "[]"
@@ -475,16 +476,16 @@ class ReadRecruitmentTest(SimpleTest):
         # dataset.saveStructure(TokenWriter(sys.stdout))
         lines, dp, reads = dataset.genAll(self.aligner)
         # UniqueMarker().markAllUnique(lines, dp)
-        line1 = lines["L" + name1]
+        line1 = lines[name1]
         line1.correct_segments.add(line1.asSegment())
         line1.completely_resolved.add(line1.asSegment())
-        line2 = lines["L" + name2]
+        line2 = lines[name2]
         line2.correct_segments.add(line2.asSegment())
         line2.completely_resolved.add(line2.asSegment())
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         res = extender.attemptCleanResolution(line1.asSegment())
-        assert str(res[0][1]) == "[(R2_bcde[0:2200-0]->LC0_abcde[550:2750-0]:0.97), (R3_bcde[4:2192-0]->LC0_abcde[553:2750-0]:0.97), (R4_cdef[0:1657]->LC0_abcde[1100:2750-0]:0.96), (R5_cdef[0:1656]->LC0_abcde[1100:2750-0]:0.96)]", str(res[0][1])
-        assert str(res[1][1]) == "[(R24_mCDE[0:2201-0]->LC1_klmCDE[1100:3298-0]:0.97), (R25_mCDE[0:2194-0]->LC1_klmCDE[1100:3298-0]:0.96), (R27_CDEF[0:1658]->LC1_klmCDE[1651:3298-0]:0.96)]", str(res[1][1])
+        assert str(res[0][1]) == "[(R2_bcde[0:2200-0]->C0_abcde[550:2750-0]:0.97), (R3_bcde[4:2192-0]->C0_abcde[553:2750-0]:0.97), (R4_cdef[0:1657]->C0_abcde[1100:2750-0]:0.96), (R5_cdef[0:1656]->C0_abcde[1100:2750-0]:0.96)]", str(res[0][1])
+        assert str(res[1][1]) == "[(R24_mCDE[0:2201-0]->C1_klmCDE[1100:3298-0]:0.97), (R25_mCDE[0:2194-0]->C1_klmCDE[1100:3298-0]:0.96), (R27_CDEF[0:1658]->C1_klmCDE[1651:3298-0]:0.96)]", str(res[1][1])
 
 
 class KnottingTest(SimpleTest):
@@ -499,7 +500,7 @@ class KnottingTest(SimpleTest):
         lines, dp, reads = dataset.genAll(self.aligner)
         read1 = reads[read1]
         read2 = reads[read2]
-        line1 = lines["L" + name1]
+        line1 = lines[name1]
         UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         dp.printAll(sys.stdout)
@@ -523,15 +524,15 @@ class StructureUpdatingTest(SimpleTest):
         dataset.generateReads(4, 20, True)
         lines, dp, reads = dataset.genAll(self.aligner)
         UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
-        line1 = lines["L" + name1]
-        line2 = lines["L" + name2]
+        line1 = lines[name1]
+        line2 = lines[name2]
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         extender.updateAllStructures(list(line1.correct_segments))
         print str(line1.correct_segments), str(line1.completely_resolved), str(line2.correct_segments), str(line2.completely_resolved)
-        assert str(line1.correct_segments) == "ReadStorage+:[LC0_abcde[0:2200]]", str(line1.correct_segments)
-        assert str(line1.completely_resolved) == "ReadStorage+:[LC0_abcde[0:2195]]", str(line1.completely_resolved)
-        assert str(line2.correct_segments) == "ReadStorage+:[LC1_klmCDE[0:2745]]", str(line2.correct_segments)
-        assert str(line2.completely_resolved) == "ReadStorage+:[LC1_klmCDE[0:2745]]", str(line2.completely_resolved)
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2200]]", str(line1.correct_segments)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2195]]", str(line1.completely_resolved)
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2745]]", str(line2.correct_segments)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2745]]", str(line2.completely_resolved)
 
     def test2(self):
         dataset = TestDataset("abcdefgcijklmCDEFGHInopqr")
@@ -541,8 +542,8 @@ class StructureUpdatingTest(SimpleTest):
         dataset.generateReads(4, 20, True)
         lines, dp, reads = dataset.genAll(self.aligner)
         UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
-        line1 = lines["L" + name1]
-        line2 = lines["L" + name2]
+        line1 = lines[name1]
+        line2 = lines[name2]
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
         # extender.updateAllStructures(list(line1.correct_segments))
@@ -551,10 +552,10 @@ class StructureUpdatingTest(SimpleTest):
         print str(line1.completely_resolved)
         print str(line2.correct_segments)
         print str(line2.completely_resolved)
-        assert str(line1.correct_segments) == "ReadStorage+:[LC0_abcde[550:3850]]", str(line1.correct_segments)
-        assert str(line1.completely_resolved) == "ReadStorage+:[LC0_abcde[550:3000], LC0_abcde[3300:3845]]", str(line1.completely_resolved)
-        assert str(line2.correct_segments) == "ReadStorage+:[LC1_klmCDE[550:4395]]", str(line2.correct_segments)
-        assert str(line2.completely_resolved) == "ReadStorage+:[LC1_klmCDE[851:3549], LC1_klmCDE[3851:4395]]", str(line2.completely_resolved)
+        assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[550:3850]]", str(line1.correct_segments)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[550:3000], C0_abcde[3300:3845]]", str(line1.completely_resolved)
+        assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[550:4395]]", str(line2.correct_segments)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[851:3549], C1_klmCDE[3851:4395]]", str(line2.completely_resolved)
 
 
 class LineExtensionTest(SimpleTest):
@@ -603,8 +604,8 @@ class LineExtensionTest(SimpleTest):
         dataset.generateReads(5, 25, True)
         lines, dp, reads = dataset.genAll(self.aligner)
         UniqueMarker(self.aligner).markAllUnique(lines, dp, reads)
-        line1 = lines["L" + name1]
-        line2 = lines["L" + name2]
+        line1 = lines[name1]
+        line2 = lines[name2]
         knotter = LineMerger(lines, Polisher(self.aligner, self.aligner.dir_distributor), dp)
         extender = LineExtender(self.aligner, knotter, lines.disjointigs, dp)
         print "New iteration results"
