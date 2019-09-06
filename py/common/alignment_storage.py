@@ -202,6 +202,22 @@ class AlignmentPiece:
                     prevb = b
         return "".join(map(str, res))
 
+    def trimByQuality(self, div, w):
+        blocks = list(self.matchingBlocks())
+        right_ind = 0
+        cur_indel = 0
+        for left_ind, left in enumerate(blocks):
+            while right_ind < len(blocks) and blocks[right_ind][1].right - left[1].left < w:
+                cur_indel += blocks[right_ind + 1][0].left - blocks[right_ind][0].right + blocks[right_ind + 1][1].left - blocks[right_ind][1].right
+                right_ind += 1
+            if blocks[right_ind][1].right - left[1].left < w:
+                return self
+            if cur_indel > div * (blocks[right_ind][1].right - left[1].left):
+                return AlignmentPiece.FromBlocks(blocks[:left_ind + 1])
+            if left_ind  + 1 < len(blocks):
+                cur_indel += blocks[left_ind + 1][0].left - blocks[left_ind][0].right + blocks[left_ind + 1][1].left - blocks[left_ind][1].right
+        return self
+
     def __repr__(self):
         if len(self) < 20000:
             pid = self.percentIdentity()

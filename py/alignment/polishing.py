@@ -261,7 +261,7 @@ class Polisher:
                         print reduced_read_list[i].seq
                         print polished_base.seq
                     assert al is not None, reduced_read_list[i]
-                    positions.append(al.seg_to.right)
+                    positions.append(al.trimByQuality(0.3, 100).seg_to.right)
                 positions = sorted(positions)[::-1]
                 num = max(min_cov, len(relevant_als)  * 8 / 10)
                 if num >= len(positions):

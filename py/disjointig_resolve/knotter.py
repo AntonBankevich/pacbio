@@ -111,6 +111,7 @@ class LineMerger:
             if final[0] < -params.k - 100:
                 for al in self.dot_plot.getAlignmentsToFrom(other, line):
                     if len(list(al.matchingSequence().common(line_alignment.matchingSequence()))) > 0:
+
                         tmp = al
                         break
                 if (tmp.seg_to.left < 20 and tmp.rc.seg_to.left < 20) or (tmp.seg_from.left < 20 and tmp.seg_from.right < 20):
