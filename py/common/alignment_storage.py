@@ -215,7 +215,7 @@ class AlignmentPiece:
             if cur_indel > div * (blocks[right_ind][1].right - left[1].left):
                 return AlignmentPiece.FromBlocks(blocks[:left_ind + 1])
             if left_ind  + 1 < len(blocks):
-                cur_indel += blocks[left_ind + 1][0].left - blocks[left_ind][0].right + blocks[left_ind + 1][1].left - blocks[left_ind][1].right
+                cur_indel -= blocks[left_ind + 1][0].left - blocks[left_ind][0].right + blocks[left_ind + 1][1].left - blocks[left_ind][1].right
         return self
 
     def __repr__(self):
