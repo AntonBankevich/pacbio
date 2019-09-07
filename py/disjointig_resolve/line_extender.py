@@ -256,14 +256,14 @@ class LineExtender:
         for ltl in line_alignments:
             line = ltl.seg_from.contig # type: NewLine
             new_copy = line.correct_segments.find(ltl.seg_from)
-            if new_copy is not None and new_copy.contains(ltl.seg_from):
-                correct_segments.append(new_copy)
-                if ltl.percentIdentity() > 0.95:
-                    active_segments.add(new_copy)
-                read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
-            else:
+            assert new_copy is not None and new_copy.interSize(ltl.seg_from) >= max(len(ltl.seg_from) - 20, params.k), str([ltl, new_copy, str(line.correct_segments)])
+            if not new_copy.contains(ltl.seg_from):
                 print "Warning: alignment of resolved segment to uncorrected segment"
                 print ltl, new_copy, line.correct_segments
+            correct_segments.append(new_copy)
+            if ltl.percentIdentity() > 0.95:
+                active_segments.add(new_copy)
+            read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
         read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.id)
         print "Potential alignments:", read_alignments
         # removing all reads that are already sorted to one of the contigs
@@ -601,7 +601,7 @@ class LineExtender:
                 matching = al.matchingSequence()
                 # print line, incorrect
                 for seg1 in incorrect:
-                    seg2 = matching.mapSegDown(seg.contig, seg1)
+                    seg2 = matching.mapSegDown(seg.contig, seg1, mapIn=False)
                     segs.add(seg2)
                     print "Relevant segment alignment:", seg1, seg2
         segs.mergeSegments()
