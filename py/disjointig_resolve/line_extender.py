@@ -548,7 +548,7 @@ class LineExtender:
         return True
 
     def findAndFilterResolvedBound(self, rec, sz):
-        bound0 = self.findResolvedBound(rec, sz) + params.k / 2
+        bound0 = self.findResolvedBound(rec, sz) + params.k * 9 / 10
         bound = min(rec.correct.right, rec.next_resolved_start + params.k - 1, bound0)
         res = rec.resolved.right
         if bound > rec.resolved.right:
