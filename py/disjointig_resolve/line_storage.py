@@ -1,3 +1,5 @@
+import sys
+
 from typing import Dict, List, Iterator, Optional, Iterable, BinaryIO, Tuple, Generator
 
 from alignment.align_tools import Aligner
@@ -98,6 +100,7 @@ class NewLineStorage(ContigStorage):
 
     def mergeLines(self, alignment, k):
         # type: (AlignmentPiece, int) -> NewLine
+        sys.stdout.info("Line operation Merge", alignment.seg_from.contig, alignment.seg_to.contig, alignment)
         line1 = alignment.seg_from.contig #type: NewLine
         line2 = alignment.seg_to.contig #type: NewLine
         assert line1 != line2

@@ -579,7 +579,7 @@ class LineExtender:
             if al.seg_from.left > params.k / 2 and al.rc.seg_from.left > params.k / 2:
                 bad_segments.add(al.seg_to)
         bad_segments.mergeSegments()
-        good_segments = bad_segments.reverse().reduce(rec.line.segment(rec.resolved.right - params.k, bound))
+        good_segments = bad_segments.reverse(rec.line).reduce(rec.line.segment(rec.resolved.right - params.k, bound))
         for seg in good_segments:
             seg = Segment(seg.contig, max(0, seg.left - params.k / 2), seg.right)
             for seg1 in self.segmentsWithGoodCopies(seg, params.k):
@@ -597,7 +597,7 @@ class LineExtender:
             line = al.seg_from.contig # type: NewLine
             if len(al.seg_to) >= inter_size and al.seg_from.right > line.initial[0].seg_to.left:
                 cap = al.seg_from.cap(line.suffix(pos=line.initial[0].seg_to.left))
-                incorrect = line.correct_segments.reverse().reduce(cap)
+                incorrect = line.correct_segments.reverse(line).reduce(cap)
                 matching = al.matchingSequence()
                 # print line, incorrect
                 for seg1 in incorrect:
@@ -606,5 +606,5 @@ class LineExtender:
                     print "Relevant segment alignment:", seg1, seg2
         segs.mergeSegments()
         # print "incorrect", segs
-        return list(segs.reverse().reduce(seg).filterBySize(min=inter_size))
+        return list(segs.reverse(seg.contig).reduce(seg).filterBySize(min=inter_size))
 

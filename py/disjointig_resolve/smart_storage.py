@@ -334,10 +334,13 @@ class SegmentStorage(SmartStorage):
         # type: (int, int) -> SegmentStorage
         return self.filter(lambda seg: min <= len(seg) <= max)
 
-    def reverse(self):
-        # type: () -> SegmentStorage
+    def reverse(self, contig = None):
+        # type: (Contig) -> SegmentStorage
+        assert contig is not None or len(self) != 0
+        if contig is None:
+            contig = self.items[0].contig
         if len(self) == 0:
-            return SegmentStorage()
+            return SegmentStorage(contig.asSegment())
         if self.isCanonical():
             self.sort()
             res = SegmentStorage()

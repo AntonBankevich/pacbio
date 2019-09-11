@@ -117,7 +117,7 @@ def main(args):
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
             subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", str(cl_params.threads), "--pacbio-raw", reads_file, "--genome-size", str(5000000)])
-            cl_params.set_flye_dir(assembly_dir)
+            cl_params.set_flye_dir(assembly_dir, cl_params.mode)
 
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads)
 

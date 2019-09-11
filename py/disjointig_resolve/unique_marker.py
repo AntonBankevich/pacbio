@@ -73,8 +73,8 @@ class UniqueMarker:
         out.insert(0, (line.segment(0, 1), params.min_k_mer_cov))
         print "inc:", inc
         print "out:", out
-        inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= params.min_k_mer_cov]).reverse()
-        out = SegmentStorage().addAll([seg for seg, cov in out if cov >= params.min_k_mer_cov]).reverse()
+        inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= params.min_k_mer_cov]).reverse(line)
+        out = SegmentStorage().addAll([seg for seg, cov in out if cov >= params.min_k_mer_cov]).reverse(line)
         print "inc:", inc
         print "out:", out
         segs1 = inc.orderedCap(out)
