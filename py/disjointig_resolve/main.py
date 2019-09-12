@@ -77,6 +77,7 @@ def countStats(reads, lines, disjointigs, aligner, dir):
 
 
 def main(args):
+    start = time.time()
     cl_params = Params().parse(args)
     cl_params.check()
     CreateLog(cl_params.dir)
@@ -153,6 +154,11 @@ def main(args):
     # print "Disjointig alignments"
     # for line in lines
     sys.stdout.info("Finished")
+    secs = int(time.time() - start)
+    days = secs / 60 / 60 / 24
+    hours = secs / 60 / 60 % 24
+    mins = secs / 60 % (60 * 24)
+    sys.stdout.info("Finished in %d days, %d hours, %d minutes" % (days, hours, mins))
 
 
 def printState(lines):
