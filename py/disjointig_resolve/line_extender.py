@@ -362,7 +362,7 @@ class LineExtender:
         if line.knot is not None:
             print "Blocked by knot"
             return False
-        relevant_reads = list(line.read_alignments.allInter(line.asSegment().suffix(length=min(params.k, len(line)))))
+        relevant_reads = list(line.read_alignments.allInter(line.asSegment().suffix(length=min(params.k, len(line) - 20))))
         print "Relevent reads for extending", relevant_reads
         if len(relevant_reads) == 0:
             return False
