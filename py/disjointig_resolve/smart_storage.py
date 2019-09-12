@@ -343,7 +343,7 @@ class SegmentStorage(SmartStorage):
         if contig is None:
             contig = self.items[0].contig
         if len(self) == 0:
-            return SegmentStorage(contig.asSegment())
+            return SegmentStorage().addAll([contig.asSegment()])
         if self.isCanonical():
             self.sort()
             res = SegmentStorage()
@@ -357,7 +357,7 @@ class SegmentStorage(SmartStorage):
                 res.add(contig.asSegment().suffix(pos=last))
             return res
         else:
-            return self.rc.reverse().rc
+            return self.rc.reverse(contig.rc).rc
 
     def contigAsSegment(self, seg):
         # type: (Segment) -> SegmentStorage
