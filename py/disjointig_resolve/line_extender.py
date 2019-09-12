@@ -362,7 +362,7 @@ class LineExtender:
         if line.knot is not None:
             print "Blocked by knot"
             return False
-        relevant_reads = list(line.read_alignments.allInter(line.asSegment().suffix(length=min(1000, len(line)))))
+        relevant_reads = list(line.read_alignments.allInter(line.asSegment().suffix(length=min(params.k, len(line)))))
         print "Relevent reads for extending", relevant_reads
         if len(relevant_reads) == 0:
             return False
@@ -523,12 +523,12 @@ class LineExtender:
         for read in rec:
             if len(read.seg_to) >= inter_size:
                 bad_reads.append(read)
-            if len(bad_reads) >= params.min_k_mer_cov:
+            if len(bad_reads) >= params.min_contra_for_break:
                 if bad_reads[-1].seg_to.left - bad_reads[0].seg_to.left > 50:
                     bad_reads = bad_reads[1:]
                 else:
                     break
-        if len(bad_reads) < 3:
+        if len(bad_reads) < params.min_contra_for_break:
             print "No resolved bound for", rec.resolved
             return len(rec.line)
         else:

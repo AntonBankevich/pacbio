@@ -20,6 +20,7 @@ bad_end_length = 500
 # l = 1500
 threads = 16
 min_k_mer_cov = 10
+min_contra_for_break = 5 # minimal nunber of unaligned reads needed to break resolved segment
 max_read_length = 80000
 min_alignment_size = 100 # minimal size of alignment that will be considered. Important for composition of alignments.
 

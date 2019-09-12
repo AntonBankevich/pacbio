@@ -152,7 +152,10 @@ class SegmentStorage(SmartStorage):
     def add(self, seg):
         if self.isCanonical():
             self.items.append(seg)
-            self.sorted = False
+            if self.sorted and (len(self) == 1 or self.key(self.items[-2]) < self.key(self.items[-1])):
+                pass
+            else:
+                self.sorted = False
         else:
             self.rc.add(seg.RC())
 
@@ -295,7 +298,7 @@ class SegmentStorage(SmartStorage):
 
     # here we assume that segments inside each colection can not have intersection at least min_inter
     def cap(self, other = None, min_inter = 0, seg = None):
-        # type: (SegmentStorage, Segment, int) -> SegmentStorage
+        # type: (SegmentStorage, int, Segment) -> SegmentStorage
         if other is None:
             other = SegmentStorage().addAll([seg])
         if not self.isCanonical():
@@ -441,7 +444,10 @@ class AlignmentStorage(SmartStorage):
     def add(self, al):
         if self.isCanonical():
             self.items.append(al)
-            self.sorted = False
+            if self.sorted and (len(self) == 1 or self.key(self.items[-2]) < self.key(self.items[-1])):
+                pass
+            else:
+                self.sorted = False
             self.max_len = max(self.max_len, len(al.seg_to))
             self.rc.max_len = self.max_len
         else:
@@ -682,7 +688,7 @@ class AlignmentStorage(SmartStorage):
                 yield contig.segment(last, pos + k - 1), cur
                 last = pos
             cur += delta
-        if positions[-1][0] < len(contig):
+        if len(contig) - positions[-1][0] >= k:
             yield contig.asSegment().suffix(pos=positions[-1][0]), 0
 
     def calculateWindowedCoverage(self, sz):
@@ -726,10 +732,9 @@ class ReadAlignmentStorage(AlignmentStorage):
 
     def add(self, al):
         if self.isCanonical():
-            self.items.append(al)
+            AlignmentStorage.add(self, al)
             read = al.seg_from.contig #type: AlignedRead
             read.addAlignment(al)
-            self.sorted = False
         else:
             self.rc.add(al.rc)
 
