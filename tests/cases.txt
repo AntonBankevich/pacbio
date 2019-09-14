@@ -1,7 +1,7 @@
 14
 LineExtensionTest 9
-List aaabacadaeafagahaiaj 5 0 b
 List abbbcdefBBBghij 5 0 ja de
+List aaabacadaeafagahaiaj 5 0 b
 List abCDEFGHijklcdemnodgfp 5 0 pa jk mn
 List abcdefghijaklDEFGmnopaqrsDeFgHtuv 5 0 ab ij no
 List abbBbbcdefBBbBBghij 5 2 ja de

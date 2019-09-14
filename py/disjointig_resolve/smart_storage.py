@@ -149,6 +149,9 @@ class SegmentStorage(SmartStorage):
             sign = "-"
         return "ReadStorage" + sign + ":" + str(list(self))
 
+    def __repr__(self):
+        return self.__str__()
+
     def add(self, seg):
         if self.isCanonical():
             self.items.append(seg)
