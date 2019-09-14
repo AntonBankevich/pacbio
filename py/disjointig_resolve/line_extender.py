@@ -239,9 +239,10 @@ class LineExtender:
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, List[AlignmentPiece]]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
-        resolved = resolved.suffix(length = min(len(resolved), params.k * 2))
         print "Attempting recruitment:", resolved, str(resolved.contig)
-        line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k / 2,
+        resolved = resolved.suffix(length = min(len(resolved), params.k * 2))
+        print "Considering resolved subsegment:", resolved
+        line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k - 30,
                                  self.dot_plot.allInter(resolved)) # type: List[AlignmentPiece]
         line_alignments = [al for al in line_alignments if al.seg_from.right > al.seg_from.contig.initial[-1].seg_to.left and (al.rc.seg_to.left > 20 or al.seg_from.left > 20 or al.isIdentical())]
         print "Alternative lines:", map(str, line_alignments)
@@ -559,7 +560,7 @@ class LineExtender:
             for candidate in candidates:
                 if candidate.left == max(0, rec.resolved.right - sz) and candidate.right > rec.resolved.right:
                     res = candidate.right
-        print "Resolved bound for", rec.resolved, ":", res
+        print "Final resolved bound for", rec.resolved, " and k =", sz, ":", res
         return res
 
     # TODO: filter chimeric reads
