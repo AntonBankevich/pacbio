@@ -45,6 +45,7 @@ class AlignmentPiece:
         #     print self
         #     print self.reverse()
         #     traceback.print_stack()
+        self._hash = None
 
     @staticmethod
     def FromSamRecord(seq_from, seq_to, rec):
@@ -572,6 +573,11 @@ class AlignmentPiece:
             if a == preva:
                 continue
 
+    def __hash__(self):
+        if self._hash is None:
+            self._hash = (self.seg_from.__hash__(), self.seg_to.__hash__(), self.cigar.__hash__()).__hash__()
+        return self._hash
+
 
 
 class MatchingSequence:
@@ -758,8 +764,8 @@ class MatchingSequence:
     def __len__(self):
         return len(self.matches)
 
-    def mapPositionsDown(self, positions):
-        # type: (List[int]) -> List[Optional[int]]
+    def mapPositionsDown(self, positions, roundUp = False):
+        # type: (List[int], bool) -> List[Optional[int]]
         tmp = [(pos, i) for i, pos in enumerate(positions)]
         tmp = sorted(tmp)
         res = [0] * len(positions)
@@ -772,14 +778,17 @@ class MatchingSequence:
                 if tmp[cur_pos][0] == p1:
                     res[tmp[cur_pos][1]] = p2
                 else:
-                    res[tmp[cur_pos][1]] = None
+                    if roundUp:
+                        res[tmp[cur_pos][1]] = p2
+                    else:
+                        res[tmp[cur_pos][1]] = None
                 cur_pos += 1
         while cur_pos < len(positions):
             res[tmp[cur_pos][1]] = None
             cur_pos += 1
         return res
 
-    def mapPositionsUp(self, positions):
+    def mapPositionsUp(self, positions, roundUp = False):
         # type: (List[int]) -> List[Optional[int]]
         tmp = [(pos, i) for i, pos in enumerate(positions)]
         tmp = sorted(tmp)
@@ -793,7 +802,10 @@ class MatchingSequence:
                 if tmp[cur_pos][0] == p2:
                     res[tmp[cur_pos][1]] = p1
                 else:
-                    res[tmp[cur_pos][1]] = None
+                    if roundUp:
+                        res[tmp[cur_pos][1]] = p1
+                    else:
+                        res[tmp[cur_pos][1]] = None
                 cur_pos += 1
         while cur_pos < len(positions):
             res[tmp[cur_pos][1]] = None
@@ -811,6 +823,15 @@ class MatchingSequence:
                 chunk = []
         for res in map_function(chunk):
             yield res
+
+    # def massMapSegDown(self, segs, contig):
+    #     # type: (List[Segment], Contig) -> List[Segment]
+    #     res = []
+    #     positions = itertools.chain.from_iterable([[seg.left, seg.right] for seg in segs])
+    #     generator = self.continuousMapping(lambda poslist: self.mapPositionsDown(poslist), positions)
+    #     for seg in segs:
+    #         res.append(contig.segment(generator.next(), generator.next()))
+    #     return res
 
     def massCompose(self, others):
         # type: (List[MatchingSequence]) -> List[MatchingSequence]

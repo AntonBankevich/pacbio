@@ -267,7 +267,7 @@ class Segment:
                       "(" + self.contig.id + ")[" + str(self.left) + "," + str(self.right) + "]")
 
     def merge(self, other):
-        return Segment(self.contig, self.left, other.right)
+        return Segment(self.contig, min(self.left, other.left), max(self.right, other.right))
 
     def shift(self, val):
         return Segment(self.contig, self.left + val, self.right + val)
