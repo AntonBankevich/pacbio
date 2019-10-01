@@ -157,7 +157,7 @@ def main(args):
     secs = int(time.time() - start)
     days = secs / 60 / 60 / 24
     hours = secs / 60 / 60 % 24
-    mins = secs / 60 % (60 * 24)
+    mins = secs / 60 % 60
     sys.stdout.info("Finished in %d days, %d hours, %d minutes" % (days, hours, mins))
 
 

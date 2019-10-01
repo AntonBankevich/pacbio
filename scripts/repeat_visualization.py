@@ -5,7 +5,7 @@ import sys
 
 sys.path.append("py")
 from common.basic import CreateLog
-from typing import List
+from typing import List, BinaryIO
 from common.alignment_storage import AlignmentPiece
 from common.sequences import ContigStorage, Segment
 from disjointig_resolve.dot_plot import DotPlot
@@ -96,6 +96,26 @@ class Block:
             self.out.append(other)
             other.inc.append(self)
 
+    def lDist(self):
+        if len(self.inc) == 0:
+            return 0
+        return min(map(lambda b: self.x - b.x - len(b), self.inc))
+
+    def rDist(self):
+        if len(self.out) == 0:
+            return 0
+        return min(map(lambda b: b.x - self.x - len(b), self.out))
+
+    def inter(self, seg):
+        # type: (Segment) -> bool
+        for seg1 in self.segs:
+            if seg.contains(seg1):
+                return True
+        return False
+
+    def __len__(self):
+        return max(map(len, self.segs))
+
 
 
 
@@ -177,6 +197,98 @@ def CreateBlocks(comp):
             blocks[seg1].addOut(blocks[seg2])
     return res
 
+def placeBlock(block):
+    # type: (Block) -> int
+    if block.x == -1:
+        return -1
+    if block.x is not None:
+        return block.x
+    block.x = -1
+    res = 0
+    for b in block.inc:
+        tmp = placeBlock(b)
+        if tmp == -1:
+            return -1
+        res = max(tmp + len(b), res)
+    return res
+
+def placeX(blocks):
+    # type: (List[Block]) -> int
+    for block in blocks:
+        tmp = placeBlock(block)
+        if tmp == -1:
+            return 1
+    for i in range(1000):
+        for block in blocks:
+            if len(block.inc) > 0 or len(block.out) > 0:
+                if len(block.inc) == 0:
+                    block.x += block.rDist()
+                elif len(block.out) == 0:
+                    block.x -= block.lDist()
+                else:
+                    block.x = block.x - block.lDist() + (block.lDist() + block.rDist()) / 2
+    return 0
+
+def placeY(blocks, segments):
+    # type: (List[Block], List[Segment]) -> None
+    for seg in segments:
+        for block in blocks:
+            if block.inter(seg) and block.y is None:
+                y = -1
+                for b in blocks:
+                    if b.y is None:
+                        continue
+                    if not (b.x >= block.x + len(block) or block.x >= b.x + len(b)):
+                        y = max(y, b.y)
+                block.y = y + 1
+    for block in blocks:
+        if block.y is None:
+            y = -1
+            for b in blocks:
+                if b.y is None:
+                    continue
+                if not (b.x >= block.x + len(block) or block.x >= b.x + len(b)):
+                    y = max(y, b.y)
+            block.y = y + 1
+
+class SimplePrinter:
+    def __init__(self, scale = 100):
+        self.scale = scale
+
+    def blockLen(self, block):
+        return self.pos(block.x + len(block)) - self.pos(block.x)
+
+    def pos(self, x):
+        return x / self.scale
+
+    def blockStr(self, block):
+        # type: (Block) -> str
+        res = str(block.id) + ":" + str(len(block.segs))
+        if len(res) > self.blockLen(block):
+            res = str(block.id)
+        if len(res) > self.blockLen(block):
+            res = "*" * len(block)
+        if len(res) < self.blockLen(block):
+            extra = self.blockLen(block) - len(res)
+            res = "*" * (extra / 2) + res + "*" * (extra - extra / 2)
+        assert len(res) == self.blockLen(block)
+        return res
+
+    def printBlocks(self, blocks, stream):
+        # type: (List[Block], BinaryIO) -> None
+        blocks = sorted(blocks, key = lambda block: (block.y, block.x))
+        y = 0
+        x = 0
+        for block in blocks:
+            if block.y != y:
+                stream.write("\n")
+                x = 0
+                y = block.y
+            stream.write(" " * (self.pos(block.x) - x))
+            s = self.blockStr(block)
+            stream.write(s)
+            x = self.pos(block.x) + len(s)
+        stream.write("\n")
 
 
 def draw(contigs_file, output_dir, k):
@@ -201,9 +313,15 @@ def draw(contigs_file, output_dir, k):
         for block in blocks:
             for other in block.out:
                 print block.id, "->", other.id
-
         print "Placing blocks on X axis"
+        code = placeX(blocks)
+        if code == 1:
+            print "WARNING: component", cnt, "contains cycle. Aborting visualization."
         print "Placing blocks on Y axis"
+        placeY(blocks, comp.segments)
+        print "Printing figure"
+        SimplePrinter().printBlocks(blocks, sys.stdout)
+        print "Finished printing figure"
 
 
 

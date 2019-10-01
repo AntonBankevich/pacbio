@@ -236,9 +236,12 @@ def CreateLog(dir):
     old_logs_dir = os.path.join(dir, "old")
     ensure_dir_existance(old_logs_dir)
     log_file = os.path.join(dir, "log.info")
+    num = len(filter(lambda name: name.endswith(".log"), os.listdir(old_logs_dir)))
     if os.path.isfile(log_file):
-        num = len(os.listdir(old_logs_dir))
         shutil.copy(log_file, os.path.join(old_logs_dir, str(num) + ".log"))
+    fasta_file = os.path.join(dir, "lines_knotted.fasta")
+    if os.path.isfile(fasta_file):
+        shutil.copy(fasta_file, os.path.join(old_logs_dir, str(num) + ".fasta"))
     log = open(log_file, "w")
     sys.stdout = OStreamWrapper(sys.stdout, log)
     sys.stdout.prefix = lambda s: time.strftime("%y.%m.%d %H:%M:%S") + "  "
