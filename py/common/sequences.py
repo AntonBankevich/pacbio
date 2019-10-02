@@ -208,6 +208,19 @@ class Segment:
     def dist(self, other):
         # type: (Segment) -> int
         assert self.contig == other.contig
+        if self.inter(other):
+            return 0
+        if self.right <= other.left:
+            return other.left - self.right
+        if self.left >= other.right:
+            return self.left - other.right
+        return 0
+
+    def extendedDist(self, other):
+        # type: (Segment) -> int
+        assert self.contig == other.contig
+        if self.inter(other):
+            return -self.interSize(other)
         if self.right <= other.left:
             return other.left - self.right
         if self.left >= other.right:

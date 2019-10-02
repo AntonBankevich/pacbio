@@ -223,7 +223,12 @@ class NewLineStorage(ContigStorage):
 
     def printKnottedToFasta(self, handler):
         # type: (BinaryIO) -> None
+        printed = set()
         for chain in self.chains():
+            if chain[0].rc.id in printed:
+                continue
+            for line in chain:
+                printed.add(line.id)
             seq = []
             id = []
             if chain[-1].knot is not None:
