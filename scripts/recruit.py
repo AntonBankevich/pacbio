@@ -3,12 +3,12 @@ import shutil
 import subprocess
 import sys
 
-from common.sequences import ContigStorage
-
 sys.path.append("py")
-from alignment.align_tools import DirDistributor, Aligner
 
+from common.sequences import ContigStorage
+from alignment.align_tools import DirDistributor, Aligner
 from common import basic, params
+
 
 
 def main(cf, rf, dir, k):
