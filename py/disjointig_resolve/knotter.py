@@ -59,7 +59,7 @@ class LineMerger:
                 if al2.contradictingRTC() or (al1.canMergeTo(al2) and al1.deepInter(al2)):
                     continue
                 new_rec = self.Record(al1, al2)
-                if len(line) + new_rec.gap > 0:
+                if len(line) + new_rec.other.initial[0].seg_to.left + new_rec.gap > line.initial[0].seg_to.left:
                     candidates.append(new_rec)
         #             (al2.seg_from.contig, gap, read, al1, al2)
         candidates = sorted(candidates, key = lambda rec: rec.other.id)
