@@ -36,10 +36,13 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     for line in lines.unique():
         print line, line.completely_resolved
     if not split:
+        print "Splitting lines into parts"
         line_list = list(lines.unique()) # type: List[NewLine]
         while len(line_list) > 0:
             line = line_list.pop()
+            print "Splitting line", line
             if len(line.completely_resolved) > 1:
+                print "Splitted line because of two resolved segments:", str(line.completely_resolved)
                 left = line.completely_resolved[1].left
                 right = line.completely_resolved[0].right
                 if left >= right:
@@ -47,6 +50,7 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
                 line1, line2 = lines.splitLine(line.segment(left, right))
                 line_list.extend([line1, line2])
             elif len(line.completely_resolved[0]) > 40000:
+                print "Splitted line because it is too long", str(line.completely_resolved)
                 line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=10000).prefix(length=1000))
                 line1, line2 = lines.splitLine(line12.completely_resolved[0].prefix(length=10000).suffix(length=1000))
                 line1.tie(line2, -1000, "")
