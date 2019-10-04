@@ -44,6 +44,7 @@ class SimpleGraph:
         v1 = self.AddVertex(start)
         v2 = self.AddVertex(fin)
         edge = Edge(id, start, fin, len, label, seq)
+        self.e[id] = edge
         v1.out.append(edge)
         v2.inc.append(edge)
 
@@ -83,14 +84,15 @@ class SimpleGraph:
                 v.union(v1, v2)
                 v1, v2 = ((not v2[0], v2[1], not v2[2]), (not v1[0], v1[1], not v1[2]))
                 v.union(v1, v2)
-            ids = dict()
-            cnt = 1
-            for vid, vl in v.listComponenets():
-                self.AddVertex(str(cnt), str(vid))
-                ids[vid] = str(cnt)
-            for eid, seq in seqs.items():
-                self.AddEdge(eid, ids[v.get((True, eid, False))], ids[v.get((True, eid, True))], len(seq), eid, seq)
-                self.AddEdge("-" + eid, ids[v.get((False, eid, False))], ids[v.get((False, eid, True))], len(seq), "-" + eid, basic.RC(seq))
+        ids = dict()
+        cnt = 1
+        for vid, vl in v.listComponenets():
+            self.AddVertex(str(cnt), str(vid))
+            ids[vid] = str(cnt)
+            cnt += 1
+        for eid, seq in seqs.items():
+            self.AddEdge(eid, ids[v.get((True, eid, False))], ids[v.get((True, eid, True))], len(seq), eid, seq)
+            self.AddEdge("-" + eid, ids[v.get((False, eid, False))], ids[v.get((False, eid, True))], len(seq), "-" + eid, basic.RC(seq))
         return self
 
     def Find(self, minlen, v):

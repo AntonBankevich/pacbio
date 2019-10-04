@@ -23,9 +23,9 @@ def main(flye_dir, rf, dir, edge_id, k):
     good = 0
     print "Reading graph"
     graph = SimpleGraph().ReadGFA(os.path.join(flye_dir, "assembly_graph.gfa"))
-    for e in graph.e[edge_id].fin.out:
+    for e in graph.v[graph.e[edge_id].fin].out:
         print e.id
-    for e in graph.e[edge_id].start.inc:
+    for e in graph.v[graph.e[edge_id].start].inc:
         print e.id
     return
     print "Reading reads"
