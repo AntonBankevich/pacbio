@@ -5,20 +5,29 @@ import sys
 
 sys.path.append("py")
 
+
+from common.SimpleGraph import SimpleGraph
 from common.sequences import ContigStorage, Contig
 from alignment.align_tools import DirDistributor, Aligner
 from common import basic, params, SeqIO
 
 
 
-def main(cf, rf, dir, k):
-    technology = "nano"
+def main(flye_dir, rf, dir, edge_id, k):
+    params.technology = "nano"
     params.k = k
     basic.ensure_dir_existance(dir)
     basic.CreateLog(dir)
     dd = DirDistributor(os.path.join(dir, "alignments"))
     all = 0
     good = 0
+    print "Reading graph"
+    graph = SimpleGraph().ReadGFA(os.path.join(flye_dir, "assembly_graph.gfa"))
+    for e in graph.e[edge_id].fin.out:
+        print e.id
+    for e in graph.e[edge_id].start.inc:
+        print e.id
+    return
     print "Reading reads"
     reads = ContigStorage()
     for read in SeqIO.parse_fasta(open(rf, "r")):
@@ -54,5 +63,10 @@ def main(cf, rf, dir, k):
     subprocess.check_call([". dotconv", dir])
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
+    flye_dir = sys.argv[1]
+    rf = sys.argv[2]
+    dir = sys.argv[3]
+    edge_id = sys.argv[4]
+    k = int(sys.argv[5])
+    main(flye_dir, rf, dir, edge_id, k)
 
