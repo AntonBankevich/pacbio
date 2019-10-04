@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from common import basic
 from common.disjoint_set import DisjointSet
@@ -13,19 +13,19 @@ def toint(s):
 
 class Edge:
     def __init__(self, id, start, fin, len, label, seq):
-        self.id = id
-        self.seq = seq
-        self.label = label
-        self.start = start # type: Vertex
+        self.id = id # type: str
+        self.seq = seq # type: str
+        self.label = label # type: str
+        self.start = start # type: str
         self.len = len
-        self.fin = fin # type: Vertex
+        self.fin = fin # type: str
 
 
 class Vertex:
     def __init__(self, id, label):
         self.id = id
-        self.inc = []
-        self.out = []
+        self.inc = [] # type: List[Edge]
+        self.out = [] # type: List[Edge]
         self.label = label
 
 

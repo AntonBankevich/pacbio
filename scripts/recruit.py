@@ -3,6 +3,8 @@ import shutil
 import subprocess
 import sys
 
+from common.seq_records import NamedSequence
+
 sys.path.append("py")
 
 
@@ -19,48 +21,52 @@ def main(flye_dir, rf, dir, edge_id, k):
     basic.ensure_dir_existance(dir)
     basic.CreateLog(dir)
     dd = DirDistributor(os.path.join(dir, "alignments"))
-    all = 0
-    good = 0
     print "Reading graph"
     graph = SimpleGraph().ReadGFA(os.path.join(flye_dir, "assembly_graph.gfa"))
-    for e in graph.v[graph.e[edge_id].fin].out:
-        print e.id
-    for e in graph.v[graph.e[edge_id].start].inc:
-        print e.id
-    return
+    print "Parsing edge mapping"
+    id_map = dict()
+    for s in open(os.path.join(flye_dir, "flye.log"), "r").readlines():
+        if s.find("UPath") != -1:
+            s = s.split()
+            id_map[s[4][:-1]] = id_map[5::2]
+            id_map["-" + s[4][:-1]] = map(lambda val: basic.Reverse(val), id_map[5::2])
+    edge_ids = edge_id.split(",")
+    print "Extracting relevant graph component"
+    res = open(os.path.join(dir, "contigs.fasta"), "r")
+    unique = dict()
+    for eid in edge_ids:
+        for e in graph.v[graph.e[eid].start].inc:
+            if len(e.seq) < 10000:
+                unique[e.id] = e
+            else:
+                if e.id.startswith("-"):
+                    unique[e.id + "l"] = NamedSequence(basic.RC(e.seq[:5000]), e.id + "l")
+                else:
+                    unique[e.id + "r"] = NamedSequence(e.seq[-5000:], e.id + "r")
+    for c in unique.values():
+        SeqIO.write(c, res, "fasta")
+    res.close()
+    old_ids = []
+    for eid in edge_ids:
+        for olde in id_map[eid[len("edge_"):]]:
+            old_ids.append(basic.Normalize(olde))
+    print "Finding reads that align to", edge_ids
+    print "Old ids:", old_ids
+    relevant_read_ids = set()
+    for s in open(os.path.join(flye_dir, "20-repeat", "read_alignment_dump"), "r").readlines():
+        s = s.split()
+        if s[0] != "Aln":
+            continue
+        if s[6].split("_")[1] in old_ids:
+            relevant_read_ids.add(s[2][1:])
+            print s[2][1:], s[6].split("_")[1]
     print "Reading reads"
-    reads = ContigStorage()
+    res = open(os.path.join(dir, "reads.fasta"), "r")
     for read in SeqIO.parse_fasta(open(rf, "r")):
-        all += 1
-        if len(read) > k * 1.2:
-            good += 1
-            reads.add(Contig(read.seq, read.id))
-        if all % 1000000 == 0:
-            print all, good
-    print "Reading contigs"
-    contigs = ContigStorage().loadFromFasta(open(cf, "r"), False)
-    tl = sum(map(len, contigs.unique()))
-    read_ids = set()
-    aligner = Aligner(dd)
-    print "Aligning reads"
-    for al in aligner.localAlign(reads, contigs):
-        if len(al) > k:
-            read_ids.add(al.seg_from.contig.id)
-    relevant_reads = ContigStorage()
-    print "Choosing relevant reads"
-    for rid in read_ids:
-        relevant_reads.add(reads[rid])
-    rrf = os.path.join(dir, "reads.fasta")
-    handler = open(rrf, "w")
-    relevant_reads.writeToFasta(handler)
-    handler.close()
-    assembly_dir = dd.nextDir()
-    print "Assembling relevant reads"
-    subprocess.check_call(
-        ["./bin/flye", "-o", assembly_dir, "-t", 16, "--pacbio-raw", rrf, "--genome-size", tl + 5000])
-    shutil.copy(os.path.join(assembly_dir, "assembly.fasta"), os.path.join(dir, "new_seqs.fasta"))
-    shutil.copy(os.path.join(assembly_dir, "assembly_graph.gv"), os.path.join(dir, "graph.gv"))
-    subprocess.check_call([". dotconv", dir])
+        if read.id in relevant_read_ids and len(read) > k * 1.2:
+            SeqIO.write(read, res, "fasta")
+    res.close()
+
 
 if __name__ == "__main__":
     flye_dir = sys.argv[1]
