@@ -113,12 +113,20 @@ def main(args):
 
         reads = CreateReadCollection(cl_params.reads_file, cl_params.downsample)
 
+
         if cl_params.contigs_file is None:
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
             subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", str(cl_params.threads), "--pacbio-raw", reads_file, "--genome-size", str(5000000)])
             cl_params.set_flye_dir(assembly_dir, cl_params.mode)
+        elif len(cl_params.disjointigs_file_list) == 0:
+            assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
+            reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
+            reads.print_fasta(open(reads_file, "w"))
+            subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", str(cl_params.threads), "--nano-raw", reads_file, "--genome-size", str(100000)])
+            graph_file, contigs_file, disjointigs_file, graph_file_after, contigs_file_after = cl_params.parseFlyeDir(assembly_dir)
+            cl_params.disjointigs_file_list.append(disjointigs_file)
 
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads)
 

@@ -109,10 +109,13 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
 
 def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher, reads):
     sys.stdout.info("Creating contig collection")
-    unique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if val[4].unique and val[4].cov >= min_cov]
+    if graph_file is not None:
+        nonunique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if not (val[4].unique and val[4].cov >= min_cov)]
+    else:
+        nonunique = []
     contigs = ContigCollection()
     contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
-    contigs = contigs.filter(lambda contig: contig.id in unique)
+    contigs = contigs.filter(lambda contig: contig.id not in nonunique)
     sys.stdout.info("Created", len(contigs), "initial contigs")
     sys.stdout.info("Polishing contigs")
     polished_contigs = polisher.polishMany(reads, list(contigs.unique()))
