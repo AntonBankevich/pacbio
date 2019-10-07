@@ -2,19 +2,19 @@ import sys
 
 import os
 
-from common.SimpleGraph import SimpleGraph
-
 sys.path.append("py")
+from common.SimpleGraph import SimpleGraph
 from common import basic
 
 
 g = SimpleGraph()
 g.ReadDot(sys.argv[1])
 basic.ensure_dir_existance(sys.argv[2])
-for cnt, comp in enumerate(g.Split(50)):
+cnt = 0
+for comp in g.Split(10):
     if len(comp) < 3:
         continue
-    print len(comp)
+    print cnt, len(comp)
     f = open(os.path.join(sys.argv[2], str(cnt) + ".dot"), "w   ")
     g.Draw(comp, f)
     f.close()

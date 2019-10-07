@@ -115,7 +115,7 @@ class LineMerger:
 
                         tmp = al
                         break
-                if (tmp.seg_to.left < 20 and tmp.rc.seg_to.left < 20) or (tmp.seg_from.left < 20 and tmp.seg_from.right < 20):
+                if (tmp.seg_to.left < 20 and tmp.rc.seg_to.left < 20) or (tmp.seg_from.left < 20 and tmp.rc.seg_from.left < 20):
                     print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
                 else:
                     assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
