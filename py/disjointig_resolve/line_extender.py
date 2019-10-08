@@ -555,7 +555,7 @@ class LineExtender:
 
     def findAndFilterResolvedBound(self, rec, sz):
         bound0 = self.findResolvedBound(rec, sz) + params.k * 9 / 10
-        bound = min(rec.correct.right, rec.next_resolved_start + params.k - 1, bound0)
+        bound = min(rec.correct.right, rec.next_resolved_start + sz - 1, bound0)
         res = rec.resolved.right
         if bound > rec.resolved.right:
             print "Checking resolved bound against known copies"
