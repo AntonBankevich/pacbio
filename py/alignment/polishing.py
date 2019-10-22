@@ -177,10 +177,10 @@ class Polisher:
         for al in als:
             new_seq = ""
             al = al.reduce(target=seg)
-            if al.seg_to.left < seg.left + 3:
+            if al.seg_to.left < seg.left + 20:
                 new_seq += start
             new_seq += al.seg_from.Seq()
-            if al.seg_to.right > seg.right - 3:
+            if al.seg_to.right > seg.right - 20:
                 new_seq += end
             reads.append(NamedSequence(new_seq, al.seg_from.contig.id))
         base = Contig(start + seg.Seq() + end, "base")
@@ -206,8 +206,35 @@ class Polisher:
                 return al.compose(mapping)
         assert False, "No alignment from polished to base: " + str(als)
 
-    def polishEnd(self, als, min_cov = 4):
-        # type: (List[AlignmentPiece], int) -> Tuple[Contig, List[AlignmentPiece]]
+    def allEnds(self, als, min_cov = 5):
+        contig = als[0].seg_to.contig
+        res_contigs = []
+        res_als = []
+        undefined = list(als)
+        while True:
+            new_contig, new_als = self.polishEnd(undefined, min_cov, 0)
+            tmp_als = []
+            read_ids = set()
+            for al in new_als:
+                if al.seg_to.right > len(contig) + 500:
+                    tmp_als.append(al)
+                    read_ids.add(al.seg_from.contig.id)
+            if len(tmp_als) == 0:
+                break
+            if len(tmp_als) >= 5:
+                res_contigs.append(new_contig)
+                res_als.append(list(tmp_als))
+            tmp_als = []
+            for al in undefined:
+                if al.seg_from.contig.id not in read_ids:
+                    tmp_als.append(al)
+            undefined = tmp_als
+        for contig, tmp_als in zip(res_contigs, res_als):
+            al = self.polishSmallSegment(contig.asSegment(), tmp_als)
+            yield al.seg_to.contig, [al1.compose(al) for al1 in tmp_als]
+
+    def polishEnd(self, als, min_cov = 4, min_cov_frac = 0.8):
+        # type: (List[AlignmentPiece], int, int) -> Tuple[Contig, List[AlignmentPiece]]
         scorer = Scorer()
         contig = als[0].seg_to.contig
         print "Polishing end of", als[0].seg_to.contig
@@ -263,7 +290,7 @@ class Polisher:
                     assert al is not None, reduced_read_list[i]
                     positions.append(al.trimByQuality(0.3, 100).seg_to.right)
                 positions = sorted(positions)[::-1]
-                num = max(min_cov, len(relevant_als)  * 8 / 10)
+                num = max(min_cov, int(len(relevant_als)  * min_cov_frac))
                 if num >= len(positions):
                     continue
                 cutoff_pos = max(positions[num - 1], len(start))
