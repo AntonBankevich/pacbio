@@ -48,8 +48,6 @@ class UniqueMarker:
     def markUniqueInLine(self, line):
         # type: (NewLine) -> None
         print "Finding unique in", line
-
-
         alignments = list(line.read_alignments) # type: List[AlignmentPiece]
         # for i in range(len(alignments)):
         #     for j in range(len(alignments)):
@@ -73,15 +71,34 @@ class UniqueMarker:
         out.insert(0, (line.segment(0, 1), params.min_k_mer_cov))
         print "inc:", inc
         print "out:", out
-        inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= params.min_k_mer_cov]).reverse(line)
-        out = SegmentStorage().addAll([seg for seg, cov in out if cov >= params.min_k_mer_cov]).reverse(line)
-        print "inc:", inc
-        print "out:", out
-        segs1 = inc.orderedCap(out)
-        print "segs1:", segs1
-        # segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
-        segs = segs1.filterBySize(min = params.max_allowed_unaligned).expand(params.k / 2).expandTo(params.k + 50).filterBySize(min=params.k)
-        # segs = segs1.expand(params.k / 2).filterBySize(min = params.k)
+        events = []
+        for seg, val in inc:
+            if val >= params.min_k_mer_cov:
+                events.append((seg.right, -1))
+        for seg, val in out:
+            if val >= params.min_k_mer_cov:
+                events.append((seg.left, 1))
+        events= sorted(events)
+        print events
+        segs = SegmentStorage()
+        for e1, e2 in zip(events[:-1], events[1:]):
+            seg = line.segment(e1[0], e2[0])
+            if e1[1] == 1 and e2[1] == -1:
+                if len(seg) > params.max_allowed_unaligned:
+                    seg = seg.expand(params.k / 2).expandToSize(params.k + 50)
+                    if len(seg) >= params.k:
+                        segs.add(seg)
+            elif len(seg) > 50000:
+                segs.add(seg.shrink(3000))
+        # inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= params.min_k_mer_cov]).reverse(line)
+        # out = SegmentStorage().addAll([seg for seg, cov in out if cov >= params.min_k_mer_cov]).reverse(line)
+        # print "inc:", inc
+        # print "out:", out
+        # segs1 = inc.orderedCap(out)
+        # print "segs1:", segs1
+        # # segs = segs1.cap(segs2).expand(params.k / 2).filterBySize(min = params.k)
+        # segs = segs1.filterBySize(min = params.max_allowed_unaligned).expand(params.k / 2).expandTo(params.k + 50).filterBySize(min=params.k)
+        # # segs = segs1.expand(params.k / 2).filterBySize(min = params.k)
         line.cleanReadAlignments()
         line.read_alignments.clean()
         all = 0

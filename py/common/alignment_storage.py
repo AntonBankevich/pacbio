@@ -512,13 +512,17 @@ class AlignmentPiece:
         res = [] # type: List[Tuple[Segment, Segment]]
         for seg_from, seg_to in self.matchingBlocks():
             if len(res) > 0 and (seg_from.left - res[-1][0].right > 20 or seg_to.left - res[-1][1].right > 100):
-                yield AlignmentPiece.FromBlocks(res)
+                tmp = AlignmentPiece.FromBlocks(res)
+                if tmp is not None:
+                    yield tmp
                 res = []
             res.append((seg_from, seg_to))
         if res[0][0].left == self.seg_from.left:
             yield self
         else:
-            yield AlignmentPiece.FromBlocks(res)
+            tmp = AlignmentPiece.FromBlocks(res)
+            if tmp is not None:
+                yield tmp
 
     @staticmethod
     def FromBlocks(blocks):
@@ -526,11 +530,13 @@ class AlignmentPiece:
         blocks = list(blocks)
         seq_from = blocks[0][0].contig
         seq_to = blocks[0][1].contig
-        while seq_from[blocks[0][0].left] != seq_to[blocks[0][1].left]:
+        while len(blocks) > 0 and seq_from[blocks[0][0].left] != seq_to[blocks[0][1].left]:
             if len(blocks[0][0]) == 1:
                 blocks = blocks[1:]
             else:
                 blocks[0] = (blocks[0][0].suffix(length=len(blocks[0][0]) - 1), blocks[0][1].suffix(length=len(blocks[0][0]) - 1))
+        if len(blocks) == 0:
+            return None
         while seq_from[blocks[-1][0].right - 1] != seq_to[blocks[-1][1].right - 1]:
             if len(blocks[-1][0]) == 1:
                 blocks = blocks[:-1]

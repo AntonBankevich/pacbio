@@ -49,12 +49,19 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
                     right = left + 1
                 line1, line2 = lines.splitLine(line.segment(left, right))
                 line_list.extend([line1, line2])
-            elif len(line.completely_resolved[0]) > 40000:
-                print "Splitted line because it is too long", str(line.completely_resolved)
-                line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=10000).prefix(length=1000))
-                line1, line2 = lines.splitLine(line12.completely_resolved[0].prefix(length=10000).suffix(length=1000))
-                line1.tie(line2, -1000, "")
-                line2.tie(line3, -1000, "")
+            else:
+                if line.initial[-1].seg_to.right + 5000 < len(line) - 5000:
+                    print "Cut line of the right because too long unresolved segment:", line, str(line.completely_resolved)
+                    line.cutRight(line.initial[-1].seg_to.right + 3000)
+                if line.initial[0].seg_to.left > 5000:
+                    print "Cut line of the left because too long unresolved segment:", line, str(line.completely_resolved)
+                    line.rc.cutRight(len(line) - line.initial[0].seg_to.left + 3000)
+                if len(line.completely_resolved[0]) > 40000:
+                    print "Splitted line because it is too long", str(line.completely_resolved)
+                    line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=10000).prefix(length=1000))
+                    line1, line2 = lines.splitLine(line12.completely_resolved[0].prefix(length=10000).suffix(length=1000))
+                    line1.tie(line2, -1000, "")
+                    line2.tie(line3, -1000, "")
         line_list = sorted(lines.unique(), key = lambda line: line.id)
         print "Final list of lines:"
         for line in line_list:
