@@ -24,8 +24,6 @@ class AlignmentPiece:
         # self.blocks = None
         assert len(seg_from) > 0 and len(seg_to) > 0
         assert len(seg_to) == easy_cigar.CigarLen(cigar), str([len(seg_to), easy_cigar.CigarLen(cigar)])
-        assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left], str(self) + " " + self.seg_from.contig[self.seg_from.left]+ " " + self.seg_to.contig[self.seg_to.left]
-        assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1], str(self) + " " + self.seg_from.contig[self.seg_from.right - 1]+ " " + self.seg_to.contig[self.seg_to.right - 1]
         self.pi = None
         if params.assert_pi:
             pi = self.percentIdentity()
@@ -46,6 +44,8 @@ class AlignmentPiece:
         #     print self.reverse()
         #     traceback.print_stack()
         self._hash = None
+        assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left], str(self) + " " + self.seg_from.contig[self.seg_from.left]+ " " + self.seg_to.contig[self.seg_to.left]
+        assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1], str(self) + " " + self.seg_from.contig[self.seg_from.right - 1]+ " " + self.seg_to.contig[self.seg_to.right - 1]
 
     @staticmethod
     def FromSamRecord(seq_from, seq_to, rec):
