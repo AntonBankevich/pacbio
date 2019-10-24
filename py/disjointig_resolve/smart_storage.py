@@ -322,7 +322,7 @@ class SegmentStorage(SmartStorage):
         # type: (SegmentStorage, int) -> SegmentStorage
         res = SegmentStorage()
         cur = 0
-        for seg in self:
+        for seg in list(self):
             while cur < len(other) and other[cur].right < seg.right:
                 cur += 1
             if cur < len(other) and seg <= other[cur] and seg.interSize(other[cur]) >= min_inter:

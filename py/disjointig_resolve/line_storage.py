@@ -187,20 +187,20 @@ class NewLineStorage(ContigStorage):
         line2 = self.addNew(seg2.Seq(), line.id + "r")
         al1 = AlignmentPiece.Identical(seg1, line1.asSegment())
         al2 = AlignmentPiece.Identical(seg2, line2.asSegment())
-        line1.initial.addAll([al.compose(al1) for al in line.initial.allInter(seg1, params.min_alignment_size)])
-        line2.initial.addAll([al.compose(al2) for al in line.initial.allInter(seg2, params.min_alignment_size)])
+        line1.initial.addAll(al1.massComposeBack(line.initial.allInter(seg1, params.min_alignment_size)))
+        line2.initial.addAll(al2.massComposeBack(line.initial.allInter(seg2, params.min_alignment_size)))
         line1.correct_segments.addAll(line.correct_segments.cap(seg=seg1, min_inter=params.k).map(al1))
         line2.correct_segments.addAll(line.correct_segments.cap(seg=seg2, min_inter=params.k).map(al2))
         line1.completely_resolved.addAll(line.completely_resolved.cap(seg=seg1, min_inter=params.k).map(al1).filterBySize(min=params.k))
         line2.completely_resolved.addAll(line.completely_resolved.cap(seg=seg2, min_inter=params.k).map(al2).filterBySize(min=params.k))
 
-        line1.disjointig_alignments.addAll([al.compose(al1) for al in line.disjointig_alignments.allInter(seg1, params.k)])
-        line2.disjointig_alignments.addAll([al.compose(al2) for al in line.disjointig_alignments.allInter(seg2, params.k)])
-        for al in line.read_alignments:
-            if al.seg_to.interSize(seg1) > params.k:
-                line1.addReadAlignment(al.compose(al1))
-            if al.seg_to.interSize(seg2) > params.k:
-                line2.addReadAlignment(al.compose(al2))
+        line1.disjointig_alignments.addAll(al1.massComposeBack(line.disjointig_alignments.allInter(seg1, params.k)))
+        line2.disjointig_alignments.addAll(al2.massComposeBack(line.disjointig_alignments.allInter(seg2, params.k)))
+
+        for al in al1.massComposeBack(filter(lambda tmp_al: tmp_al.seg_to.interSize(seg1) > params.k, line.read_alignments)):
+            line1.addReadAlignment(al)
+        for al in al2.massComposeBack(filter(lambda tmp_al: tmp_al.seg_to.interSize(seg2) > params.k, line.read_alignments)):
+            line2.addReadAlignment(al)
         line.cleanReadAlignments()
         self.notifySplitLine(al1, al2)
         self.remove(line)
