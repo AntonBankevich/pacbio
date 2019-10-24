@@ -434,19 +434,19 @@ class AlignmentPiece:
             l += 1
         while r > 0 and blocks[r - 1][1].left >= other.seg_from.right:
             r -= 1
-        if l == r:
+        if l >= r:
             return None
         blocks = blocks[l:r]
-        if blocks[0][0].left < other.seg_from.left:
-            cut = other.seg_from.left - blocks[0][0].left
+        if blocks[0][1].left < other.seg_from.left:
+            cut = other.seg_from.left - blocks[0][1].left
             blocks[0] = (blocks[0][0].expandLeft(-cut), blocks[0][1].expandLeft(-cut))
-        if blocks[-1][0].right > other.seg_from.right:
-            cut = blocks[-1][0].right - other.seg_from.right
+        if blocks[-1][1].right > other.seg_from.right:
+            cut = blocks[-1][1].right - other.seg_from.right
             blocks[-1] = (blocks[-1][0].expandRight(-cut), blocks[-1][1].expandRight(-cut))
         res = AlignmentPiece.FromBlocks(blocks)
         return AlignmentPiece(res.seg_from, other.seg_to.contig.segment(other.seg_to.left + res.seg_to.left - other.seg_from.left,
-                                                                        other.seg_to.left + res.seg_to.right - other.seg_from.left),
-                              res.cigar)
+                                                                        other.seg_to.left + res.seg_to.right - other.seg_from.left), res.cigar)
+
     @staticmethod
     def load(handler, collection_from, collection_to):
         # type: (TokenReader, Any, Any) -> AlignmentPiece
