@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Generator
 
 from common import basic
 from common.disjoint_set import DisjointSet
@@ -105,6 +105,7 @@ class SimpleGraph:
                 self.Find(minlen, e.start)
 
     def Split(self, minlen):
+        # type: (int) -> Generator[List[Vertex]]
         visited = set()
         for v in self.v.values():
             if v.id in visited:
@@ -112,7 +113,7 @@ class SimpleGraph:
             self.visited = set()
             self.Find(minlen, v.id)
             visited = visited.union(self.visited)
-            yield self.visited
+            yield list(self.visited)
 
     def Draw(self, comp, out):
         out.write("digraph {\n")

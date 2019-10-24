@@ -158,7 +158,10 @@ class Params:
             res = os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "10-consensus", "consensus.fasta")
         else:
             res = os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(self.flye_dir, "2-repeat", "graph_before_rr.fasta"), os.path.join(self.flye_dir, "1-consensus", "consensus.fasta")
-        res = res + (os.path.join(self.flye_dir, "assembly_graph.gv"), os.path.join(self.flye_dir, "scaffolds.fasta"))
+        if not os.path.isfile(os.path.join(self.flye_dir, "scaffolds.fasta")):
+            res = res + (os.path.join(self.flye_dir, "assembly_graph.gv"), os.path.join(self.flye_dir, "assembly.fasta"))
+        else:
+            res = res + (os.path.join(self.flye_dir, "assembly_graph.gv"), os.path.join(self.flye_dir, "scaffolds.fasta"))
         for f in res:
             assert os.path.isfile(f), f
         return res
