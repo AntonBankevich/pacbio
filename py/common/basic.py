@@ -124,6 +124,9 @@ class OStreamWrapper:
     def info(self, *strings):
         self.log(params.LogPriority.main_parts, "INFO: " + " ".join(map(str, strings)))
 
+    def trace(self, *strings):
+        self.log(params.LogPriority.main_parts, "TRACE: " + " ".join(map(str, strings)))
+
     def substage(self, *strings):
         self.log(params.LogPriority.main_parts, "SUBSTAGE: " + " ".join(map(str, strings)))
 

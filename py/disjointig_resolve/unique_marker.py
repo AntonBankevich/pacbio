@@ -47,7 +47,7 @@ class UniqueMarker:
 
     def markUniqueInLine(self, line):
         # type: (NewLine) -> None
-        print "Finding unique in", line
+        sys.stdout.info("Finding unique in", line)
         alignments = list(line.read_alignments) # type: List[AlignmentPiece]
         # for i in range(len(alignments)):
         #     for j in range(len(alignments)):
@@ -58,6 +58,7 @@ class UniqueMarker:
         #             break
         # alignments = filter(lambda al: al is not None, alignments)
         alignments = sorted(alignments, key=lambda al:al.seg_to.left)
+        sys.stdout.trace("Sorting finished")
         inc = self.link(line, [al.seg_to.left for al in alignments if al.seg_from.left > 1000 and al.seg_to.left > 50], 20)
         # for al in alignments:
         #     if al.seg_from.left > 1000 and al.seg_to.left > 50:
@@ -65,6 +66,7 @@ class UniqueMarker:
         inc.append((line.segment(len(line) - 1, len(line)), params.min_k_mer_cov))
         alignments = sorted(alignments, key=lambda al:al.seg_to.right)
         out = self.link(line, [al.seg_to.right for al in alignments if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50 ], 20)
+        sys.stdout.trace("Linking finished")
         # for al in alignments:
         #     if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50:
         #         print "Breakpoint read out:", al
@@ -79,6 +81,7 @@ class UniqueMarker:
             if val >= params.min_k_mer_cov:
                 events.append((seg.left, 1))
         events= sorted(events)
+        sys.stdout.trace("Events collected and sorted", len(events))
         print events
         segs = SegmentStorage()
         for e1, e2 in zip(events[:-1], events[1:]):
@@ -90,6 +93,7 @@ class UniqueMarker:
                         segs.add(seg)
             elif len(seg) > 50000:
                 segs.add(seg.shrink(3000))
+        sys.stdout.trace("Unique segmetns selected")
         # inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= params.min_k_mer_cov]).reverse(line)
         # out = SegmentStorage().addAll([seg for seg, cov in out if cov >= params.min_k_mer_cov]).reverse(line)
         # print "inc:", inc
@@ -120,10 +124,11 @@ class UniqueMarker:
                     print "Contradicting read alignment", al, str(al.seg_from.contig.alignments)
             # else:
             #     print "Ambiguous read alignment", al, str(al.seg_from.contig.alignments)
-        print all, inter, float(contradicting) / inter
+        sys.stdout.trace("Read recruitment results:", all, inter, float(contradicting) / inter)
         line.updateCorrectSegments(line.asSegment())
         segs = segs.cap(line.correct_segments, params.k)
         line.completely_resolved.addAll(segs)
+        sys.stdout.trace("The end")
 
     def markAllUnique(self, lines, reads):
         # type: (NewLineStorage, Iterable[AlignedRead]) -> None
