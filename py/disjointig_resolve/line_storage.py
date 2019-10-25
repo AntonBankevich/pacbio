@@ -202,7 +202,7 @@ class NewLineStorage(ContigStorage):
                 line1.addReadAlignment(al.embed(al1))
         for al in line.read_alignments:
             if al.seg_to.interSize(seg2) > params.k:
-                line1.addReadAlignment(al.embed(al2))
+                line2.addReadAlignment(al.embed(al2))
         line.cleanReadAlignments()
         self.notifySplitLine(al1, al2)
         self.remove(line)
