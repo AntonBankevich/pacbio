@@ -7,23 +7,23 @@ from typing import List, BinaryIO
 from alignment.align_tools import DirDistributor, Aligner
 from common import basic, params
 from common.alignment_storage import AlignmentPiece
-from common.sequences import ContigCollection, Contig
+from common.sequences import ContigStorage, Contig
 
 from common.basic import CreateLog
 
 def constructDisjointigs(reads, total_length, dir):
-    # type: (ContigCollection, int, str) -> ContigCollection
+    # type: (ContigStorage, int, str) -> ContigStorage
     reads_file = os.path.join(dir, "reads.fasta")
     disjointigs_file = os.path.join(dir, "disjointigs.fasta")
     log_file = os.path.join(dir, "log.txt")
     reads.writeToFasta(open(reads_file, "w"))
     subprocess.check_call(["./bin/flye-assemble", reads_file, disjointigs_file, str(total_length), "flye/config/bin_cfg/asm_raw_reads.cfg", "-v", "1500", "-t", "16", "-u", "-l", log_file])
-    return ContigCollection().loadFromFasta(open(disjointigs_file, "r"), False)
+    return ContigStorage().loadFromFasta(open(disjointigs_file, "r"), False)
 
 def alsToReads(als):
-    # type: (List[AlignmentPiece]) -> ContigCollection
+    # type: (List[AlignmentPiece]) -> ContigStorage
     readIds = set()
-    res = ContigCollection()
+    res = ContigStorage()
     for al in als:
         if al.seg_from.contig.id in readIds:
             continue
@@ -32,7 +32,7 @@ def alsToReads(als):
     return res
 
 def fakeGraph(contigs, handler):
-    # type: (ContigCollection, BinaryIO) -> None
+    # type: (ContigStorage, BinaryIO) -> None
     handler.writelines(["digraph", "{"])
     for contig in contigs:
         handler.writelines(['"0" -> "1"[label = "id ' + contig.id + ' k 100x", color = "black"];'])
@@ -42,7 +42,7 @@ def recruit(seqs, reads, k, dir):
     dd = DirDistributor(os.path.join(dir, "alignments"))
     aligner = Aligner(dd)
     params.k = k
-    relevant_reads = ContigCollection()
+    relevant_reads = ContigStorage()
     disjointigs = seqs
     for i in range(2):
         sys.stdout.info("Recruiting iteration", i)
@@ -69,7 +69,7 @@ def recruit(seqs, reads, k, dir):
     print "Starts:"
     for cid, val in starts.items():
         print cid, val
-    contigs = ContigCollection()
+    contigs = ContigStorage()
     cnt = 1
     for dis in disjointigs:
         if starts[dis.id] > k and starts[dis.id] < len(dis):
@@ -94,9 +94,9 @@ def main(args):
     sys.stdout.info("Starting graph-free recruitment")
     print " ".join(args)
     sys.stdout.info("Loading repeat sequences")
-    seqs = ContigCollection().loadFromFasta(open(args[1], "r"), False)
+    seqs = ContigStorage().loadFromFasta(open(args[1], "r"), False)
     sys.stdout.info("Loading reads")
-    reads = ContigCollection().loadFromFasta(open(args[2], "r"), False)
+    reads = ContigStorage().loadFromFasta(open(args[2], "r"), False)
     k = int(args[3])
     recruit(seqs, reads, k, dir)
     sys.stdout.info("Finised graph-free recruitment")
