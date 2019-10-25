@@ -101,8 +101,8 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     bad_reads.print_fasta(open(rf, "w"))
     l = tlen * clen / tlen0
     assembly_dir = os.path.join(dir, "assembly0")
-    subprocess.check_call(["./bin/flye", "-o", assembly_dir, "-t", "8", "--pacbio-raw", rf, "--genome-size", str(l),
-                           "--no-trestle"])
+    subprocess.check_call(["./bin/flye", "--meta", "-o", assembly_dir, "-t", "8", "--pacbio-raw", rf, "--genome-size", str(l),
+                           "--no-trestle", "--min-overlap", str(params.k)])
     df = os.path.join(assembly_dir, "10-consensus", "consensus.fasta")
     disjointigs.loadFromFasta(open(df, "r"))
     print "Disjointigs:"

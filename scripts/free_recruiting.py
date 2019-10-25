@@ -1,16 +1,13 @@
 import subprocess
 import sys
 import os
-
+sys.path.append("py")
 from typing import List, BinaryIO
 
 from alignment.align_tools import DirDistributor, Aligner
 from common import basic, params
 from common.alignment_storage import AlignmentPiece
 from common.sequences import ContigCollection, Contig
-
-sys.path.append("py")
-sys.path.append(".")
 
 from common.basic import CreateLog
 
@@ -20,7 +17,7 @@ def constructDisjointigs(reads, total_length, dir):
     disjointigs_file = os.path.join(dir, "disjointigs.fasta")
     log_file = os.path.join(dir, "log.txt")
     reads.writeToFasta(open(reads_file, "w"))
-    subprocess.check_call(["./bin/flye-assemble", reads_file, disjointigs_file, total_length, "flye/config/bin_cfg/asm_raw_reads.cfg", "-v", "1500", "-t", "16", "-u", "-l", log_file])
+    subprocess.check_call(["./bin/flye-assemble", reads_file, disjointigs_file, str(total_length), "flye/config/bin_cfg/asm_raw_reads.cfg", "-v", "1500", "-t", "16", "-u", "-l", log_file])
     return ContigCollection().loadFromFasta(open(disjointigs_file, "r"), False)
 
 def alsToReads(als):
@@ -56,8 +53,8 @@ def recruit(seqs, reads, k, dir):
         disjointigs = constructDisjointigs(relevant_reads, l, dd.nextDir())
         print len(disjointigs), "disjointigs"
         print disjointigs
-    disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta")))
-    relevant_reads.writeToFasta(open(os.path.join(dir, "reads.fasta")))
+    disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta"), "w"))
+    relevant_reads.writeToFasta(open(os.path.join(dir, "reads.fasta"), "w"))
     sys.stdout.info("Aligning repeat sequences to disjointigs")
     als = aligner.localAlign(disjointigs, seqs)
     print "\n".join(map(str, als))
@@ -69,6 +66,9 @@ def recruit(seqs, reads, k, dir):
             starts[al.seg_to.contig.id] = min(starts[al.seg_to.contig.id], al.seg_to.left)
             al = al.rc
             starts[al.seg_to.contig.id] = min(starts[al.seg_to.contig.id], al.seg_to.left)
+    print "Starts:"
+    for cid, val in starts.items():
+        print cid, val
     contigs = ContigCollection()
     cnt = 1
     for dis in disjointigs:
@@ -80,6 +80,7 @@ def recruit(seqs, reads, k, dir):
         if len(dis) > k:
             print cnt, dis.id
             contigs.add(Contig(dis.seq, str(cnt)))
+            cnt += 1
     contigs.writeToFasta(open(os.path.join(dir, "contigs.fasta"), "w"))
     fakeGraph(contigs, open(os.path.join(dir, "graph.gv"), "w"))
 
