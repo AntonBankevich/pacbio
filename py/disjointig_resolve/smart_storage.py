@@ -437,10 +437,7 @@ class AlignmentStorage(SmartStorage):
             for item in self.rc.items[::-1]:
                 yield item.rc
 
-    def makeCanonical\
-
-
-                    (self):
+    def makeCanonical(self):
         if self.isCanonical():
             return
         self.items = [al.rc for al in self.rc.items[::-1]]
