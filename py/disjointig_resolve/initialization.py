@@ -171,11 +171,13 @@ def ExtendShortLines(contigs, reads, aligner, polisher):
     for contig in short_contigs.unique():
         if len(als[contig.id]) > 0:
             tmp_contig, new_als = polisher.polishEnd(als[contig.id], params.reliable_coverage)
+            r = len(tmp_contig) - len(contig)
+            tmp_contig, new_als = polisher.polishEnd([al.rc for al in new_als], params.reliable_coverage)
+            l = len(tmp_contig) - len(contig) - r
         else:
-            tmp_contig, new_als = contig, als
-        r = len(tmp_contig) - len(contig)
-        tmp_contig, new_als = polisher.polishEnd([al.rc for al in new_als], params.reliable_coverage)
-        l = len(tmp_contig) - len(contig) - r
+            tmp_contig, new_als = contig, als[contig.id]
+            l = 0
+            r = 0
         if l > params.k / 2 and r > params.k / 2:
             tmp_contig.seq = tmp_contig.seq[l - params.k / 2:-r + params.k / 2]
         else:
