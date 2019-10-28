@@ -56,7 +56,7 @@ def recruit(seqs, reads, k, dir):
     disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta"), "w"))
     relevant_reads.writeToFasta(open(os.path.join(dir, "reads.fasta"), "w"))
     sys.stdout.info("Aligning repeat sequences to disjointigs")
-    als = aligner.localAlign(disjointigs, seqs)
+    als = list(aligner.localAlign(seqs, disjointigs))
     print "\n".join(map(str, als))
     starts = dict()
     for dis in disjointigs:
@@ -77,7 +77,7 @@ def recruit(seqs, reads, k, dir):
             contigs.add(Contig(dis.prefix(starts[dis.id]).Seq(), str(cnt)))
             cnt += 1
     for dis in disjointigs.unique():
-        if len(dis) > k:
+        if len(dis) > k and starts[dis.id] == len(dis):
             print cnt, dis.id
             contigs.add(Contig(dis.seq, str(cnt)))
             cnt += 1
