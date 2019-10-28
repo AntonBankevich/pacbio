@@ -248,6 +248,9 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
                 else:
                     self.addAlignment(al)
 
+    def FireRemoveLine(self, line):  # type: (NewLine) -> None
+        self.removeLine(line)
+
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
         for storage in self.alignmentsToFrom[line.id].values():

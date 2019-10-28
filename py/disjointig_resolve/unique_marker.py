@@ -166,7 +166,8 @@ class UniqueMarker:
         segs = list(line.read_alignments.filterByCoverage(mi=params.reliable_coverage, k=params.k)) # type: List[Segment]
         assert len(segs) > 0, "No part of a unique edge is covered by reads"
         if len(segs) == 1 and len(segs[0]) > len(line) - 10:
-            print "Whole line", line.id, "is covered by reads"
+            sys.stdout.warning("Whole line", line.id, "is covered by reads")
+            lines.removeLine(line)
             return
         segs = filter(lambda seg: len(seg) >= params.k, segs)
         print "Line", line.id, "has poorly covered regions. Splitting into", len(segs), "parts"

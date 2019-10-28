@@ -322,6 +322,10 @@ class NewLineStorage(ContigStorage):
         del self.items[line.id]
         del self.items[line.rc.id]
 
+    def removeLine(self, line):
+        self.remove(line)
+        for listener in self.listeners:
+            listener.FireRemoveLine(line)
 
 class LineStorageListener:
     def __init__(self):
@@ -333,4 +337,8 @@ class LineStorageListener:
 
     def FireSplitLine(self, al1, al2):
         # type: (AlignmentPiece, AlignmentPiece) -> None
+        pass
+
+    def FireRemoveLine(self, line):
+        # type: (NewLine) -> None
         pass
