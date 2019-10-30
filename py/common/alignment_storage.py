@@ -279,10 +279,10 @@ class AlignmentPiece:
         ins = ""
         if not self.connects(other):
             d = (other.seg_from.left - self.seg_from.right, other.seg_to.left - self.seg_to.right)
-            if d[0] < 0 or d[0] > 100 or d[1] < 0  or d[1] > 100:
+            assert d[0] >= 0 and d[1] >= 0, str(self) + " " + str(other),
+            if d[0] > 100 or d[1] > 100:
                 print "Warning. Bad alignment:", str(self) + " " + str(other)
                 print self.seg_from.contig.seq
-                return None
             if min(d[0], d[1]) > 0:
                 ins += str(min(d[0], d[1])) + "M"
             if d[0] > d[1]:

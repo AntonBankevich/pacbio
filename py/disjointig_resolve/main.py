@@ -24,7 +24,7 @@ from common.alignment_storage import ReadCollection, AlignmentPiece
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
-from disjointig_resolve.cl_params import Params
+from disjointig_resolve.cl_params import Params, parseFlyeDir
 from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
     CreateReadCollection
 
@@ -125,7 +125,7 @@ def main(args):
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
             subprocess.check_call(["./bin/flye", "--meta", "-o", assembly_dir, "-t", str(cl_params.threads), "--nano-raw", reads_file, "--genome-size", str(100000), "--min-overlap", str(params.k)])
-            graph_file, contigs_file, disjointigs_file, graph_file_after, contigs_file_after = cl_params.parseFlyeDir(assembly_dir)
+            graph_file, contigs_file, disjointigs_file, graph_file_after, contigs_file_after = parseFlyeDir(assembly_dir)
             cl_params.disjointigs_file_list.append(disjointigs_file)
             params.min_contra_for_break = 8
 

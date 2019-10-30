@@ -3,10 +3,12 @@ import os
 import shutil
 import sys
 import time
+sys.path.append("py")
 
 from typing import List, Tuple, Dict
 
-sys.path.append("py")
+from disjointig_resolve import cl_params
+
 
 from common.dot_parser import DotParser
 from alignment.align_tools import Aligner, DirDistributor
@@ -43,12 +45,11 @@ def extract_transfers(contigs, als):
     return res
 
 def main(args):
-    unique_file = sys.argv[1]
-    graph_file = sys.argv[2]
-    our_file = sys.argv[3]
-    their_file = sys.argv[4]
-    dir = sys.argv[5]
-    min_cov = int(sys.argv[6])
+    flye_dir = sys.argv[1]
+    graph_file, unique_file, disjointigs_file, tmp, their_file = cl_params.parseFlyeDir(flye_dir)
+    our_file = sys.argv[2]
+    dir = sys.argv[3]
+    min_cov = int(sys.argv[4])
     CreateLog(dir)
     unique_ids = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if val[4].unique and val[4].cov >= min_cov]
     unique = ContigCollection()
@@ -56,7 +57,7 @@ def main(args):
     unique = unique.filter(lambda contig: contig.id in unique_ids)
     our = ContigCollection().loadFromFasta(open(our_file, "r"), False)
     their = ContigCollection().loadFromFasta(open(their_file, "r"), False)
-    aligner = Aligner(DirDistributor(dir))
+    aligner = Aligner(DirDistributor(os.path.join(dir, "alignments")))
     our_als = list(aligner.overlapAlign(unique.unique(), our))
     their_als = list(aligner.overlapAlign(unique.unique(), their))
     our_transfers = extract_transfers(our, our_als)
@@ -86,7 +87,7 @@ def main(args):
                 print [diff.seg_from.left, diff.seg_from.right], diff.seg_to, len(diff), diff.percentIdentity()
                 print "\n".join(diff.asMatchingStrings())
         else:
-            print "Our new transition:", o1, o2
+            print "Our new transition:", o1, o2, alo1.seg_to.dist(alo2.seg_to)
     for o1, o2 in their_transfers:#type: str, str
         if (o1,o2) not in our_transfers:
             print "Missing transition:", o1, o2
