@@ -31,29 +31,39 @@ def main(flye_dir, rf, dir, edge_id, k):
         for e in graph.v[graph.e[eid].start].inc:
             if basic.Normalize(e.id) in edge_ids:
                 continue
-            if len(e.seq) < 10000:
-                if e.id.startswith("-"):
-                    unique[e.id[1:]] = NamedSequence(basic.RC(e.seq), e.id[1:])
-                else:
-                    unique[e.id] = NamedSequence(e.seq, e.id)
+            if e.id.startswith("-"):
+                id = e.id[1:]
             else:
+                id = e.id
+            if len(e.seq) < 10000:
+                seq = e.seq
+            else:
+                seq = e.seq[-5000:]
                 if e.id.startswith("-"):
-                    unique[e.id[1:] + "l"] = NamedSequence(basic.RC(e.seq[:5000]), e.id[1:] + "l")
+                    id = id + "l"
                 else:
-                    unique[e.id + "r"] = NamedSequence(e.seq[-5000:], e.id + "r")
+                    id = id + "r"
+            if e.id.startswith("-"):
+                seq = basic.RC(seq)
+            unique[id] = NamedSequence(seq, e.id)
         for e in graph.v[graph.e[eid].fin].out:
             if basic.Normalize(e.id) in edge_ids:
                 continue
-            if len(e.seq) < 10000:
-                if e.id.startswith("-"):
-                    unique[e.id[1:]] = NamedSequence(basic.RC(e.seq), e.id[1:])
-                else:
-                    unique[e.id] = NamedSequence(e.seq, e.id)
+            if e.id.startswith("-"):
+                id = e.id[1:]
             else:
+                id = e.id
+            if len(e.seq) < 10000:
+                seq = e.seq
+            else:
+                seq = e.seq[:5000]
                 if e.id.startswith("-"):
-                    unique[e.id[1:] + "r"] = NamedSequence(basic.RC(e.seq[-5000:]), e.id[1:] + "r")
+                    id = id + "r"
                 else:
-                    unique[e.id + "l"] = NamedSequence(e.seq[:5000], e.id + "l")
+                    id = id + "l"
+            if e.id.startswith("-"):
+                seq = basic.RC(seq)
+            unique[id] = NamedSequence(seq, e.id)
 
 
     for c in unique.values():
