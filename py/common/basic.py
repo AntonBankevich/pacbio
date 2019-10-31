@@ -77,6 +77,15 @@ def parseNegativeNumber(s, pos=0):
     else:
         return int(res)
 
+def parseNegativeNumberAndMod(s, pos=0):
+    # type: (str, int) -> str
+    while pos < len(s) and s[pos] not in "0123456789":
+        pos += 1
+    minus = ""
+    if pos > 0 and s[pos - 1] == '-':
+        minus = "-"
+    assert pos < len(s)
+    return minus + s[pos:]
 
 def best2(arr, better=lambda x, y: x < y):
     # type: (list[int], Callable[[int, int], bool]) -> tuple[int,int]

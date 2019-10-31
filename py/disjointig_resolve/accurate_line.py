@@ -190,7 +190,7 @@ class NewLine(Contig):
                 cnt += 1
                 # if cnt % 100 == 0:
                 #     print cnt
-        sys.stdout.info("Request for read alignments for", seg, " collecting finished. Started filtering")
+        sys.stdout.trace("Request for read alignments for", seg, " collecting finished. Started filtering")
         result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
         # print "Unfiltered alignments:", result
         for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig): # type: AlignedRead, Generator[AlignmentPiece]
@@ -205,7 +205,7 @@ class NewLine(Contig):
                 if not found:
                     yield al
                     readRes.append(al)
-        sys.stdout.info("Request for read alignments for", seg, "finished")
+        sys.stdout.trace("Request for read alignments for", seg, "finished")
 
     def position(self, pos):
         # type: (int) -> LinePosition

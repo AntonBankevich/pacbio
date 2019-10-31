@@ -118,7 +118,7 @@ class ContigStorage:
         # type: (BinaryIO, bool) -> ContigCollection
         for rec in SeqIO.parse_fasta(handler):
             if num_names:
-                self.add(Contig(rec.seq, str(basic.parseNegativeNumber(rec.id))))
+                self.add(Contig(rec.seq, str(basic.parseNegativeNumberAndMod(rec.id))))
             else:
                 self.add(Contig(rec.seq, rec.id))
         return self
