@@ -45,7 +45,7 @@ def main(flye_dir, rf, dir, edge_id, k):
                     id = id + "r"
             if e.id.startswith("-"):
                 seq = basic.RC(seq)
-            unique[id] = NamedSequence(seq, e.id)
+            unique[id] = NamedSequence(seq, id)
         for e in graph.v[graph.e[eid].fin].out:
             if basic.Normalize(e.id) in edge_ids:
                 continue
@@ -63,7 +63,7 @@ def main(flye_dir, rf, dir, edge_id, k):
                     id = id + "l"
             if e.id.startswith("-"):
                 seq = basic.RC(seq)
-            unique[id] = NamedSequence(seq, e.id)
+            unique[id] = NamedSequence(seq, id)
 
 
     for c in unique.values():
