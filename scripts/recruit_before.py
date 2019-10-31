@@ -83,14 +83,16 @@ def main(flye_dir, rf, dir, edge_id, k):
     for read in res_reads:
         if cnt % 5 == 0:
             SeqIO.write(read, random_down, "fasta")
+        cnt += 1
     random_down.close()
     res_reads = sorted(res_reads, key = lambda read: -len(read))
-    largest_down = open(os.path.join(dir, "largest.fasta"), "w")
+    largest_down = open(os.path.join(dir, "largest_down.fasta"), "w")
     all = sum(map(len, res_reads))
     cnt = 0
     for read in res_reads:
         if cnt > all / 5:
             break
+        cnt += len(read)
         SeqIO.write(read, largest_down, "fasta")
     largest_down.close()
 
