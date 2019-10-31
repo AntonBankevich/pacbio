@@ -1,6 +1,6 @@
 from typing import Dict, List, Generator
 
-from common import basic
+from common import basic, SeqIO
 from common.disjoint_set import DisjointSet
 
 
@@ -65,6 +65,16 @@ class SimpleGraph:
             l = float(tmp[tmp.find("\\l") + 2: tmp.find("k ")])
             id = tmp[tmp.find("id ") + 3: tmp.find("\\l")]
             self.AddEdge(id, v_from, v_to, l, label)
+        return self
+
+    def FillSeq(self, f, numeric = True):
+        for s in SeqIO.parse_fasta(open(f, "r")):
+            if numeric:
+                s.id = str(basic.parseNumber(s.id))
+            if s.id in self.e:
+                self.e[s.id].seq = s.seq
+            if "-" + s.id in self.e:
+                self.e["-" + s.id].seq = basic.RC(s.seq)
         return self
 
     def ReadGFA(self, f):
