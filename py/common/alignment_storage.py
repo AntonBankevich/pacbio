@@ -177,7 +177,7 @@ class AlignmentPiece:
     def __str__(self):
         # type: () -> str
         res = [self.__repr__()]
-        if len(self) < 20000:
+        if len(self) < 55555:
             res.append(":")
             preva = self.seg_from.left
             prevb = self.seg_to.left
@@ -220,7 +220,7 @@ class AlignmentPiece:
         return self
 
     def __repr__(self):
-        if len(self) < 20000:
+        if len(self) < 50000:
             pid = self.percentIdentity()
             if pid > 0.99:
                 spid = "%0.3f" % pid

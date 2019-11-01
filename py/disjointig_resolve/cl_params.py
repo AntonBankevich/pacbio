@@ -80,6 +80,7 @@ class Params:
                 self.threads = int(value)
             elif key == "-k":
                 params.k = int(value)
+                params.l = max(params.l, params.k + 100)
             elif key == "-l":
                 params.l = int(value)
             elif key == "--focus":

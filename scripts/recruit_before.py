@@ -97,6 +97,7 @@ def main(flye_dir, rf, dir, edge_id, k):
     random_down.close()
     res_reads = sorted(res_reads, key = lambda read: -len(read))
     largest_down = open(os.path.join(dir, "largest_down.fasta"), "w")
+    mixed = open(os.path.join(dir, "mixed_down.fasta"), "w")
     all = sum(map(len, res_reads))
     cnt = 0
     for read in res_reads:
@@ -105,6 +106,15 @@ def main(flye_dir, rf, dir, edge_id, k):
         cnt += len(read)
         SeqIO.write(read, largest_down, "fasta")
     largest_down.close()
+    cnt = 0
+    t = 0
+    for read in res_reads:
+        if cnt <= all / 5 or t % 5 == 0:
+            SeqIO.write(read, mixed, "fasta")
+        t += 1
+        cnt += len(read)
+    mixed.close()
+            
 
 
 
