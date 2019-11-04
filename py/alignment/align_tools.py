@@ -259,6 +259,7 @@ class Aligner:
             else:
                 seq_from = read_storage[rec.query_name]
             seq_to = ref_storage[rec.tname]
+            tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
             if tmp is not None:
                 if not mode == "overlap" and tmp.indelLength * 8 > tmp.matchingPositionsCount:
                     # TODO: move this to filter
