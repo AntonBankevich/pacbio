@@ -51,7 +51,7 @@ def main(model_file, k, dir, contigs_file, reads_file):
         al0 = None
         others = []
         for al in read.alignments:
-            if al.contradictingRTC():
+            if not al.contradictingRTC():
                 cnt += 1
                 al0 = al
             else:
@@ -75,13 +75,13 @@ def main(model_file, k, dir, contigs_file, reads_file):
         scorer = Scorer(params.scores)
         print "Winner"
         for al in others:
-            scorer.scoreCommon(al0, al)
+            print "oppa", scorer.scoreCommon(al0, al)
         print "No winner"
         for al1 in others:
             for al2 in others:
                 if al1 == al2:
                     continue
-                scorer.scoreCommon(al1, al2)
+                print "oppa", scorer.scoreCommon(al1, al2)
 
 if __name__ == "__main__":
     model = sys.argv[1]
