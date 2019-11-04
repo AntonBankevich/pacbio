@@ -76,6 +76,12 @@ def main(model_file, k, dir, contigs_file, reads_file):
         for al in others:
             a, b, c = scorer.scoreCommon(al0, al)
             print "win", a, b, c, len(seg)
+        if len(seg) > 1000:
+            for i in range(len(seg) / 1000):
+                seg1 = seg.prefix(length=i * 1000 + 1000).suffix(1000)
+                for al in others:
+                    a, b, c = scorer.scoreCommon(al0.reduce(seg1), al.reduce(seg1))
+                    print "win1000", a, b, c, len(seg1)
         for al1 in others:
             for al2 in others:
                 if al1 == al2:
