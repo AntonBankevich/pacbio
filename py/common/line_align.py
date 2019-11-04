@@ -1,5 +1,6 @@
 from typing import Optional, Tuple, List, Dict
 
+from common.scoring_model import ScoringModel
 from common.sequences import Segment
 
 if __name__ == "__main__":
@@ -12,8 +13,8 @@ from common import params
 class Scorer:
     def __init__(self, scores = None):
         if scores is None:
-            scores = params.Scores()
-        self.scores = scores
+            scores = params.scores
+        self.scores = scores # type: ScoringModel
 
     def countHomo(self, seq, pos, step):
         cpos = pos + step
@@ -24,33 +25,38 @@ class Scorer:
         return (cpos - pos) * step
 
     def score(self, alignment):
-        # type: (MatchingSequence) -> int
-        matches = alignment.matches
-        res = 0
-        for match1, match2 in zip(matches[:-1], matches[1:]):
-            if match2[0] - match1[0] == 1 and match2[1] - match1[1] == 1:
-                continue
-            l = [match2[0] - match1[0] - 1, match2[1] - match1[1] - 1]
-            homo = 0
-            if l[1] > l[0]:
-                homo += self.countHomo(alignment.seq_to, match1[1], 1) - 1
-                homo += self.countHomo(alignment.seq_to, match2[1], -1) - 1
-                homo = min(homo, (match2[1] - match1[1]) - (match2[0] - match1[0]))
-                res += self.scores.sub_score * l[0] + homo * self.scores.homo_score + (l[1] - l[0] - homo) * self.scores.del_score
-            else:
-                homo += self.countHomo(alignment.seq_from, match1[0], 1) - 1
-                homo += self.countHomo(alignment.seq_from, match2[0], -1) - 1
-                homo = min(homo, l[0] - l[1])
-                res += self.scores.sub_score * l[1] + homo * self.scores.homo_score + (l[0] - l[1] - homo) * self.scores.del_score
-        return res
+        assert False
+    #     TODO: rewrite
+    #     # type: (MatchingSequence) -> int
+    #     matches = alignment.matches
+    #     res = 0
+    #     for match1, match2 in zip(matches[:-1], matches[1:]):
+    #         if match2[0] - match1[0] == 1 and match2[1] - match1[1] == 1:
+    #             continue
+    #         l = [match2[0] - match1[0] - 1, match2[1] - match1[1] - 1]
+    #         homo = 0
+    #         if l[1] > l[0]:
+    #             homo += self.countHomo(alignment.seq_to, match1[1], 1) - 1
+    #             homo += self.countHomo(alignment.seq_to, match2[1], -1) - 1
+    #             homo = min(homo, (match2[1] - match1[1]) - (match2[0] - match1[0]))
+    #             res += self.scores.scoreMM()csub_score * l[0] + homo * self.scores.homo_score + (l[1] - l[0] - homo) * self.scores.del_score
+    #         else:
+    #             homo += self.countHomo(alignment.seq_from, match1[0], 1) - 1
+    #             homo += self.countHomo(alignment.seq_from, match2[0], -1) - 1
+    #             homo = min(homo, l[0] - l[1])
+    #             res += self.scores.sub_score * l[1] + homo * self.scores.homo_score + (l[0] - l[1] - homo) * self.scores.del_score
+    #     return res
 
     def accurateScore(self, alignment): #This score is nonsymmetric!!! Insertions and deletions have different cost
         # type: (MatchingSequence) -> int
         # print "Accurate scoring:", alignment[0], alignment[-1]
-        cur = 0
         prev = Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius, self.scores.inf)
-        for j in range(alignment[0][1], alignment[1][1] + params.alignment_correction_radius + 1):
-            prev.set(j, (j - alignment[0][1]) * self.scores.del_score)
+        prev.set(alignment[0][1], 0)
+        cur_del = 0
+        for j in range(alignment[0][1] + 1, min(alignment[1][1] + params.alignment_correction_radius + 1, len(alignment.seq_to))):
+            cur_del += self.scores.scoreDel(alignment.seq_to[j - 1])
+            prev.set(j, cur_del)
+        cur = 0
         for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
             j_min = max(alignment[cur][1] - params.alignment_correction_radius, alignment[0][1])
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
@@ -59,19 +65,21 @@ class Scorer:
                     print "Long gap:", alignment[cur], alignment[cur + 1]
             j_max = min(alignment[cur + 1][1] + params.alignment_correction_radius, alignment[-1][1])
             ne = Storage(j_min, j_max + 1, self.scores.inf)
+            c1 = alignment.seq_from[i]
             for j in range(j_min, j_max + 1):
                 res = self.scores.inf
-                if alignment.seq_from[i] == alignment.seq_to[j]:
-                    res = min(res, prev.get(j - 1))
-                    if i > 0 and j > 0 and alignment.seq_from[i - 1] == alignment.seq_from[i] and alignment.seq_to[j - 1] == alignment.seq_to[j]:
+                c2 = alignment.seq_to[j]
+                if c1 == c2:
+                    res = min(res, prev.get(j - 1) + self.scores.scoreMatch(alignment.seq_from[i - 1]))
+                    if i > 0 and j > 0 and alignment.seq_from[i - 1] == c1 and alignment.seq_to[j - 1] == c2:
                         if i > 1 and alignment.seq_from[i - 2] == alignment.seq_from[i - 1]:
-                            res = min(res, prev.get(j) + self.scores.homo_score)
+                            res = min(res, prev.get(j) + self.scores.scoreHomo(c1))
                         if j > 1 and alignment.seq_to[j - 2] == alignment.seq_to[j - 1]:
-                            res = min(res, ne.get(j - 1) + self.scores.homo_score)
+                            res = min(res, ne.get(j - 1) + self.scores.scoreHomo(c2))
                 else:
-                    res = min(res, prev.get(j - 1) + self.scores.sub_score)
-                res = min(res, prev.get(j) + self.scores.ins_score)
-                res = min(res, ne.get(j - 1) + self.scores.del_score)
+                    res = min(res, prev.get(j - 1) + self.scores.scoreMM(c1, c2))
+                res = min(res, prev.get(j) + self.scores.scoreIns(c1))
+                res = min(res, ne.get(j - 1) + self.scores.scoreDel(c2))
                 ne.set(j, res)
             prev = ne
         return prev.get(alignment[-1][1])
@@ -92,14 +100,16 @@ class Scorer:
         assert  len(alignment) > 0
         if len(alignment) == 1:
             return alignment
-        cur = 0
         storage = RectStorage(alignment[0][0], alignment[-1][0])
         prev = Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius, self.scores.inf)
         storage.set(alignment[0][0], Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius))
-        for j in range(alignment[0][1], alignment[1][1] + params.alignment_correction_radius + 1):
-            prev.set(j, (j - alignment[0][1]) * self.scores.del_score)
-            if j > alignment[0][1]:
-                storage.get(alignment[0][0]).set(j, (alignment[0][0], j - 1))
+        cur_del = 0
+        prev.set(alignment[0][1], 0)
+        for j in range(alignment[0][1] + 1, min(alignment[1][1] + params.alignment_correction_radius + 1, len(alignment.seq_to))):
+            cur_del += self.scores.scoreDel(alignment.seq_to[j - 1])
+            prev.set(j, cur_del)
+            storage.get(alignment[0][0]).set(j, (alignment[0][0], j - 1))
+        cur = 0
         for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
             j_min = max(alignment[cur][1] - params.alignment_correction_radius, alignment[0][1])
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
@@ -109,20 +119,22 @@ class Scorer:
             j_max = min(alignment[cur + 1][1] + params.alignment_correction_radius, alignment[-1][1])
             ne = Storage(j_min, j_max + 1, self.scores.inf)
             storage.set(i, Storage(j_min, j_max + 1, None))
+            c1 = alignment.seq_from[i]
             for j in range(j_min, j_max + 1):
+                c2 = alignment.seq_to[j]
                 res = self.scores.inf
                 res_shift = (0, 0)
-                if alignment.seq_from[i] == alignment.seq_to[j]:
+                if c1 == c2:
                     res, res_shift = self.adjustMin(res, res_shift, prev.get(j - 1), (-1, -1))
                     if i > 0 and j > 0 and alignment.seq_from[i - 1] == alignment.seq_from[i] and alignment.seq_to[j - 1] == alignment.seq_to[j]:
                         if i > 1 and alignment.seq_from[i - 2] == alignment.seq_from[i - 1]:
-                            res, res_shift = self.adjustMin(res, res_shift, prev.get(j) + self.scores.homo_score, (-1, 0))
+                            res, res_shift = self.adjustMin(res, res_shift, prev.get(j) + self.scores.scoreHomo(c1), (-1, 0))
                         if j > 1 and alignment.seq_to[j - 2] == alignment.seq_to[j - 1]:
-                            res, res_shift = self.adjustMin(res, res_shift, ne.get(j - 1) + self.scores.homo_score, (0, -1))
+                            res, res_shift = self.adjustMin(res, res_shift, ne.get(j - 1) + self.scores.scoreHomo(c1), (0, -1))
                 else:
-                    res, res_shift = self.adjustMin(res, res_shift, prev.get(j - 1) + self.scores.sub_score, (-1, -1))
-                res, res_shift = self.adjustMin(res, res_shift, prev.get(j) + self.scores.ins_score, (-1, 0))
-                res, res_shift = self.adjustMin(res, res_shift, ne.get(j - 1) + self.scores.del_score, (0, -1))
+                    res, res_shift = self.adjustMin(res, res_shift, prev.get(j - 1) + self.scores.scoreMM(c1, c2), (-1, -1))
+                res, res_shift = self.adjustMin(res, res_shift, prev.get(j) + self.scores.scoreIns(c1), (-1, 0))
+                res, res_shift = self.adjustMin(res, res_shift, ne.get(j - 1) + self.scores.scoreDel(c2), (0, -1))
                 ne.set(j, res)
                 storage.get(i).set(j, (i + res_shift[0], j + res_shift[1]))
             prev = ne
@@ -156,6 +168,48 @@ class Scorer:
             return self.score(piece1.matchingSequence()), None, None
         return self.scoreCommon(piece1, piece2)
 
+    def scoreInCorrectSegments(self, al1, seg1, al2, seg2):
+        # type: (AlignmentPiece, Segment, AlignmentPiece, Segment) -> Tuple[Optional[int], Optional[int], Optional[int]]
+        invalid1 = al1.contradictingRTC(tail_size=params.bad_end_length)
+        invalid2 = al2.contradictingRTC(tail_size=params.bad_end_length)
+        if invalid1 and invalid2:
+            return 0, 0, 0
+        elif invalid1:
+            return 1000, 0, 1000
+        elif invalid2:
+            return 0, 1000, 1000
+        p1 = 0
+        p2 = 0
+        alignment_length_penalty = min(self.scores.avgInsScore(), self.scores.avgDelScore())
+        # we penalize alignment that ends earlier on the left by the alignment length differenth but only up to the start of alignment target
+        if al1.seg_from.left > al2.seg_from.left:
+            p1 += min(al1.seg_from.left - al2.seg_from.left, al1.seg_to.left) * alignment_length_penalty
+        else:
+            p2 += min(al2.seg_from.left - al1.seg_from.left, al2.seg_to.left) * alignment_length_penalty
+        # same for the right end
+        if al1.seg_from.right > al2.seg_from.right:
+            p2 += min(al1.seg_from.right - al2.seg_from.right, len(al2.seg_to.contig) - al2.seg_to.right) * alignment_length_penalty
+        else:
+            p1 += min(al2.seg_from.right - al1.seg_from.right, len(al1.seg_to.contig) - al1.seg_to.right) * alignment_length_penalty
+        full_scores = self.scoreCommon(al1, al2)
+        # On this segment both alignments go to correct sequences. We place larger weight on differences in this segment.
+        q1 = al1.reduce(target=seg1).seg_from
+        q2 = al2.reduce(target=seg2).seg_from
+        if q1.inter(q2):
+            seg = q1.cap(q2)
+            correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
+        else:
+            correct_scores = full_scores
+        if correct_scores[0] > correct_scores[1]:
+            p = p1 - p2
+        else:
+            p = p2 - p1
+        s1 = (full_scores[0] + correct_scores[0] * 9) / 10 + p1
+        s2 = (full_scores[1] + correct_scores[1] * 9) / 10 + p2
+        s12 = (full_scores[2] + correct_scores[2] * 9) / 10 + abs(p)
+        print (p1, p2), full_scores, correct_scores, (s1, s2, s12)
+        return s1, s2, s12
+
     def scoreCommon(self, piece1, piece2):
         # type: (AlignmentPiece, AlignmentPiece) -> Tuple[int, int, int]
         if not piece1.seg_from.inter(piece2.seg_from):
@@ -178,58 +232,6 @@ class Scorer:
                   str(accurate1) + " " + str(accurate2) + " " + \
                   str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" + str(accurate1 + accurate2)
         return accurate1, accurate2, self.accurateScore(composite)
-
-    def scoreInCorrectSegments(self, al1, seg1, al2, seg2):
-        # type: (AlignmentPiece, Segment, AlignmentPiece, Segment) -> Tuple[Optional[int], Optional[int], Optional[int]]
-        invalid1 = al1.contradictingRTC(tail_size=params.bad_end_length)
-        invalid2 = al2.contradictingRTC(tail_size=params.bad_end_length)
-        if invalid1 and invalid2:
-            return 0, 0, 0
-        elif invalid1:
-            return 1000, 0, 1000
-        elif invalid2:
-            return 0, 1000, 1000
-        p1 = 0
-        p2 = 0
-        alignment_length_penalty = min(self.scores.ins_score, self.scores.del_score)
-        # we penalize alignment that ends earlier on the left by the alignment length differenth but only up to the start of alignment target
-        if al1.seg_from.left > al2.seg_from.left:
-            p1 += min(al1.seg_from.left - al2.seg_from.left, al1.seg_to.left) * alignment_length_penalty
-        else:
-            p2 += min(al2.seg_from.left - al1.seg_from.left, al2.seg_to.left) * alignment_length_penalty
-        # same for the right end
-        if al1.seg_from.right > al2.seg_from.right:
-            p2 += min(al1.seg_from.right - al2.seg_from.right, len(al2.seg_to.contig) - al2.seg_to.right) * alignment_length_penalty
-        else:
-            p1 += min(al2.seg_from.right - al1.seg_from.right, len(al1.seg_to.contig) - al1.seg_to.right) * alignment_length_penalty
-        full_scores = self.scoreCommon(al1, al2)
-        if al1.seg_from.contig.id == "-NCTC11962/54272/33188_38592":
-            print "DO for 11962"
-            print al1
-            print "\n".join(al1.asMatchingStrings())
-            print al2
-            print "\n".join(al2.asMatchingStrings())
-            print al1.composeTargetDifference(al2)
-            print "\n".join(al1.composeTargetDifference(al2).asMatchingStrings())
-            print full_scores
-
-        # On this segment both alignments go to correct sequences. We place larger weight on differences in this segment.
-        q1 = al1.reduce(target=seg1).seg_from
-        q2 = al2.reduce(target=seg2).seg_from
-        if q1.inter(q2):
-            seg = q1.cap(q2)
-            correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
-        else:
-            correct_scores = full_scores
-        if correct_scores[0] > correct_scores[1]:
-            p = p1 - p2
-        else:
-            p = p2 - p1
-        s1 = (full_scores[0] + correct_scores[0] * 9) / 10 + p1
-        s2 = (full_scores[1] + correct_scores[1] * 9) / 10 + p2
-        s12 = (full_scores[2] + correct_scores[2] * 9) / 10 + abs(p)
-        print (p1, p2), full_scores, correct_scores, (s1, s2, s12)
-        return s1, s2, s12
 
     def cutHomo(self, m1, m2):
         # type: (MatchingSequence, MatchingSequence) -> Tuple[MatchingSequence, MatchingSequence]

@@ -1,6 +1,7 @@
 import os
 import sys
 
+import common.log_params
 
 sys.path.append("py")
 sys.path.append(".")
@@ -169,7 +170,7 @@ class Polisher:
             if al.seg_to.contains(seg):
                 ok = True
         if not ok:
-            sys.stdout.log(params.LogPriority.warning, "Warning", seg, "has no covering reads")
+            sys.stdout.log(common.log_params.LogPriority.warning, "Warning", seg, "has no covering reads")
             return AlignmentPiece.Identical(seg.asContig().asSegment(), seg)
         reads = []
         start = basic.randomSequence(200)
@@ -188,7 +189,7 @@ class Polisher:
         try:
             polished = Contig(self.polish(reads, base), "polished")
         except PolishException:
-            sys.stdout.log(params.LogPriority.warning, "Warning", seg, "has a sequence very different from reads. Using reads to correct.")
+            sys.stdout.log(common.log_params.LogPriority.warning, "Warning", seg, "has a sequence very different from reads. Using reads to correct.")
             for al, read in zip(als, reads):
                 if al.seg_to.contains(seg):
                     try:
@@ -197,7 +198,7 @@ class Polisher:
                     except PolishException:
                         pass
         if polished is None:
-            sys.stdout.log(params.LogPriority.warning, "Warning", seg, "could not be corrected even though some reads cover it.")
+            sys.stdout.log(common.log_params.LogPriority.warning, "Warning", seg, "could not be corrected even though some reads cover it.")
             polished = seg.asContig()
         als = list(self.aligner.overlapAlign([polished], ContigStorage([base])))
         for al in als:

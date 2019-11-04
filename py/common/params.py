@@ -1,3 +1,5 @@
+from common.scoring_model import SimpleScores
+
 MINIMAP_BIN = "bin/flye-minimap2"
 
 clean = False
@@ -25,21 +27,16 @@ max_read_length = 80000
 min_alignment_size = 100 # minimal size of alignment that will be considered. Important for composition of alignments.
 technology = "pacbio"
 
-class Scores:
-    ins_score = 8
-    del_score = 7
-    sub_score = 10
-    homo_score = 4
-    switch_core = 1
-    center_score = 20
-    inf = 10000000
 
-class LogPriority:
-    warning = 2
-    log_level = 5
-    alignment_files = 5
-    main_parts = 0
-    common = 1
+scores = SimpleScores(scoreIns = 8, scoreDel = 7, scoreMM = 10, scoreHomo = 4)
+# class Scores:
+#     ins_score = 8
+#     del_score = 7
+#     sub_score = 10
+#     homo_score = 4
+#     switch_core = 1
+#     center_score = 20
+#     inf = 10000000
 
 
 downsample = 100000000

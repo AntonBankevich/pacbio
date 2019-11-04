@@ -69,7 +69,7 @@ class Params:
             elif key == "--nosplit":
                 self.split = False
             elif key == "--homo-score":
-                params.Scores.homo_score = int(value)
+                params.scores.sHomo = int(value)
             elif key == "--clean":
                 params.clean = True
             elif key == "--reads":

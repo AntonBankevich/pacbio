@@ -4,6 +4,8 @@ import shutil
 import subprocess
 import sys
 
+import common.log_params
+
 sys.path.append("py")
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
@@ -202,7 +204,7 @@ class Aligner:
             cmdline.append("-Hk19")
         try:
             devnull = open(os.devnull, "w")
-            sys.stdout.log(params.LogPriority.alignment_files, "Running: " + " ".join(cmdline))
+            sys.stdout.log(common.log_params.LogPriority.alignment_files, "Running: " + " ".join(cmdline))
             subprocess.check_call(cmdline, stderr=devnull, stdout=open(out_file, "w"))
             env = os.environ.copy()
             env["LC_ALL"] = "C"
@@ -223,12 +225,12 @@ class Aligner:
         basic.ensure_dir_existance(dir)
         basic.ensure_dir_existance(alignment_dir)
         if same and not params.clean and os.path.exists(alignment_file):
-            sys.stdout.log(params.LogPriority.alignment_files, "Alignment reused:", alignment_file)
+            sys.stdout.log(common.log_params.LogPriority.alignment_files, "Alignment reused:", alignment_file)
             pass
         else:
             if os.path.isfile(alignment_file):
                 os.remove(alignment_file)
-            sys.stdout.log(params.LogPriority.alignment_files, "Performing alignment:", alignment_file, str([(c.id, len(c)) for c in reference]))
+            sys.stdout.log(common.log_params.LogPriority.alignment_files, "Performing alignment:", alignment_file, str([(c.id, len(c)) for c in reference]))
             self.align_files(contigs_file, [reads_file], self.threads, params.technology, mode, alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 
@@ -257,10 +259,10 @@ class Aligner:
             else:
                 seq_from = read_storage[rec.query_name]
             seq_to = ref_storage[rec.tname]
-            tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
             if tmp is not None:
                 if not mode == "overlap" and tmp.indelLength * 8 > tmp.matchingPositionsCount:
                     # TODO: move this to filter
+                    tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
                     for al in tmp.split():
                         als.append(al)
                 else:

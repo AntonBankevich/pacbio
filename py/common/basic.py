@@ -7,7 +7,7 @@ import time
 
 from typing import Callable, Union, List
 
-from common import params
+import common.log_params
 
 rc = dict()
 rc['A'] = 'T'
@@ -114,33 +114,33 @@ class OStreamWrapper:
         self.streams = list(streams)
         self.active = True
         self.prefix = lambda x: ""
-        self.level = params.LogPriority.log_level
+        self.level = common.log_params.LogPriority.log_level
 
     def fileno(self):
         return 1
 
     def write(self, string):
-        if self.level >= params.LogPriority.common and self.active:
+        if self.level >= common.log_params.LogPriority.common and self.active:
             for stream in self.streams:
                 stream.write(string)
 
     def writelines(self, lines):
-        if self.level >= params.LogPriority.common and self.active:
+        if self.level >= common.log_params.LogPriority.common and self.active:
             for line in lines:
                 for stream in self.streams:
                     stream.write(line)
 
     def info(self, *strings):
-        self.log(params.LogPriority.main_parts, "INFO: " + " ".join(map(str, strings)))
+        self.log(common.log_params.LogPriority.main_parts, "INFO: " + " ".join(map(str, strings)))
 
     def trace(self, *strings):
-        self.log(params.LogPriority.main_parts, "TRACE: " + " ".join(map(str, strings)))
+        self.log(common.log_params.LogPriority.main_parts, "TRACE: " + " ".join(map(str, strings)))
 
     def substage(self, *strings):
-        self.log(params.LogPriority.main_parts, "SUBSTAGE: " + " ".join(map(str, strings)))
+        self.log(common.log_params.LogPriority.main_parts, "SUBSTAGE: " + " ".join(map(str, strings)))
 
     def warn(self, *strings):
-        self.log(params.LogPriority.warning, "WARNING: " + " ".join(map(str, strings)))
+        self.log(common.log_params.LogPriority.warning, "WARNING: " + " ".join(map(str, strings)))
 
     def log(self, level = 0, *strings):
         if level <= self.level and self.active:
@@ -258,3 +258,15 @@ def CreateLog(dir):
     sys.stdout = OStreamWrapper(sys.stdout, log)
     sys.stdout.prefix = lambda s: time.strftime("%y.%m.%d %H:%M:%S") + "  "
     sys.stderr = sys.stdout
+
+def letterToIndex(char):
+    # type: (str) -> int
+    if char == "A":
+        return 0
+    elif char == "C":
+        return 1
+    elif char == "G":
+        return 2
+    elif char == "T":
+        return 3
+    assert False

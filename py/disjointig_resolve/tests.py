@@ -8,6 +8,7 @@ from string import ascii_lowercase, ascii_uppercase
 
 from typing import Dict, List, Any, Tuple, Callable
 
+import common.log_params
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common import params
@@ -15,6 +16,7 @@ from common.alignment_storage import AlignmentPiece, ReadCollection
 from common.basic import OStreamWrapper
 from common.line_align import Scorer
 from common.save_load import TokenReader, TokenWriter
+from common.scoring_model import ComplexScores
 from common.seq_records import NamedSequence
 from common.sequences import Contig, ContigStorage
 from disjointig_resolve.accurate_line import NewLine
@@ -32,6 +34,9 @@ class Tester:
 
     def __init__(self, aligner):
         # type: (Aligner) -> None
+        params.scores = ComplexScores()
+        params.scores.load(open("flye/config/bin_cfg/pacbio_substitutions.mat", "r"))
+
         self.aligner = aligner
         self.polisher = Polisher(aligner, aligner.dir_distributor)
         testList = []
@@ -43,7 +48,7 @@ class Tester:
         params.k = 500
         params.l = 1500
         params.min_k_mer_cov = 5
-        sys.stdout.level = params.LogPriority.alignment_files - 1
+        sys.stdout.level = common.log_params.LogPriority.alignment_files - 1
         # sys.stdout.level = params.LogPriority.main_parts
 
     def testAll(self, fname):
