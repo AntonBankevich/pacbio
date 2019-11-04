@@ -68,7 +68,7 @@ def main(model_file, k, dir, contigs_file, reads_file):
             else:
                 seg = al.seg_from.cap(seg)
         print seg
-        if seg == None:
+        if seg is None:
             continue
         al0 = al0.reduce(query=seg)
         others = [al.reduce(query=seg) for al in others]

@@ -51,8 +51,8 @@ def main(k, dir, contigs_file, reads_file):
     res.close()
 
 if __name__ == "__main__":
-    k = int(sys.argv[2])
-    dir = sys.argv[3]
-    contigs_file = sys.argv[4]
-    reads_file = sys.argv[5]
+    k = int(sys.argv[1])
+    dir = sys.argv[2]
+    contigs_file = sys.argv[3]
+    reads_file = sys.argv[4]
     main(k, dir, contigs_file, reads_file)
