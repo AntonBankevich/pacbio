@@ -73,15 +73,15 @@ def main(model_file, k, dir, contigs_file, reads_file):
         al0 = al0.reduce(query=seg)
         others = [al.reduce(query=seg) for al in others]
         scorer = Scorer(params.scores)
-        print "Winner"
         for al in others:
-            print "oppa", scorer.scoreCommon(al0, al)
-        print "No winner"
+            a, b, c = scorer.scoreCommon(al0, al)
+            print "win", a, b, c, len(seg)
         for al1 in others:
             for al2 in others:
                 if al1 == al2:
                     continue
-                print "oppa", scorer.scoreCommon(al1, al2)
+                a, b, c = scorer.scoreCommon(al1, al2)
+                print "draw", a, b, c, len(seg)
 
 if __name__ == "__main__":
     model = sys.argv[1]
