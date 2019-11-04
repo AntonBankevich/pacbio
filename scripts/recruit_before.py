@@ -28,6 +28,7 @@ def main(flye_dir, rf, dir, edge_id, k):
     unique = dict()
     edge_ids = edge_id.split(",")
     for eid in edge_ids:
+        print "Finding neighbours of", eid
         for e in graph.v[graph.e[eid].start].inc:
             if basic.Normalize(e.id) in edge_ids:
                 continue
@@ -45,6 +46,7 @@ def main(flye_dir, rf, dir, edge_id, k):
                     id = id + "r"
             if e.id.startswith("-"):
                 seq = basic.RC(seq)
+            print "Right netghbour", eid, id
             unique[id] = NamedSequence(seq, id)
         for e in graph.v[graph.e[eid].fin].out:
             if basic.Normalize(e.id) in edge_ids:
@@ -63,6 +65,7 @@ def main(flye_dir, rf, dir, edge_id, k):
                     id = id + "l"
             if e.id.startswith("-"):
                 seq = basic.RC(seq)
+            print "Left neighbour", eid, id
             unique[id] = NamedSequence(seq, id)
 
 
