@@ -4,9 +4,8 @@ import shutil
 import subprocess
 import sys
 
-import common.log_params
-
 sys.path.append("py")
+import common.log_params
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from flye_tools.alignment import make_alignment
@@ -339,7 +338,12 @@ if __name__ == "__main__":
     basic.CreateLog(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"), False)
     for al in aln.localAlign(ReadCollection().loadFromFasta(open(query, "r")), contigs):
-        print al
+        sys.stdout.write(str(al))
+        if len(al) > 5000:
+            for i in range(len(al.seg_from) / 1000):
+                seg = al.seg_from.prefix(length = i * 1000 + 1000).suffix(length = 1000)
+                sys.stdout.write(" " + str(al.reduce(query=seg).percentIdentity()))
+        sys.stdout.write("\n")
         s = list(al.asMatchingStrings())
         print s[0]
         for a, b in zip(s[0], s[1]):
