@@ -226,6 +226,7 @@ class NewLineStorage(ContigStorage):
     def printKnottedToFasta(self, handler):
         # type: (BinaryIO) -> None
         printed = set()
+        cnt = 1
         for chain in self.chains():
             if chain[0].rc.id in printed:
                 continue
@@ -246,7 +247,9 @@ class NewLineStorage(ContigStorage):
                         seq.append(line.knot.gap_seq)
                 else:
                     seq.append(line.seq)
-            SeqIO.write(NamedSequence("".join(seq), ";".join(id)), handler, "fasta")
+            print cnt, ":", ";".join(id)
+            SeqIO.write(NamedSequence("".join(seq), str(cnt)), handler, "fasta")
+            cnt += 1
 
     def chains(self):
         # type: () -> Generator[List[NewLine]]
