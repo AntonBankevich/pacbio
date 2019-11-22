@@ -40,3 +40,6 @@ def main(args):
         print contig
         cals = sorted(it, key = lambda al: al.seg_from.left)
         print cals
+
+if __name__ == "__main__":
+    main(sys.argv)
