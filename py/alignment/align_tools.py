@@ -122,6 +122,7 @@ class Aligner:
         self.filters["overlap"] = lambda als: self.filterOverlaps(als)
         self.filters["dotplot"] = lambda als: self.filterLocal(als)
         self.filters["local"] = lambda als: als
+        self.filters["reference"] = lambda als: als
 
     def alignReadCollection(self, reads_collection, contigs):
         # type: (ReadCollection, Iterable[Contig]) -> None
@@ -136,7 +137,7 @@ class Aligner:
                 read_ids.add(read.id)
         contigs = filter(lambda contig: contig.id in contig_ids, contigs)
         reads = filter(lambda read: read.id in read_ids, reads_collection)
-        reads_collection.fillFromSam(self.align(reads, contigs), contig_collection)
+        reads_collection.fillFromSam(self.align(reads, contigs, "local"), contig_collection)
 
     def alignReadsToSegments(self, reads, segments):
         # type: (ReadCollection, Iterable[Segment]) -> None
@@ -195,12 +196,13 @@ class Aligner:
             cmdline.append("-p0.00")
         elif mode in ["overlap", "local"]:
             cmdline.append("-p0.1")
+        if mode == "reference":
+            cmdline.extend(["-x", "asm5"])
         else:
-            assert False, "Unknown mode"
-        if platform == "nano":
-            cmdline.append("-k15")
-        else:
-            cmdline.append("-Hk19")
+            if platform == "nano":
+                cmdline.append("-k15")
+            else:
+                cmdline.append("-Hk19")
         try:
             devnull = open(os.devnull, "w")
             sys.stdout.log(common.log_params.LogPriority.alignment_files, "Running: " + " ".join(cmdline))
@@ -260,7 +262,7 @@ class Aligner:
             seq_to = ref_storage[rec.tname]
             tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
             if tmp is not None:
-                if not mode == "overlap" and tmp.indelLength * 8 > tmp.matchingPositionsCount:
+                if (mode == "local" or mode == "dotplot") and tmp.indelLength * 8 > tmp.matchingPositionsCount:
                     # TODO: move this to filter
                     tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
                     for al in tmp.split():
@@ -287,6 +289,11 @@ class Aligner:
     def localAlign(self, reads, ref_storage):
         # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
         for al in self.alignAndFilter(reads, ref_storage, "local"):
+            yield al
+
+    def referenceAlign(self, reads, ref_storage):
+        # type: (Iterable[Contig], ContigStorage) -> Generator[AlignmentPiece]
+        for al in self.alignAndFilter(reads, ref_storage, "reference"):
             yield al
 
     def save(self, handler):
@@ -328,7 +335,6 @@ class Aligner:
         # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
         als = filter(lambda al: not al.contradictingRTC(tail_size=params.bad_end_length), als)
         return self.filterLocal(als)
-
 
 if __name__ == "__main__":
     dir = sys.argv[1]
