@@ -1,17 +1,16 @@
 import itertools
 import os
 import sys
-
+sys.path.append("py")
 from alignment.align_tools import Aligner, DirDistributor
 from common.basic import CreateLog
 from common.sequences import ContigStorage
 
 
 def main(args):
-    flye_dir = sys.argv[1]
-    contigsf = sys.argv[2]
-    reff = sys.argv[3]
-    dir = sys.argv[4]
+    contigsf = sys.argv[1]
+    reff = sys.argv[2]
+    dir = sys.argv[3]
     CreateLog(dir)
     aligner = Aligner(DirDistributor(os.path.join(dir, "alignments")))
     print "Reading contigs and reference"
