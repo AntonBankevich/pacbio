@@ -38,13 +38,14 @@ def main(args):
             cseg1 = als[0].seg_from
             cseg2 = als[0].seg_to
             for al1, al2 in zip(als[:-1], als[1:]):
-                if al1.__le__(al2) and al1.seg_from.dist(al2.seg_from) < 30000 and al1.seg_to.dist(al2.seg_to) < 30000:
+                if al1.__le__(al2) and al1.seg_from.dist(al2.seg_from) < 60000 and al1.seg_to.dist(al2.seg_to) < 60000:
                     cseg1 = cseg1.merge(al2.seg_from)
                     cseg2 = cseg2.merge(al2.seg_to)
                 else:
                     res.append((cseg1, cseg2))
                     cseg1 = al2.seg_from
                     cseg2 = al2.seg_to
+            res.append((cseg1, cseg2))
         res_sorted = sorted(res, key = lambda al: al[1].left)
         print ", ".join("(%s[%d:%d]->%s[%d:%d])" % (f.contig.id, f.left, f.right, t.contig.id, t.left, t.right) for f, t in res_sorted)
 
