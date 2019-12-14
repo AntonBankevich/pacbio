@@ -1,6 +1,7 @@
-from typing import Generator, Callable, BinaryIO
+from typing import Generator, Callable, BinaryIO, Iterable
 
 from common.seq_records import SeqRecord
+import gzip
 
 
 class Reader:
@@ -127,3 +128,17 @@ def RemoveNs(input_handler, output_handler):
             r -= 1
         if r > l:
             output_handler.write(SeqRecord(contig.seq[l:r], contig.id))
+
+def parse_by_name(fname):
+    # type: (str) -> Iterable
+    if fname.endswith(".gz"):
+        f = gzip.open(fname, "r")
+        fname = fname[:len(fname) - 3]
+    else:
+        f = open(fname, "r")
+    if fname.lower().endswith(".fasta") or fname.lower().endswith("fa"):
+        return parse_fasta(f)
+    elif fname.lower().endswith(".fastq") or fname.lower().endswith("fq"):
+        return parse_fastq(f)
+    else:
+        assert False, "noncanonical filename"

@@ -69,7 +69,7 @@ def main(args):
     print "Reading and printing reads"
     freads = open(os.path.join(dir, "reads.fasta"), "w")
     cnt = 0
-    for read in SeqIO.parse_fasta(open(reads_file, "r")):
+    for read in SeqIO.parse_by_name(reads_file):
         cnt += 1
         if cnt % 10000 == 0:
             print cnt
