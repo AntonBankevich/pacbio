@@ -46,7 +46,7 @@ def extract_transfers(contigs, als):
 
 def main(args):
     flye_dir = sys.argv[1]
-    graph_file, unique_file, disjointigs_file, tmp, their_file = cl_params.parseFlyeDir(flye_dir)
+    graph_file, unique_file, disjointigs_file, rep_dir, tmp, their_file = cl_params.parseFlyeDir(flye_dir)
     our_file = sys.argv[2]
     dir = sys.argv[3]
     min_cov = int(sys.argv[4])
