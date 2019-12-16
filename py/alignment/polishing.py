@@ -141,7 +141,7 @@ class Polisher:
     def polishSegment(self, seg, als):
         # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
         print "Polishing segment", seg
-        w = 900
+        w = max(900, params.k)
         r = 50
         first = seg.left / w
         last = min(seg.right + w - 1, len(seg.contig)) / w
