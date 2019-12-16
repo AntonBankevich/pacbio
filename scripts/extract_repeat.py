@@ -59,8 +59,12 @@ def main(args):
     als = []
     for s in open(dump).readlines():
         if s.startswith("Chain"):
+            if cur_read == "06dfd536-e258-446f-a019-8d8340ef831e":
+                print als
             for al in als:
                 if al in repeats:
+                    if cur_read == "06dfd536-e258-446f-a019-8d8340ef831e":
+                        print "oppa"
                     reads.add(cur_read)
                     break
             als = []
@@ -71,6 +75,8 @@ def main(args):
             eid = s[6].split("_")[1]
             if s[6][0] == "-":
                 eid = "-" + eid
+            if cur_read == "06dfd536-e258-446f-a019-8d8340ef831e":
+                print eid
             als.append(eid)
     print "Selected", len(reads), "reads"
     print "\n".join(reads)

@@ -348,7 +348,7 @@ class Polisher:
 class FakePolishingArgs:
     def __init__(self):
         self.num_iters = params.num_iters
-        self.platform = "pacbio"
+        self.platform = params.technology
         self.threads = params.threads
 
 if __name__ == "__main__":
