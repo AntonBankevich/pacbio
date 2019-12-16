@@ -21,7 +21,7 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats mode homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats mode nano homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
@@ -70,6 +70,8 @@ class Params:
                 self.split = False
             elif key == "--homo-score":
                 params.scores.sHomo = int(value)
+            elif key == "--nano":
+                params.technology = "nano"
             elif key == "--clean":
                 params.clean = True
             elif key == "--reads":
