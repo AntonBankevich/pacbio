@@ -26,6 +26,7 @@ min_contra_for_break = 5 # minimal nunber of unaligned reads needed to break res
 max_read_length = 80000
 min_alignment_size = 100 # minimal size of alignment that will be considered. Important for composition of alignments.
 technology = "pacbio"
+expected_size = 5000000
 
 
 scores = SimpleScores(scoreIns = 8, scoreDel = 7, scoreMM = 10, scoreHomo = 4)

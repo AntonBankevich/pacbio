@@ -26,7 +26,7 @@ from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params, parseFlyeDir
 from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
-    CreateReadCollection
+    CreateReadCollection, constructDisjointigs
 
 
 def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
@@ -118,13 +118,13 @@ def main(args):
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
-            subprocess.check_call(["./bin/flye", "--meta", "-o", assembly_dir, "-t", str(cl_params.threads), "--" + params.technology + "-raw", reads_file, "--genome-size", str(5000000), "--min-overlap", str(params.k)])
+            subprocess.check_call(["./bin/flye", "--meta", "-o", assembly_dir, "-t", str(cl_params.threads), "--" + params.technology + "-raw", reads_file, "--genome-size", str(params.expected_size), "--min-overlap", str(params.k)])
             cl_params.set_flye_dir(assembly_dir, cl_params.mode)
         elif len(cl_params.disjointigs_file_list) == 0:
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
-            subprocess.check_call(["./bin/flye", "--meta", "-o", assembly_dir, "-t", str(cl_params.threads), "--" + params.technology + "-raw", reads_file, "--genome-size", str(100000), "--min-overlap", str(params.k)])
+            dosjointigs_file = constructDisjointigs(reads, params.expected_size, assembly_dir)
             graph_file, contigs_file, disjointigs_file, rep_dir, graph_file_after, contigs_file_after = parseFlyeDir(assembly_dir)
             cl_params.disjointigs_file_list.append(disjointigs_file)
             params.min_contra_for_break = 8

@@ -191,3 +191,13 @@ def ExtendShortLines(contigs, reads, aligner, polisher):
         else:
             sys.stdout.warn("Could not prolong contig", contig.id, "enough. Removing it.")
             contigs.remove(contig)
+
+
+def constructDisjointigs(reads, total_length, dir):
+    # type: (ContigStorage, int, str) -> str
+    reads_file = os.path.join(dir, "reads.fasta")
+    disjointigs_file = os.path.join(dir, "disjointigs.fasta")
+    log_file = os.path.join(dir, "log.txt")
+    reads.writeToFasta(open(reads_file, "w"))
+    subprocess.check_call(["./bin/flye-assemble", reads_file, disjointigs_file, str(total_length), "flye/config/bin_cfg/asm_raw_reads.cfg", "-v", "1500", "-t", "16", "-u", "-l", log_file])
+    return disjointigs_file

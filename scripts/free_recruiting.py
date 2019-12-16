@@ -1,6 +1,8 @@
-import subprocess
 import sys
 import os
+
+from disjointig_resolve.initialization import constructDisjointigs
+
 sys.path.append("py")
 from typing import List, BinaryIO
 
@@ -11,14 +13,6 @@ from common.sequences import ContigStorage, Contig
 
 from common.basic import CreateLog
 
-def constructDisjointigs(reads, total_length, dir):
-    # type: (ContigStorage, int, str) -> ContigStorage
-    reads_file = os.path.join(dir, "reads.fasta")
-    disjointigs_file = os.path.join(dir, "disjointigs.fasta")
-    log_file = os.path.join(dir, "log.txt")
-    reads.writeToFasta(open(reads_file, "w"))
-    subprocess.check_call(["./bin/flye-assemble", reads_file, disjointigs_file, str(total_length), "flye/config/bin_cfg/asm_raw_reads.cfg", "-v", "1500", "-t", "16", "-u", "-l", log_file])
-    return ContigStorage().loadFromFasta(open(disjointigs_file, "r"), False)
 
 def alsToReads(als):
     # type: (List[AlignmentPiece]) -> ContigStorage
