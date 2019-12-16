@@ -271,8 +271,7 @@ class Polisher:
                     read.clean()
                 polished_base = Contig(self.polish(reduced_reads, base), "polished_base")
                 for al in self.aligner.localAlign(reduced_reads, ContigStorage().addAll([polished_base])):
-                    if len(al) >= params.k:
-                        reduced_reads.reads[al.seg_from.contig.id].addAlignment(al)
+                    reduced_reads.reads[al.seg_from.contig.id].addAlignment(al)
                 # self.aligner.alignReadCollection(reduced_reads, [polished_base])
                 candidate_alignments = []
                 # print "RRL1:", reduced_read_list
@@ -291,7 +290,9 @@ class Polisher:
                         print polished_base.seq
                     assert al is not None, reduced_read_list[i]
                     positions.append(al.trimByQuality(0.3, 100).seg_to.right)
+                print "Positions before sorting:", positions
                 positions = sorted(positions)[::-1]
+                print "Positions after sorting:", positions
                 num = max(min_cov, int(len(relevant_als)  * min_cov_frac))
                 if num >= len(positions):
                     continue
