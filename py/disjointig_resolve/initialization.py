@@ -100,12 +100,13 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     tlen = sum(map(len, bad_reads))
     bad_reads.print_fasta(open(rf, "w"))
     l = tlen * clen / tlen0
-    assembly_dir = os.path.join(dir, "assembly0")
     code = subprocess.call(["./bin/flye", "--meta", "-o", assembly_dir, "-t", "8", "--" + params.technology + "-raw", rf, "--genome-size", str(l),
                            "--no-trestle", "--min-overlap", str(params.k)])
+    assembly_dir = os.path.join(dir, "assembly0")
+    disjointigs_file = constructDisjointigs(reads, l, assembly_dir)
+
     if code == 0:
-        df = os.path.join(assembly_dir, "10-consensus", "consensus.fasta")
-        disjointigs.loadFromFasta(open(df, "r"))
+        disjointigs.loadFromFasta(open(disjointigs_file, "r"))
         print "Disjointigs:"
         for dis in disjointigs:
             print dis.id, len(dis)

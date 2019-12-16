@@ -124,8 +124,8 @@ def main(args):
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
-            dosjointigs_file = constructDisjointigs(reads, params.expected_size, assembly_dir)
-            graph_file, contigs_file, disjointigs_file, rep_dir, graph_file_after, contigs_file_after = parseFlyeDir(assembly_dir)
+            disjointigs_file = constructDisjointigs(reads, params.expected_size, assembly_dir)
+            # graph_file, contigs_file, disjointigs_file, rep_dir, graph_file_after, contigs_file_after = parseFlyeDir(assembly_dir)
             cl_params.disjointigs_file_list.append(disjointigs_file)
             params.min_contra_for_break = 8
 
