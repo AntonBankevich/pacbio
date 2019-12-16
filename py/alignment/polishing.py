@@ -265,13 +265,14 @@ class Polisher:
                     continue
                 # Base consists 500 random nucleotides and 500 last nucls from the polished sequence a segment of read of length at most 500
                 base_segment = base_al.seg_from.contig.segment(base_al.seg_from.right,
-                                                     min(len(base_al.seg_from.contig), base_al.seg_from.right + params.window_size))
+                                                     min(len(base_al.seg_from.contig), base_al.seg_from.right + max(params.window_size, params.k)))
                 base = Contig(start + base_segment.Seq(), "base")
                 for read in reduced_read_list:
                     read.clean()
                 polished_base = Contig(self.polish(reduced_reads, base), "polished_base")
                 for al in self.aligner.localAlign(reduced_reads, ContigStorage().addAll([polished_base])):
-                    reduced_reads.reads[al.seg_from.contig.id].addAlignment(al)
+                    if len(al) >= params.k:
+                        reduced_reads.reads[al.seg_from.contig.id].addAlignment(al)
                 # self.aligner.alignReadCollection(reduced_reads, [polished_base])
                 candidate_alignments = []
                 # print "RRL1:", reduced_read_list
