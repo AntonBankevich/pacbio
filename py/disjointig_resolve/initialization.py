@@ -102,6 +102,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     l = tlen * clen / tlen0
     assembly_dir = os.path.join(dir, "assembly0")
     disjointigs_file = constructDisjointigs(reads, l, assembly_dir)
+    code = 0
 
     if code == 0:
         disjointigs.loadFromFasta(open(disjointigs_file, "r"))
