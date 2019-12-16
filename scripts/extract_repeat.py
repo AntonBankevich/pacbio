@@ -1,6 +1,8 @@
 import os
 import sys
 
+sys.path.append("py")
+
 from common import SeqIO, basic
 from common.basic import CreateLog
 from common.seq_records import NamedSequence
@@ -14,12 +16,14 @@ def parse(f):
     ends = []
     for s in open(f, "r").readlines():
         s = s.split()
+        if len(s) == 0:
+            continue
         if s[0] == "Repeat":
-            repeats.append(s[1:])
+            repeats.append(s[1])
         elif s[0] == "Start":
-            repeats.append(s[1:])
+            starts.append(s[1:])
         elif s[0] == "End":
-            repeats.append(s[1:])
+            ends.append(s[1:])
         else:
             assert False, "Incorrect dataset file"
     return repeats, starts, ends
@@ -58,6 +62,9 @@ def main(args):
             for al in als:
                 if al in repeats:
                     reads.add(cur_read)
+                    break
+            als = []
+            
         else:
             s = s.split()
             cur_read = s[2][1:]
@@ -66,6 +73,7 @@ def main(args):
                 eid = "-" + eid
             als.append(eid)
     print "Selected", len(reads), "reads"
+    print "\n".join(reads)
     print "Reading and printing reads"
     freads = open(os.path.join(dir, "reads.fasta"), "w")
     cnt = 0
