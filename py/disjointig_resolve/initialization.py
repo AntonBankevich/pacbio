@@ -7,7 +7,7 @@ from typing import Dict, List
 
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
-from common import params
+from common import params, basic
 from common.alignment_storage import ReadCollection, AlignmentPiece
 from common.dot_parser import DotParser
 from common.sequences import ContigCollection, ContigStorage, Contig
@@ -195,6 +195,7 @@ def ExtendShortLines(contigs, reads, aligner, polisher):
 
 def constructDisjointigs(reads, total_length, dir):
     # type: (ReadCollection, int, str) -> str
+    basic.ensure_dir_existance(dir)
     reads_file = os.path.join(dir, "reads.fasta")
     disjointigs_file = os.path.join(dir, "disjointigs.fasta")
     log_file = os.path.join(dir, "log.txt")
