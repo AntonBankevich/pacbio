@@ -530,10 +530,26 @@ class AlignmentPiece:
         #         yield b1, b2
 
 
-    def split(self):
+    def splitRead(self):
         res = [] # type: List[Tuple[Segment, Segment]]
         for seg_from, seg_to in self.matchingBlocks():
-            if len(res) > 0 and (seg_from.left - res[-1][0].right > 20 or seg_to.left - res[-1][1].right > 100):
+            if len(res) > 0 and (seg_from.left - res[-1][0].right > 150 or seg_to.left - res[-1][1].right > 150):
+                tmp = AlignmentPiece.FromBlocks(res)
+                if tmp is not None:
+                    yield tmp
+                res = []
+            res.append((seg_from, seg_to))
+        if res[0][0].left == self.seg_from.left:
+            yield self
+        else:
+            tmp = AlignmentPiece.FromBlocks(res)
+            if tmp is not None:
+                yield tmp
+
+    def splitRef(self):
+        res = [] # type: List[Tuple[Segment, Segment]]
+        for seg_from, seg_to in self.matchingBlocks():
+            if len(res) > 0 and (seg_from.left - res[-1][0].right > 100 or seg_to.left - res[-1][1].right > 100):
                 tmp = AlignmentPiece.FromBlocks(res)
                 if tmp is not None:
                     yield tmp

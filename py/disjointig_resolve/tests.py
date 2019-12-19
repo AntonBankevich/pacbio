@@ -34,8 +34,8 @@ class Tester:
 
     def __init__(self, aligner):
         # type: (Aligner) -> None
-        params.scores = ComplexScores()
-        params.scores.load(open("flye/config/bin_cfg/pacbio_substitutions.mat", "r"))
+        # params.scores = ComplexScores()
+        # params.scores.load(open("flye/config/bin_cfg/pacbio_substitutions.mat", "r"))
 
         self.aligner = aligner
         self.polisher = Polisher(aligner, aligner.dir_distributor)

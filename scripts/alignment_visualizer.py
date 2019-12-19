@@ -29,14 +29,14 @@ def printAlignments(sam_handler, reference_handler, reads_handler):
     down = 0
     for al in res:
         print al
-        print list(al.split())
+        print list(al.splitRead())
         s1, s2 = al.asMatchingStrings()
         up += s1.count("-")
         down += s2.count("-")
         s = []
-        if len(list(al.split())) > 1:
+        if len(list(al.splitRead())) > 1:
             nums = []
-            for al1 in al.split():
+            for al1 in al.splitRead():
                 nums.append(al1.seg_from.left)
                 nums.append(al1.seg_from.right - 1)
             cur_num = 0

@@ -262,11 +262,10 @@ class Aligner:
             seq_to = ref_storage[rec.tname]
             tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
             if tmp is not None:
-                if (mode == "local" or mode == "dotplot") and tmp.indelLength * 8 > tmp.matchingPositionsCount:
-                    # TODO: move this to filter
-                    tmp = AlignmentPiece.FromSamRecord(seq_from, seq_to, rec)
-                    for al in tmp.split():
-                        als.append(al)
+                if mode == "dotplot":
+                    als.extend(tmp.splitRef())
+                elif (mode == "local") and tmp.indelLength * 8 > tmp.matchingPositionsCount:
+                    als.extend(tmp.splitRead())
                 else:
                     als.append(tmp)
         if len(als) > 0:

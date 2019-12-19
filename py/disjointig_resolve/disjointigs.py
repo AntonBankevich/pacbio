@@ -1,5 +1,5 @@
 from typing import Dict, Optional, BinaryIO, Callable, Iterator, Generator, Iterable, Union
-from common import basic, SeqIO
+from common import basic, SeqIO, params
 from common.save_load import TokenWriter, TokenReader
 from common.seq_records import NamedSequence
 from common.sequences import Segment, UniqueList, Contig, ContigStorage
@@ -104,7 +104,7 @@ class DisjointigCollection(ContigStorage):
         for al in als:
             dt = al.seg_to.contig # type: Disjointig
             all += 1
-            if al.seg_from.left < 500 and al.rc.seg_from.left < 500 and len(list(al.split())) == 1:
+            if al.seg_from.left < 500 and al.rc.seg_from.left < 500 and len(list(al.splitRef())) == 1 and len(al) > params.k:
                 cnt += 1
                 dt.addAlignment(al)
                 if cnt % 10000 == 0:

@@ -95,6 +95,8 @@ class ExtensionHandler(LineListener):
             line.read_alignments.addAll(tmp)
         new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + params.k + 100))
         for al in self.aligner.dotplotAlign([new_seg.asContig()], self.disjointigs):
+            if len(al) < params.k:
+                continue
             al = al.reverse().targetAsSegment(new_seg)
             line.disjointig_alignments.addAndMergeRight(al)
 
@@ -183,9 +185,19 @@ class NewLine(Contig):
             dt = alDL.seg_from.contig # type: Disjointig
             cnt = 0
             als = filter(lambda al: al.seg_to.interSize(alDL.seg_from) > 8 * params.k / 10, dt.allInter(reduced.seg_from))
+            tmp_als = [al for al in als if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6"]
+            if len(tmp_als) > 0:
+                print "output1 -1b3f79ea-630a-4015-a9cd-c9b147cb50e6", alDL
+                print tmp_als
             compositions = alDL.massComposeBack(als)
+            tmp_als = [al for al in compositions if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6"]
+            if len(tmp_als) > 0:
+                print "output2 -1b3f79ea-630a-4015-a9cd-c9b147cb50e6", alDL
+                print tmp_als
             for al in compositions:
                 if len(al.seg_to) >= params.k:
+                    if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6":
+                        print "result", al
                     result.append(al)
                 cnt += 1
                 # if cnt % 100 == 0:
@@ -202,6 +214,8 @@ class NewLine(Contig):
                     if len(inter.matches) != 0:
                         found = True
                         break
+                if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6":
+                    print "filtered", al, found
                 if not found:
                     yield al
                     readRes.append(al)

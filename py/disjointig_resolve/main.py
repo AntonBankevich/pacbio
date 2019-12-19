@@ -44,7 +44,7 @@ def printToFile(als, dir, name):
     # type: (Iterable[AlignmentPiece], str, str) -> None
     f = open(os.path.join(dir, name + ".txt"), "w")
     for al in als:
-        f.write(" ".join([str(al.seg_from.contig.id), str(al.seg_to.contig.id), str(al.seg_from.left), str(al.seg_from.right), str(al.seg_to.left), str(al.seg_to.right), str(len(list(al.split())))]) + "\n")
+        f.write(" ".join([str(al.seg_from.contig.id), str(al.seg_to.contig.id), str(al.seg_from.left), str(al.seg_from.right), str(al.seg_to.left), str(al.seg_to.right), str(len(list(al.splitRead())))]) + "\n")
     f.close()
 
 def printVals(vals, dir, name):
@@ -62,7 +62,7 @@ def countStats(reads, lines, disjointigs, aligner, dir):
     for al in aligner.overlapAlign(reads, lines):
         line = al.seg_to.contig # type: NewLine
         line.addReadAlignment(al)
-        tmp.addAll(al.split())
+        tmp.addAll(al.splitRead())
         cnt += 1
         if cnt % 10000 == 0:
             print cnt
