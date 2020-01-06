@@ -1,4 +1,4 @@
-from typing import Generator, Callable, BinaryIO, Iterable
+from typing import Generator, Callable, BinaryIO, Iterable, Any
 
 from common.seq_records import SeqRecord
 import gzip
@@ -102,6 +102,7 @@ def parse_fastq(handler):
 
 
 def write(rec, handler, file_type):
+    # type: (Any, BinaryIO, str) -> None
     if file_type == "fasta":
         handler.write(">" + str(rec.id) + "\n")
         handler.write(rec.seq + "\n")
