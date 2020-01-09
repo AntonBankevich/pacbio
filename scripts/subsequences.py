@@ -1,4 +1,5 @@
 import sys
+sys.path.append("py")
 
 from common import SeqIO
 from common.sequences import ContigStorage
