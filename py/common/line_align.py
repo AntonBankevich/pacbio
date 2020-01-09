@@ -9,6 +9,20 @@ if __name__ == "__main__":
 from common.alignment_storage import AlignmentPiece, MatchingSequence
 from common import params
 
+class EventCounter:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.ms = 0
+        self.mm = 0
+        self.indel = 0
+        self.homo = 0
+
+    def __str__(self):
+        return " ".join(map(str, [self.ms, self.mm, self.indel, self.homo]))
+
+events = EventCounter()
 
 class Scorer:
     def __init__(self, scores = None):
@@ -129,8 +143,8 @@ class Scorer:
         # type: (AlignmentPiece) -> AlignmentPiece
         return self.polyshMatching(alignment.matchingSequence()).asAlignmentPiece(alignment.seg_from.contig, alignment.seg_to.contig)
 
-    def polyshMatching(self, alignment, matchingOnly = True):
-        # type: (MatchingSequence, bool) -> MatchingSequence
+    def polyshMatching(self, alignment):
+        # type: (MatchingSequence) -> MatchingSequence
         assert  len(alignment) > 0
         if len(alignment) == 1:
             return alignment
@@ -177,9 +191,27 @@ class Scorer:
         matches = [(cur_i, cur_j)]
         prev_i = cur_i
         prev_j = cur_j
+        tmp_i = prev_i
+        tmp_j = prev_j
+        events.reset()
         while cur_i != alignment[0][0] or cur_j != alignment[0][1]:
             cur_i, cur_j = storage.get(cur_i).get(cur_j)
-            if cur_i != prev_i and cur_j != prev_j and ((not matchingOnly) or alignment.seq_from[cur_i] == alignment.seq_to[cur_j]):
+            assert tmp_i - cur_i <= 1 and tmp_j - cur_j <= 1
+            if tmp_i - cur_i == 1 and tmp_j - cur_j == 1:
+                if alignment.seq_from[cur_i] == alignment.seq_to[cur_j]:
+                    events.ms += 1
+                else:
+                    events.mm += 1
+            else:
+                if alignment.seq_from[cur_i] == alignment.seq_to[cur_j] and \
+                        alignment.seq_from[cur_i] == alignment.seq_to[tmp_j] and \
+                        alignment.seq_from[tmp_i] == alignment.seq_to[cur_j]:
+                    events.homo += 1
+                else:
+                    events.indel += 1
+            tmp_i = cur_i
+            tmp_j = cur_j
+            if cur_i != prev_i and cur_j != prev_j and alignment.seq_from[cur_i] == alignment.seq_to[cur_j]:
                 matches.append((cur_i, cur_j))
                 prev_i = cur_i
                 prev_j = cur_j
