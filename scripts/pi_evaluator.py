@@ -39,17 +39,18 @@ def evaluatePI(dir, contigs_file, initial_file, ref_file):
         print list(csegs)
     print "Analysis of contigs"
     scorer = Scorer()
-    for al in aligner.overlapAlign(contigs.unique(), ref):
+    for al in aligner.localAlign(contigs.unique(), ref):
         print al
         for seg in interesting[al.seg_from.contig.id]:
-            if al.seg_from.interSize(seg) > 2000:
+            if al.seg_from.expand(500).contains(seg):
                 tmp_al = al.reduce(query=al.seg_from.cap(seg))
                 scorer.polyshMatching(tmp_al.matchingSequence())
                 print tmp_al.seg_from, tmp_al.seg_to, str(events)
     print ""
     print "Analysis of initial"
     for al in aligner.overlapAlign(initial, ref):
-        print al.seg_from, al.seg_to, " ".join(map(str, scorer.countEvents(scorer.polyshMatching(al.matchingSequence()))))
+        scorer.polyshMatching(al.matchingSequence())
+        print al.seg_from, al.seg_to, str(events)
 
 
 
