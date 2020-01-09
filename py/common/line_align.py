@@ -26,7 +26,6 @@ class Scorer:
 
     def score(self, alignment):
         assert False
-    #     TODO: rewrite
     #     # type: (MatchingSequence) -> int
     #     matches = alignment.matches
     #     res = 0
@@ -46,6 +45,41 @@ class Scorer:
     #             homo = min(homo, l[0] - l[1])
     #             res += self.scores.sub_score * l[1] + homo * self.scores.homo_score + (l[0] - l[1] - homo) * self.scores.del_score
     #     return res
+
+    def countEvents(self, alignment):
+        # type: (MatchingSequence) -> Tuple[int, int, int, int]
+        # Matches, mismatches, indels, homo
+        matches = alignment.matches
+        res = 0
+        ms = 0
+        mm = 0
+        indels = 0
+        homo = 0
+        for match1, match2 in zip(matches[:-1], matches[1:]):
+            assert match2[0] - match1[0] == 1 or match2[1] - match1[1] == 1
+            if match2[0] - match1[0] == 1 and match2[1] - match1[1] == 1:
+                continue
+            if match2[0] - match1[0] == 1:
+                t = 1
+                seq = alignment.seq_to
+            else:
+                t = 0
+                seq = alignment.seq_from
+            tmp = match1[t] + 1
+            while tmp < match2[t] and seq[match1[t]] == seq[tmp]:
+                tmp += 1
+                homo += 1
+            tmp2 = match2[t] - 1
+            while tmp2 > tmp and seq[match2[t]] == seq[tmp2]:
+                tmp2 -= 1
+                homo += 1
+            indels += match2[0] - match1[0] + match2[1] - match1[1]  - 2
+        for m in alignment.matches:
+            if alignment.seq_from[m[0]] == alignment.seq_to[m[1]]:
+                ms += 1
+            else:
+                mm += 1
+        return ms, mm, indels, homo
 
     def accurateScore(self, alignment): #This score is nonsymmetric!!! Insertions and deletions have different cost
         # type: (MatchingSequence) -> int
@@ -95,8 +129,8 @@ class Scorer:
         # type: (AlignmentPiece) -> AlignmentPiece
         return self.polyshMatching(alignment.matchingSequence()).asAlignmentPiece(alignment.seg_from.contig, alignment.seg_to.contig)
 
-    def polyshMatching(self, alignment):
-        # type: (MatchingSequence) -> MatchingSequence
+    def polyshMatching(self, alignment, matchingOnly = True):
+        # type: (MatchingSequence, bool) -> MatchingSequence
         assert  len(alignment) > 0
         if len(alignment) == 1:
             return alignment
@@ -145,7 +179,7 @@ class Scorer:
         prev_j = cur_j
         while cur_i != alignment[0][0] or cur_j != alignment[0][1]:
             cur_i, cur_j = storage.get(cur_i).get(cur_j)
-            if cur_i != prev_i and cur_j != prev_j and alignment.seq_from[cur_i] == alignment.seq_to[cur_j]:
+            if cur_i != prev_i and cur_j != prev_j and ((not matchingOnly) or alignment.seq_from[cur_i] == alignment.seq_to[cur_j]):
                 matches.append((cur_i, cur_j))
                 prev_i = cur_i
                 prev_j = cur_j

@@ -17,6 +17,7 @@ class DotParser:
             v_from = basic.parseNumber(s)
             v_to = basic.parseNumber(s, s.find("->"))
             eid = basic.parseNegativeNumber(s, s.find("id"))
+            len = basic.parseNegativeNumber(s, s.find("\\l"))
             cov = basic.parseNumber(s, s.find("k "))
             unique = (s.find("black") != -1)
             src = (s.find("dir = both") != -1)
@@ -26,4 +27,4 @@ class DotParser:
                         v_to = "sink"
                     if "source" in edge_ids[eid]:
                         v_from = "source"
-                yield eid, v_from, v_to, cov, EdgeInfo(s, unique, cov, src)
+                yield eid, v_from, v_to, cov, EdgeInfo(s, unique, cov, len, src)

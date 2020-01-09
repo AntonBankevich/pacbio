@@ -5,14 +5,15 @@ from common.alignment_storage import ReadCollection
 
 
 class EdgeInfo(TmpInfo):
-    def __init__(self, label, unique, cov, selfrc = False):
-        # type: (str, bool, int, bool) -> EdgeInfo
+    def __init__(self, label, unique, cov, len, selfrc = False):
+        # type: (str, bool, int, int, bool) -> EdgeInfo
         TmpInfo.__init__(self, [])
         self.label = label
         self.unique = unique
         self.misc = []
         self.cov = cov
         self.selfrc = selfrc
+        self.len = len
 
     def __repr__(self):
         return str([self.label, self.unique, self.cov, self.selfrc])
