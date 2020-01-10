@@ -1278,12 +1278,18 @@ class ReadCollection:
         for read in self.reads.values():
             yield common.seq_records.SeqRecord(read.seq, read.id)
 
-    def loadFromFasta(self, handler, downsample = 1000000000):
-        # type: (BinaryIO, int) -> ReadCollection
+    def loadFromFasta(self, handler, downsample = 1000000000, cut_reads = None):
+        # type: (BinaryIO, int, Optional[int]) -> ReadCollection
         cnt = 0
         for rec in SeqIO.parse_fasta(handler):
             cnt += 1
-            self.add(AlignedRead(rec))
+            if cut_reads is not None and len(rec.seq) > cut_reads:
+                for i in range(len(rec.seq) / cut_reads):
+                    tmp = rec.subSequence(i* cut_reads, i * cut_reads + cut_reads)
+                    tmp.id = rec.id + "_" + str(i)
+                    self.add(AlignedRead(tmp))
+            else:
+                self.add(AlignedRead(rec))
             if cnt >= downsample:
                 break
         return self

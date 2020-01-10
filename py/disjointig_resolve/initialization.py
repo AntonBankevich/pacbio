@@ -135,7 +135,7 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
     return contigs
 
 
-def CreateReadCollection(reads_file, downsample):
+def CreateReadCollection(reads_file, cut_reads, downsample):
     sys.stdout.info("Creating read collection")
     num = params.downsample
     if downsample < 1:
@@ -144,7 +144,7 @@ def CreateReadCollection(reads_file, downsample):
         reads.loadFromFasta(open(reads_file, "r"))
         num = int(reads.__len__() * downsample)
     reads = ReadCollection()
-    reads.loadFromFasta(open(reads_file, "r"), num)
+    reads.loadFromFasta(open(reads_file, "r"), num, cut_reads)
     return reads
 
 

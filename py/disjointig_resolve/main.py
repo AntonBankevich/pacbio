@@ -111,7 +111,7 @@ def main(args):
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         polisher = Polisher(aligner, aligner.dir_distributor)
 
-        reads = CreateReadCollection(cl_params.reads_file, cl_params.downsample)
+        reads = CreateReadCollection(cl_params.reads_file, cl_params.cut_reads, cl_params.downsample)
 
 
         if cl_params.contigs_file is None:
