@@ -433,7 +433,7 @@ class LineExtender:
 
         def add(self, al):
             # type: (AlignmentPiece) -> None
-            if al.seg_from.left < params.k / 2:
+            if al.seg_from.left < params.bad_end_length:
                 self.potential_good.append(al)
             else:
                 self.reads.append(al)
