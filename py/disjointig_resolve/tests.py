@@ -535,7 +535,7 @@ class StructureUpdatingTest(SimpleTest):
         extender.updateAllStructures(list(line1.correct_segments))
         print str(line1.correct_segments), str(line1.completely_resolved), str(line2.correct_segments), str(line2.completely_resolved)
         assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2200]]", str(line1.correct_segments)
-        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2195]]", str(line1.completely_resolved)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2194]]", str(line1.completely_resolved)
         assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2745]]", str(line2.correct_segments)
         assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2745]]", str(line2.completely_resolved)
 

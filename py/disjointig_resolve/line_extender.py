@@ -585,9 +585,10 @@ class LineExtender:
             if al.seg_from.left > params.k / 2 and al.rc.seg_from.left > params.k / 2:
                 bad_segments.add(al.seg_to)
         bad_segments.mergeSegments()
+        print "Bad segments:", bad_segments
         good_segments = bad_segments.reverse(rec.line).reduce(rec.line.segment(rec.resolved.right - params.k, bound))
         for seg in good_segments:
-            seg = Segment(seg.contig, max(0, seg.left - params.k / 2), seg.right)
+            seg = Segment(seg.contig, max(0, seg.left - params.k), seg.right)
             for seg1 in self.segmentsWithGoodCopies(seg, params.k):
                 if len(seg1) >= params.k and seg1.right > rec.resolved.right:
                     rec.setResolved(seg1)
@@ -603,14 +604,14 @@ class LineExtender:
             line = al.seg_from.contig # type: NewLine
             if len(al.seg_to) >= inter_size and al.seg_from.right > line.initial[0].seg_to.left:
                 cap = al.seg_from.cap(line.suffix(pos=line.initial[0].seg_to.left))
-                incorrect = line.correct_segments.reverse(line).reduce(cap)
+                incorrect = line.correct_segments.reverse(line, inter_size - 1).reduce(cap)
                 matching = al.matchingSequence()
                 # print line, incorrect
                 for seg1 in incorrect:
                     seg2 = matching.mapSegDown(seg.contig, seg1, mapIn=False)
                     segs.add(seg2)
-                    print "Relevant segment alignment:", seg1, seg2
-        segs.mergeSegments()
+                    print "Relevant unpolished k-mer segment alignment:", seg1, seg2
+        segs.mergeSegments(inter_size - 1)
         # print "incorrect", segs
-        return list(segs.reverse(seg.contig).reduce(seg).filterBySize(min=inter_size))
+        return list(segs.reverse(seg.contig, inter_size - 1).reduce(seg))
 

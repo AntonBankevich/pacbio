@@ -340,8 +340,9 @@ class SegmentStorage(SmartStorage):
         # type: (int, int) -> SegmentStorage
         return self.filter(lambda seg: min <= len(seg) <= max)
 
-    def reverse(self, contig = None):
-        # type: (Contig) -> SegmentStorage
+    # Maximal collection of segments of size at least inter_size + 1 that have overlap with givel collection of length t most inter_size
+    def reverse(self, contig = None, inter_size = 0):
+        # type: (Optional[Contig], int) -> SegmentStorage
         assert contig is not None or len(self) != 0
         if contig is None:
             contig = self.items[0].contig
@@ -353,10 +354,12 @@ class SegmentStorage(SmartStorage):
             contig = self.items[0].contig
             last = 0
             for seg in self:
+                if len(seg) < inter_size:
+                    continue
                 if seg.left > last:
-                    res.add(contig.segment(last, seg.left))
-                last = max(seg.right, last)
-            if last < len(contig):
+                    res.add(contig.segment(last, seg.left + inter_size))
+                last = max(seg.right - inter_size, last)
+            if last + inter_size < len(contig):
                 res.add(contig.asSegment().suffix(pos=last))
             return res
         else:
