@@ -1,6 +1,6 @@
 import os
 import sys
-
+sys.path.append("py")
 from typing import List
 
 from alignment.align_tools import Aligner, DirDistributor
@@ -20,26 +20,30 @@ def largestSubseq(als):
         cbest = 0
         cres = []
         for val, r, in zip(best, res):
-            if r[-1].seg_from.right <= al.seg_from.left and r[-1].seg_to.right <= al.seg_to.left and val > cbest:
+            if (len(r) == 0 or (r[-1].seg_from.right <= al.seg_from.left and r[-1].seg_to.right <= al.seg_to.left)) and val > cbest:
                 cbest = val
                 cres = list(r)
+        cbest += len(al)
+        cres.append(al)
         res.append(cres)
         best.append(cbest)
         if cbest > all_best:
             all_best = cbest
             all_res = cres
+    print all_res
     return all_res
 
 
 
 def iter_align(aligner, contig1, contig2):
     als = sorted(aligner.localAlign([contig1], ContigStorage([contig2])), key = lambda al: al.seg_from.left)
+    als = [al for al in als if len(al) > 400 and al.seg_from.contig == contig1 and al.seg_to.contig == contig2]
     als = largestSubseq(als)
     res = []
     if len(als) > 0:
         for al1, al2 in zip(als[:-1], als[1:]):
             res.append(al1)
-            if al1.seg_from.dist(al2.seg_from)> 1000 and al1.seg_from.dist(al2.seg_from) > 1000:
+            if al1.seg_from.dist(al2.seg_from)> 400 and al1.seg_from.dist(al2.seg_from) > 400:
                 seg1 = contig1.segment(al1.seg_from.right, al2.seg_from.left)
                 seg2 = contig2.segment(al1.seg_to.right, al2.seg_to.left)
                 tmp = iter_align(aligner, seg1.asContig(), seg2.asContig())
