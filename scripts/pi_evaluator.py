@@ -31,6 +31,8 @@ def evaluatePI(dir, contigs_file, initial_file, ref_file):
     segs = sorted(segs, key = lambda seg: basic.Normalize(seg.contig.id))
     interesting = dict()
     print "Interesting segments:"
+    for contig in contigs:
+        interesting[contig.id] = [contig.asSegment()]
     for contig, segit in itertools.groupby(segs, lambda seg: seg.contig):
         csegs = SegmentStorage().addAll(segit)
         csegs.mergeSegments()
