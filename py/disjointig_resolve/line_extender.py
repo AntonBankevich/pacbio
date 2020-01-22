@@ -11,7 +11,6 @@ from common.sequences import Segment
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
-from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 

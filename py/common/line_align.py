@@ -290,6 +290,14 @@ class Scorer:
         matches2 = matches2.reduceTarget(composite.matches[0][1], composite.matches[-1][1] + 1)
         accurate1 = self.accurateScore(matches1)
         accurate2 = self.accurateScore(matches2)
+        if piece1.seg_from.contig.id == "NCTC9002/13163/4806_16850_0" or piece1.seg_from.contig.id == "-NCTC9002/13163/4806_16850_0":
+            print "DO", piece1, piece2
+            p1 = self.polyshAlignment(piece1)
+            p2 = self.polyshAlignment(piece2)
+            print accurate1, accurate2
+            print self.accurateScore(p1.matchingSequence()), self.accurateScore(p2.matchingSequence())
+            print "\n".join(p1.asMatchingStrings2())
+            print "\n".join(p2.asMatchingStrings2())
         if accurate1 > accurate2:
             composite = composite.reverse()
         accurate12 = self.accurateScore(composite)

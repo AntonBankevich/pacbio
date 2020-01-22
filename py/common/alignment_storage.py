@@ -174,33 +174,40 @@ class AlignmentPiece:
     def isIdentical(self):
         return self.seg_from == self.seg_to
 
+    def windowPI(self, w):
+        res = []
+        preva = self.seg_from.left
+        prevb = self.seg_to.left
+        cnt = 0
+        wnum = 0
+        for a, b in self.matchingPositions(True):
+            cnt += 1
+            if a > self.seg_from.left + wnum * w + w or a == self.seg_from.right - 1:
+                wnum += 1
+                diff = max(a - preva, b - prevb) + 1 - cnt
+                da = a - preva
+                db = b - prevb
+                yield da, db, diff
+                cnt = 1
+                preva = a
+                prevb = b
+
     def __str__(self):
         # type: () -> str
         res = [self.__repr__()]
         if len(self) < 55555:
             res.append(":")
-            preva = self.seg_from.left
-            prevb = self.seg_to.left
-            cnt = 0
-            for a, b in self.matchingPositions(True):
-                cnt += 1
-                if a > preva + 100 or a == self.seg_from.right - 1:
-                    diff = max(a - preva, b - prevb) + 1 - cnt
-                    da = a - preva
-                    db = b - prevb
-                    if da - db > 40:
-                        res.append("I")
-                    elif da - db > 20:
-                        res.append("i")
-                    elif db - da > 40:
-                        res.append("D")
-                    elif db - da > 20:
-                        res.append("d")
-                    else:
-                        res.append(min(diff, 9))
-                    cnt = 1
-                    preva = a
-                    prevb = b
+            for da, db, diff in self.windowPI(100):
+                if da - db > 40:
+                    res.append("I")
+                elif da - db > 20:
+                    res.append("i")
+                elif db - da > 40:
+                    res.append("D")
+                elif db - da > 20:
+                    res.append("d")
+                else:
+                    res.append(min(diff, 9))
         return "".join(map(str, res))
 
     def trimByQuality(self, div, w):
@@ -346,6 +353,16 @@ class AlignmentPiece:
         l1.append(self.seg_from.contig[pos_pairs[-1][0]])
         l2.append(self.seg_to.contig[pos_pairs[-1][1]])
         return "".join(l1), "".join(l2)
+
+    def asMatchingStrings2(self):
+        s = list(self.asMatchingStrings())
+        tmp = []
+        for a, b in zip(s[0], s[1]):
+            if a != b:
+                tmp.append("-")
+            else:
+                tmp.append("|")
+        return s[0], "".join(tmp), s[1]
 
     def percentIdentity(self):
         if self.pi is None:

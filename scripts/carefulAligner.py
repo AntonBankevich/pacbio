@@ -1,3 +1,4 @@
+import itertools
 import os
 import sys
 sys.path.append("py")
@@ -37,7 +38,8 @@ def largestSubseq(als):
 
 def iter_align(aligner, contig1, contig2):
     als = sorted(aligner.localAlign([contig1], ContigStorage([contig2])), key = lambda al: al.seg_from.left)
-    als = [al for al in als if len(al) > 400 and al.seg_from.contig == contig1 and al.seg_to.contig == contig2]
+    split = [al.splitRef() for al in als]
+    als = [al for al in itertools.chain(*split) if len(al) > 400 and al.seg_from.contig == contig1 and al.seg_to.contig == contig2]
     als = largestSubseq(als)
     res = []
     if len(als) > 0:
@@ -52,6 +54,14 @@ def iter_align(aligner, contig1, contig2):
         res.append(als[-1])
     return res
 
+def printVar(fname, als):
+    # type: (str, List[AlignmentPiece]) -> None
+    output = open(fname, "w")
+    for al in als:
+        for da, db, diff in al.windowPI(1000):
+            output.write(str(float(diff) / max(da, db)) + "\n")
+    output.close()
+
 def align(dir, contigs_file):
     CreateLog(dir)
     contigs = list(SeqIO.parse_fasta(open(contigs_file, "r")))
@@ -59,7 +69,9 @@ def align(dir, contigs_file):
     contigs = [Contig(contigs[0].seq, contigs[0].id), Contig(contigs[1].seq, contigs[1].id)]
     aligner = Aligner(DirDistributor(os.path.join(dir, "alignments")))
     als = iter_align(aligner, contigs[0], contigs[1])
-    print "\n".join(map(str, als))
+    printVar(os.path.join(dir, "diff.txt"), als)
+    for al in als:
+        print al
 
 
 if __name__ == "__main__":
