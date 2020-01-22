@@ -176,7 +176,7 @@ class UniqueMarker:
         print segs
         next_left = segs[-1].left
         line.cutRight(segs[-1].right)
-        for seg in list(segs)[-2:0:-1]:
+        for seg in list(segs)[-2::-1]:
             if next_left < seg.right:
                 line, new_line = lines.splitLine(line.segment(next_left, seg.right))
             else:
