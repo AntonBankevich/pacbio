@@ -11,6 +11,7 @@ from common.sequences import Segment
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
+from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 
@@ -111,9 +112,10 @@ class LineExtender:
         sys.stdout.info("Updating structures:", interesting_segments)
         # Correct contig sequences, update correct segment storages. Return segments that were corrected.
         corrected = self.correctSequences(interesting_segments)
-        # Collect all relevant contig segments, collect all reads that align to relevant segments. Mark resolved bound for each read.
+        # Collect all relevant contig segments, collect all reads that align to relevant segments.
+        # Mark resolved bound for each read.
         print "Expanding resolved segments:"
-        records = self.collectRecords(corrected) # type: List[LineExtender.Record]
+        records = self.collectRecords(corrected)  # type: List[LineExtender.Record]
         for rec in records:
             print "Record:", rec.line, rec.correct, rec.resolved
             print "Reads from record:"
@@ -127,7 +129,7 @@ class LineExtender:
         ok = True
         while ok:
             print "Good reads:"
-            rec = records[0] # type: LineExtender.Record
+            rec = records[0]  # type: LineExtender.Record
             for read_name in rec.good_reads:
                 print read_name, rec.read_bounds[read_name]
             ok = False
@@ -140,7 +142,8 @@ class LineExtender:
                 for rec in records: # type:LineExtender.Record
                     print "Attempting to jump", rec
                     if self.attemptJump(rec):
-                        print "Jumped", rec.line, rec.line.initial, len(rec.line), rec.next_resolved_start, str(rec.old_resolved), rec.resolved
+                        print "Jumped", rec.line, rec.line.initial, len(rec.line), rec.next_resolved_start,\
+                            str(rec.old_resolved), rec.resolved
                         ok = True
         for rec in records:
             line = rec.resolved.contig  # type: NewLine
@@ -307,6 +310,8 @@ class LineExtender:
             if winner is not None:
                 if seg not in active_segments:
                     print "Winner ignored since winning segment is too different from investigated segment"
+                elif winner.percentIdentity() < 0.85:
+                    print "Winner ignored since it is too different from winning line"
                 else:
                     line = winner.seg_to.contig # type: NewLine
                     line.addReadAlignment(winner)
@@ -343,7 +348,7 @@ class LineExtender:
         return winner
 
     def tournament(self, candidates):
-        # type: (list[Tuple[AlignmentPiece, Segment]]) -> Tuple[Optional[AlignmentPiece], Optional[Segment]]
+        # type: (List[Tuple[AlignmentPiece, Segment]]) -> Tuple[Optional[AlignmentPiece], Optional[Segment]]
         best = None
         for candidate in candidates:
             if best is None:
@@ -613,4 +618,3 @@ class LineExtender:
         segs.mergeSegments(inter_size - 1)
         # print "incorrect", segs
         return list(segs.reverse(seg.contig, inter_size - 1).reduce(seg))
-
