@@ -610,11 +610,11 @@ class LineExtender:
                 cap = al.seg_from.cap(line.suffix(pos=line.initial[0].seg_to.left))
                 incorrect = line.correct_segments.reverse(line, inter_size - 1).reduce(cap)
                 matching = al.matchingSequence()
-                # print line, incorrect
+                print "Incorrect: ", line, cap, incorrect
                 for seg1 in incorrect:
                     seg2 = matching.mapSegDown(seg.contig, seg1, mapIn=False)
                     segs.add(seg2)
                     print "Relevant unpolished k-mer segment alignment:", seg1, seg2
         segs.mergeSegments(inter_size - 1)
-        # print "incorrect", segs
+        print "All incorrect", segs
         return list(segs.reverse(seg.contig, inter_size - 1).reduce(seg))
