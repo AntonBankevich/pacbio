@@ -363,7 +363,7 @@ class SegmentStorage(SmartStorage):
                 res.add(contig.asSegment().suffix(pos=last))
             return res
         else:
-            return self.rc.reverse(contig.rc).rc
+            return self.rc.reverse(contig.rc, inter_size).rc
 
     def contigAsSegment(self, seg):
         # type: (Segment) -> SegmentStorage
