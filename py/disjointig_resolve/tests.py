@@ -308,12 +308,12 @@ class AlignmentPolishingTest(SimpleTest):
         contig1 = Contig("ACGTTAAACGT", "from")
         contig2 = Contig("ACGTTTAACGT", "to")
         al = AlignmentPiece.Identical(contig1.asSegment(), contig2.asSegment())
-        al1 = self.scorer.polyshAlignment(al)
+        al1 = self.scorer.polyshAlignment(al, params.alignment_correction_radius)
         assert al1.cigar == "4M1D2M1I4M", str(al1.asMatchingStrings())
         contig1 = Contig("ACATGATCACT", "from")
         contig2 = Contig("ACGTGAAACGT", "to")
         al = AlignmentPiece.Identical(contig1.asSegment(), contig2.asSegment())
-        al1 = self.scorer.polyshAlignment(al)
+        al1 = self.scorer.polyshAlignment(al, params.alignment_correction_radius)
         assert al1.cigar == "6M1I3M1D1M", str(al1.asMatchingStrings())
 
 
@@ -364,7 +364,7 @@ class CorrectionMappingTest(SimpleTest):
     def testManual(self):
         contig1 = Contig("ACGTAAAAGGGTACGT", "c1")
         contig2 = Contig("ACGTAAGGGGGTACGT", "c2")
-        al = self.scorer.polyshAlignment(AlignmentPiece.Identical(contig1.segment(5, 12), contig2.segment(5, 12)))
+        al = self.scorer.polyshAlignment(AlignmentPiece.Identical(contig1.segment(5, 12), contig2.segment(5, 12)), params.alignment_correction_radius)
         corr = Correction(contig1, contig2, [al])
         assert corr.mapPositionsUp(range(len(contig2))) == [0, 1, 2, 3, 4, 5, 8, 9, 9, 9, 10, 11, 12, 13, 14, 15]
         assert corr.mapPositionsDown(range(len(contig1))) == [0, 1, 2, 3, 4, 5, 6, 6, 6, 9, 10, 11, 12, 13, 14, 15]
@@ -406,7 +406,7 @@ class DotPlotModificationTest(SimpleTest):
         lines = NewLineStorage(DisjointigCollection(), self.aligner)
         line1 = lines.addNew("ACGTAAAAGGGTACGT", "c1")
         line2 = lines.addNew("ACGTAAGGGGGTACGT", "c2")
-        al = self.scorer.polyshAlignment(AlignmentPiece.Identical(line1.asSegment(), line2.asSegment()))
+        al = self.scorer.polyshAlignment(AlignmentPiece.Identical(line1.asSegment(), line2.asSegment()), params.alignment_correction_radius)
         dp = LineDotPlot(lines, self.aligner)
         dp.addAlignment(al)
         alignment = AlignmentPiece.Identical(Contig("AGG", "tmp").asSegment(), line2.segment(0, 3))
@@ -535,9 +535,9 @@ class StructureUpdatingTest(SimpleTest):
         extender.updateAllStructures(list(line1.correct_segments))
         print str(line1.correct_segments), str(line1.completely_resolved), str(line2.correct_segments), str(line2.completely_resolved)
         assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2200]]", str(line1.correct_segments)
-        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2194]]", str(line1.completely_resolved)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2144]]", str(line1.completely_resolved)
         assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2745]]", str(line2.correct_segments)
-        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2745]]", str(line2.completely_resolved)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2695]]", str(line2.completely_resolved)
 
     def test2(self):
         dataset = TestDataset("abcdefgcijklmCDEFGHInopqr")

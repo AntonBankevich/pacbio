@@ -2,7 +2,7 @@ import os
 
 from typing import Callable, Optional, Union, BinaryIO, List, Dict, Tuple
 
-from common import basic
+from common import basic, params
 from common.basic import quoted
 from common.sequences import UniqueList, Segment
 from common.alignment_storage import MatchingSequence
@@ -380,7 +380,7 @@ class DotLinePrinter:
                     res_line.append(0)
                     continue
                 tmp = MatchingSequence(seg1.contig.seq, seg2.contig.seq, [(seg1.left, seg2.left), (seg1.right - 1, seg2.right - 1)])
-                res_line.append(scorer.accurateScore(tmp))
+                res_line.append(scorer.accurateScore(tmp, params.alignment_correction_radius))
 
 
             res.append(res_line)

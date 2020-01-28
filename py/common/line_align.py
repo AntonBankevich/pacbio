@@ -1,3 +1,5 @@
+from collections import deque
+
 from typing import Optional, Tuple, List, Dict
 
 from common.scoring_model import ScoringModel
@@ -95,23 +97,50 @@ class Scorer:
                 mm += 1
         return ms, mm, indels, homo
 
-    def accurateScore(self, alignment): #This score is nonsymmetric!!! Insertions and deletions have different cost
-        # type: (MatchingSequence) -> int
+    def maxInRange(self, vals, r):
+        dec = deque()
+        res = []
+        curl = 0
+        curr = 1
+        for i in range(vals[0][1], vals[-1][1] + 1):
+            while curr + 1 < len(vals) and i + r > vals[curr + 1][1]:
+                curr += 1
+                while len(dec) > 0 and dec[-1][0] <= vals[curr][0]:
+                    dec.pop()
+                dec.append(vals[curr])
+            while curl < len(vals) and i < vals[curl][1] and len(dec) > 1:
+                dec.popleft()
+                curl += 1
+            res.append(dec[0][0])
+        for i in range(len(res))[::-1]:
+            res[i] = max(res[i], res[max(0, i - r)])
+        return res
+
+    def generateBounds(self, alignment, r):
+        # type: (MatchingSequence, int) -> List[Tuple[int, int]]
+        upper = self.maxInRange([(b - a, a) for a, b in alignment.matches], r)
+        lower = self.maxInRange([(a - b, a) for a, b in alignment.matches], r)
+        return [(-a + i, b + i) for a, b, i in zip(lower, upper, range(alignment.matches[0][0], alignment.matches[-1][0] + 1))]
+
+
+    def accurateScore(self, alignment, radius): #This score is nonsymmetric!!! Insertions and deletions have different cost
+        # type: (MatchingSequence, int) -> int
         # print "Accurate scoring:", alignment[0], alignment[-1]
-        prev = Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius, self.scores.inf)
+        prev = Storage(alignment[0][1], alignment[1][1] + radius, self.scores.inf)
         prev.set(alignment[0][1], 0)
         cur_del = 0
-        for j in range(alignment[0][1] + 1, min(alignment[1][1] + params.alignment_correction_radius + 1, len(alignment.seq_to))):
+        for j in range(alignment[0][1] + 1, min(alignment[1][1] + radius + 1, len(alignment.seq_to))):
             cur_del += self.scores.scoreDel(alignment.seq_to[j - 1])
             prev.set(j, cur_del)
         cur = 0
+        bounds = self.generateBounds(alignment, params.alignment_smoothing_radius)
         for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
-            j_min = max(alignment[cur][1] - params.alignment_correction_radius, alignment[0][1])
+            j_min = max(min(bounds[i - alignment[0][0]][0], alignment[cur][1]) - radius, alignment[0][1])
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
                 cur += 1
                 if alignment[cur + 1][1] - alignment[cur][1] > 10 and alignment[cur + 1][0] - alignment[cur][0] > 10:
                     print "Long gap:", alignment[cur], alignment[cur + 1]
-            j_max = min(alignment[cur + 1][1] + params.alignment_correction_radius, alignment[-1][1])
+            j_max = min(max(bounds[i - alignment[0][0]][1], alignment[cur + 1][1]) + radius, alignment[-1][1])
             ne = Storage(j_min, j_max + 1, self.scores.inf)
             c1 = alignment.seq_from[i]
             for j in range(j_min, j_max + 1):
@@ -139,32 +168,33 @@ class Scorer:
         else:
             return old_val, old_shift
 
-    def polyshAlignment(self, alignment):
-        # type: (AlignmentPiece) -> AlignmentPiece
-        return self.polyshMatching(alignment.matchingSequence()).asAlignmentPiece(alignment.seg_from.contig, alignment.seg_to.contig)
+    def polyshAlignment(self, alignment, radius):
+        # type: (AlignmentPiece, int) -> AlignmentPiece
+        return self.polyshMatching(alignment.matchingSequence(), radius).asAlignmentPiece(alignment.seg_from.contig, alignment.seg_to.contig)
 
-    def polyshMatching(self, alignment):
-        # type: (MatchingSequence) -> MatchingSequence
+    def polyshMatching(self, alignment, radius):
+        # type: (MatchingSequence, int) -> MatchingSequence
         assert  len(alignment) > 0
         if len(alignment) == 1:
             return alignment
         storage = RectStorage(alignment[0][0], alignment[-1][0])
-        prev = Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius, self.scores.inf)
-        storage.set(alignment[0][0], Storage(alignment[0][1], alignment[1][1] + params.alignment_correction_radius))
+        prev = Storage(alignment[0][1], alignment[1][1] + radius, self.scores.inf)
+        storage.set(alignment[0][0], Storage(alignment[0][1], alignment[1][1] + radius))
         cur_del = 0
         prev.set(alignment[0][1], 0)
-        for j in range(alignment[0][1] + 1, min(alignment[1][1] + params.alignment_correction_radius + 1, len(alignment.seq_to))):
+        bounds = self.generateBounds(alignment, params.alignment_smoothing_radius)
+        for j in range(alignment[0][1] + 1, min(alignment[1][1] + radius + 1, len(alignment.seq_to))):
             cur_del += self.scores.scoreDel(alignment.seq_to[j - 1])
             prev.set(j, cur_del)
             storage.get(alignment[0][0]).set(j, (alignment[0][0], j - 1))
         cur = 0
         for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
-            j_min = max(alignment[cur][1] - params.alignment_correction_radius, alignment[0][1])
+            j_min = max(min(bounds[i - alignment[0][0]][0], alignment[cur][1]) - radius, alignment[0][1])
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
                 cur += 1
                 if alignment[cur + 1][1] - alignment[cur][1] > 10 and alignment[cur + 1][0] - alignment[cur][0] > 10:
                     print "Long gap:", alignment[cur], alignment[cur + 1]
-            j_max = min(alignment[cur + 1][1] + params.alignment_correction_radius, alignment[-1][1])
+            j_max = min(max(bounds[i - alignment[0][0]][1], alignment[cur + 1][1]) + radius, alignment[-1][1])
             ne = Storage(j_min, j_max + 1, self.scores.inf)
             storage.set(i, Storage(j_min, j_max + 1, None))
             c1 = alignment.seq_from[i]
@@ -288,24 +318,24 @@ class Scorer:
         composite = matches1.composeDifference(matches2)
         matches1 = matches1.reduceTarget(composite.matches[0][0], composite.matches[-1][0] + 1)
         matches2 = matches2.reduceTarget(composite.matches[0][1], composite.matches[-1][1] + 1)
-        accurate1 = self.accurateScore(matches1)
-        accurate2 = self.accurateScore(matches2)
+        accurate1 = self.accurateScore(matches1, params.score_counting_radius)
+        accurate2 = self.accurateScore(matches2, params.score_counting_radius)
         if piece1.seg_from.contig.id == "NCTC9002/13163/4806_16850_0" or piece1.seg_from.contig.id == "-NCTC9002/13163/4806_16850_0":
             print "DO", piece1, piece2
-            p1 = self.polyshAlignment(piece1)
-            p2 = self.polyshAlignment(piece2)
+            p1 = self.polyshAlignment(piece1, params.score_counting_radius)
+            p2 = self.polyshAlignment(piece2, params.score_counting_radius)
             print accurate1, accurate2
-            print self.accurateScore(p1.matchingSequence()), self.accurateScore(p2.matchingSequence())
+            print self.accurateScore(p1.matchingSequence(), params.score_counting_radius), self.accurateScore(p2.matchingSequence(), params.score_counting_radius)
             print "\n".join(p1.asMatchingStrings2())
             print "\n".join(p2.asMatchingStrings2())
         if accurate1 > accurate2:
             composite = composite.reverse()
-        accurate12 = self.accurateScore(composite)
+        accurate12 = self.accurateScore(composite, params.score_counting_radius)
         if not (abs(accurate1 - accurate2) <= accurate12 <= accurate1 + accurate2):
             print "Triangle inequality failed: " + \
                   str(accurate1) + " " + str(accurate2) + " " + \
                   str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" + str(accurate1 + accurate2)
-        return accurate1, accurate2, self.accurateScore(composite)
+        return accurate1, accurate2, self.accurateScore(composite, params.score_counting_radius)
 
     def cutHomo(self, m1, m2):
         # type: (MatchingSequence, MatchingSequence) -> Tuple[MatchingSequence, MatchingSequence]
@@ -412,4 +442,4 @@ class Tournament:
 
 if __name__ == "__main__":
     tmp = MatchingSequence(sys.argv[1], sys.argv[2], [(0, 0), (len(sys.argv[1]) - 1, len(sys.argv[2]) - 1)])
-    print Scorer().accurateScore(tmp)
+    print Scorer().accurateScore(tmp, params.alignment_correction_radius)

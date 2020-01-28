@@ -6,7 +6,7 @@ import random
 sys.path.append("py")
 from common.line_align import Scorer
 from alignment.align_tools import DirDistributor, Aligner
-from common import basic
+from common import basic, params
 from common.sequences import ContigCollection, Contig
 from common.alignment_storage import ReadCollection
 import common.SeqIO as SeqIO
@@ -49,7 +49,7 @@ def main(reads_file, ref_file, dir, error_rate):
         sys.stderr.write(str(contig) + " " + str(len(iter)) + "\n")
         if len(iter) < 150:
             for al in iter:
-                print scorer.accurateScore(al.matchingSequence())
+                print scorer.accurateScore(al.matchingSequence(), params.alignment_correction_radius)
                 cnt += 1
                 if cnt >= 5000:
                     break

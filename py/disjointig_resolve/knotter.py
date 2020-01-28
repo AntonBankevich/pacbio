@@ -125,7 +125,7 @@ class LineMerger:
                 line_alignment = tmp
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
-            line_alignment = Scorer().polyshAlignment(line_alignment)
+            line_alignment = Scorer().polyshAlignment(line_alignment, params.alignment_correction_radius)
             print "Polished alignment:", line_alignment
             print "\n".join(line_alignment.asMatchingStrings())
             print line_alignment.cigar

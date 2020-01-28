@@ -3,7 +3,7 @@ import sys
 
 from typing import Optional, Tuple, List, Dict, Iterable, Set, Generator, Union, Iterator
 
-from alignment.align_tools import Aligner
+from alignment.align_tools import Aligner, DirDistributor
 from alignment.polishing import Polisher
 from common import basic, params
 from common.line_align import Scorer
@@ -14,6 +14,7 @@ from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
+
 
 # class LineCorrector:
 #     def __init__(self):
@@ -302,6 +303,8 @@ class LineExtender:
                     break
             if skip:
                 continue
+            for al in als:
+                al = (self.scorer.polyshAlignment(al[0], params.alignment_correction_radius), al[1])
             winner, seg = self.tournament(als) #type: AlignmentPiece, Segment
             if winner is None:
                 print "No winner"
@@ -617,4 +620,4 @@ class LineExtender:
                     print "Relevant unpolished k-mer segment alignment:", seg1, seg2
         segs.mergeSegments(inter_size - 1)
         print "All incorrect", segs
-        return list(segs.reverse(seg.contig, inter_size - 1).reduce(seg))
+        return list(segs.reverse(seg.contig, inter_size - 1 - min(100, inter_size / 10)).reduce(seg))

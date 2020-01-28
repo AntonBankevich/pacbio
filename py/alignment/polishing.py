@@ -333,7 +333,7 @@ class Polisher:
                             if al is None:
                                 al = al1
                             elif al1.seg_from.dist(al2.seg_from) >= 10 or al1.seg_to.dist(al2.seg_to) >= 10:
-                                al = scorer.polyshAlignment(al)
+                                al = scorer.polyshAlignment(al, params.alignment_correction_radius)
                         relevant_als.append(al)
                     finished_als = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in finished_als]
                     new_contig = new_contig_candidate

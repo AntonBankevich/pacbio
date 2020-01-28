@@ -9,7 +9,7 @@ from common.basic import CreateLog
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.smart_storage import SegmentStorage
 from alignment.align_tools import Aligner, DirDistributor
-from common import basic
+from common import basic, params
 from common.sequences import ContigStorage
 from common.line_align import Scorer, events
 
@@ -46,12 +46,12 @@ def evaluatePI(dir, contigs_file, initial_file, ref_file):
         for seg in interesting[al.seg_from.contig.id]:
             if al.seg_from.expand(500).contains(seg) or al.seg_from.interSize(seg) > 40000:
                 tmp_al = al.reduce(query=al.seg_from.cap(seg))
-                scorer.polyshMatching(tmp_al.matchingSequence())
+                scorer.polyshMatching(tmp_al.matchingSequence(), params.score_counting_radius)
                 print tmp_al.seg_from, tmp_al.seg_to, str(events)
     print ""
     print "Analysis of initial"
     for al in aligner.overlapAlign(initial, ref):
-        scorer.polyshMatching(al.matchingSequence())
+        scorer.polyshMatching(al.matchingSequence(), params.score_counting_radius)
         print al.seg_from, al.seg_to, str(events)
 
 

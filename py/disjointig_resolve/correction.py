@@ -2,6 +2,7 @@ import itertools
 
 from typing import List, Iterable, Optional, Callable, Iterator, Generator
 
+from common import params
 from common.alignment_storage import MatchingSequence, AlignmentPiece
 from common.line_align import Scorer
 from common.seq_records import NamedSequence
@@ -138,7 +139,7 @@ class Correction:
                     print al
                     print al.matchingSequence(True)
             new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
-            corrected_matching = self.scorer.polyshMatching(new_matching)
+            corrected_matching = self.scorer.polyshMatching(new_matching, params.alignment_correction_radius)
             res[i] = corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from)
         return res
 
