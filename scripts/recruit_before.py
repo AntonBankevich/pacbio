@@ -48,7 +48,7 @@ def main(flye_dir, rf, dir, edge_id, k):
                 seq = basic.RC(seq)
             print "Right netghbour", eid, id
             unique[id] = NamedSequence(seq, id)
-        for e in graph.v[graph.e[eid].fin].out:
+        for e in graph.v[graph.e[eid].end].out:
             if basic.Normalize(e.id) in edge_ids:
                 continue
             if e.id.startswith("-"):

@@ -43,7 +43,7 @@ def main(flye_dir, rf, dir, edge_id, k):
                     unique[e.id[1:] + "l"] = NamedSequence(basic.RC(e.seq[:5000]), e.id[1:] + "l")
                 else:
                     unique[e.id + "r"] = NamedSequence(e.seq[-5000:], e.id + "r")
-        for e in graph.v[graph.e[eid].fin].out:
+        for e in graph.v[graph.e[eid].end].out:
             if basic.Normalize(e.id) in edge_ids:
                 continue
             if len(e.seq) < 10000:
