@@ -18,7 +18,7 @@ class Edge:
         self.label = label # type: str
         self.start = start # type: str
         self.len = len
-        self.fin = fin # type: str
+        self.end = fin # type: str
 
 
 class Vertex:
@@ -108,8 +108,8 @@ class SimpleGraph:
     def Find(self, minlen, v):
         self.visited.add(v)
         for e in self.v[v].out:
-            if e.len <= minlen and e.fin not in self.visited:
-                self.Find(minlen, e.fin)
+            if e.len <= minlen and e.end not in self.visited:
+                self.Find(minlen, e.end)
         for e in self.v[v].inc:
             if e.len <= minlen and e.start not in self.visited:
                 self.Find(minlen, e.start)
@@ -134,6 +134,6 @@ class SimpleGraph:
                 out.write(v.label)
         for v in self.v.values():
             for e in v.out:
-                if e.start in comp or e.fin in comp:
+                if e.start in comp or e.end in comp:
                     out.write(e.label + "\n")
         out.write("}\n")

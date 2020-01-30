@@ -86,7 +86,7 @@ def main(flye_dir, rf, dir, edge_id, k):
     print "Reading reads"
     res_reads = []
     res = open(os.path.join(dir, "reads.fasta"), "w")
-    for read in SeqIO.parse_fasta(open(rf, "r")):
+    for read in SeqIO.parse_by_name(rf):
         if read.id in relevant_read_ids and len(read) > k * 1.2:
             res_reads.append(read)
             SeqIO.write(read, res, "fasta")

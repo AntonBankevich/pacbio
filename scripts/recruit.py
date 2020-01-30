@@ -6,6 +6,7 @@ import sys
 
 sys.path.append("py")
 
+from common.parsing import parseUPaths
 from common.seq_records import NamedSequence
 from common.SimpleGraph import SimpleGraph
 from common.sequences import ContigStorage, Contig
@@ -23,12 +24,7 @@ def main(flye_dir, rf, dir, edge_id, k):
     print "Reading graph"
     graph = SimpleGraph().ReadGFA(os.path.join(flye_dir, "assembly_graph.gfa"))
     print "Parsing edge mapping"
-    id_map = dict()
-    for s in open(os.path.join(flye_dir, "flye.log"), "r").readlines():
-        if s.find("UPath") != -1:
-            s = s.split()
-            id_map[s[4][:-1]] = s[5::2]
-            id_map["-" + s[4][:-1]] = map(lambda val: basic.Reverse(val), s[5::2])
+    id_map = parseUPaths(flye_dir)
     edge_ids = edge_id.split(",")
     print "Extracting relevant graph component"
     res = open(os.path.join(dir, "contigs.fasta"), "w")
@@ -86,6 +82,7 @@ def main(flye_dir, rf, dir, edge_id, k):
         if read.id in relevant_read_ids and len(read) > k * 1.2:
             SeqIO.write(read, res, "fasta")
     res.close()
+
 
 
 if __name__ == "__main__":
