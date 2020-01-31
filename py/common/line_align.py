@@ -103,12 +103,12 @@ class Scorer:
         curl = 0
         curr = 1
         for i in range(vals[0][1], vals[-1][1] + 1):
-            while curr + 1 < len(vals) and i + r > vals[curr + 1][1]:
+            while curr + 1 < len(vals) and i + r >= vals[curr + 1][1]:
                 curr += 1
                 while len(dec) > 0 and dec[-1][0] <= vals[curr][0]:
                     dec.pop()
                 dec.append(vals[curr])
-            while curl < len(vals) and i < vals[curl][1] and len(dec) > 1:
+            while curl < len(vals) and i > dec[0][1] and len(dec) > 1:
                 dec.popleft()
                 curl += 1
             res.append(dec[0][0])

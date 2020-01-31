@@ -631,4 +631,14 @@ class LineExtensionTest(SimpleTest):
         print " ".join([str(dataset.translateBack(line, self.aligner)) for line in lines.unique()])
         print [line.circular for line in lines.unique()]
 
-# LAUNCH TANYA!!!
+class WindowMaxTest(SimpleTest):
+    def testManual(self):
+        random.seed(0)
+        arr = []
+        tmp_arr = []
+        for i in range(1000):
+            arr.append((random.randint(0, 100), i))
+            tmp_arr.append(arr[-1][0])
+        res = Scorer().maxInRange(arr, 50)
+        for i, val in enumerate(res):
+            assert val == max(tmp_arr[max(i - 50, 0): min(i + 50 + 1, len(arr))])
