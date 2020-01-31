@@ -134,6 +134,7 @@ class Scorer:
             prev.set(j, cur_del)
         cur = 0
         bounds = self.generateBounds(alignment, params.alignment_smoothing_radius)
+        total = []
         for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
             j_min = max(min(bounds[i - alignment[0][0]][0], alignment[cur][1]) - radius, alignment[0][1])
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
@@ -141,6 +142,7 @@ class Scorer:
                 if alignment[cur + 1][1] - alignment[cur][1] > 10 and alignment[cur + 1][0] - alignment[cur][0] > 10:
                     print "Long gap:", alignment[cur], alignment[cur + 1]
             j_max = min(max(bounds[i - alignment[0][0]][1], alignment[cur + 1][1]) + radius, alignment[-1][1])
+            total.append(j_max - j_min)
             ne = Storage(j_min, j_max + 1, self.scores.inf)
             c1 = alignment.seq_from[i]
             for j in range(j_min, j_max + 1):
@@ -159,6 +161,8 @@ class Scorer:
                 res = min(res, ne.get(j - 1) + self.scores.scoreDel(c2))
                 ne.set(j, res)
             prev = ne
+        if len(total) > 0:
+            print "Oppa", sum(total) / len(total)
         return prev.get(alignment[-1][1])
 
     def adjustMin(self, old_val, old_shift, new_val, new_shift):
@@ -320,14 +324,6 @@ class Scorer:
         matches2 = matches2.reduceTarget(composite.matches[0][1], composite.matches[-1][1] + 1)
         accurate1 = self.accurateScore(matches1, params.score_counting_radius)
         accurate2 = self.accurateScore(matches2, params.score_counting_radius)
-        if piece1.seg_from.contig.id == "NCTC9002/13163/4806_16850_0" or piece1.seg_from.contig.id == "-NCTC9002/13163/4806_16850_0":
-            print "DO", piece1, piece2
-            p1 = self.polyshAlignment(piece1, params.score_counting_radius)
-            p2 = self.polyshAlignment(piece2, params.score_counting_radius)
-            print accurate1, accurate2
-            print self.accurateScore(p1.matchingSequence(), params.score_counting_radius), self.accurateScore(p2.matchingSequence(), params.score_counting_radius)
-            print "\n".join(p1.asMatchingStrings2())
-            print "\n".join(p2.asMatchingStrings2())
         if accurate1 > accurate2:
             composite = composite.reverse()
         accurate12 = self.accurateScore(composite, params.score_counting_radius)

@@ -490,7 +490,7 @@ class ReadRecruitmentTest(SimpleTest):
         extender = LineExtender(self.aligner, None, lines.disjointigs, dp)
         res = extender.attemptCleanResolution(line1.asSegment())
         assert str(res[0][1]) == "[(R2_bcde[0:2200-0]->C0_abcde[550:2750-0]:0.97), (R3_bcde[4:2192-0]->C0_abcde[553:2750-0]:0.97), (R4_cdef[0:1657]->C0_abcde[1100:2750-0]:0.96), (R5_cdef[0:1656]->C0_abcde[1100:2750-0]:0.96)]", str(res[0][1])
-        assert str(res[1][1]) == "[(R24_mCDE[0:2201-0]->C1_klmCDE[1100:3298-0]:0.97), (R25_mCDE[0:2194-0]->C1_klmCDE[1100:3298-0]:0.96), (R27_CDEF[0:1658]->C1_klmCDE[1651:3298-0]:0.96)]", str(res[1][1])
+        assert str(res[1][1]) == "[(R24_mCDE[0:2201-0]->C1_klmCDE[1100:3298-0]:0.97), (R25_mCDE[0:2194-0]->C1_klmCDE[1100:3298-0]:0.97), (R27_CDEF[0:1658]->C1_klmCDE[1651:3298-0]:0.96)]", str(res[1][1])
 
 
 class KnottingTest(SimpleTest):
@@ -535,9 +535,9 @@ class StructureUpdatingTest(SimpleTest):
         extender.updateAllStructures(list(line1.correct_segments))
         print str(line1.correct_segments), str(line1.completely_resolved), str(line2.correct_segments), str(line2.completely_resolved)
         assert str(line1.correct_segments) == "ReadStorage+:[C0_abcde[0:2200]]", str(line1.correct_segments)
-        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2144]]", str(line1.completely_resolved)
+        assert str(line1.completely_resolved) == "ReadStorage+:[C0_abcde[0:2094]]", str(line1.completely_resolved)
         assert str(line2.correct_segments) == "ReadStorage+:[C1_klmCDE[0:2745]]", str(line2.correct_segments)
-        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2695]]", str(line2.completely_resolved)
+        assert str(line2.completely_resolved) == "ReadStorage+:[C1_klmCDE[0:2645]]", str(line2.completely_resolved)
 
     def test2(self):
         dataset = TestDataset("abcdefgcijklmCDEFGHInopqr")

@@ -242,7 +242,7 @@ class LineExtender:
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, List[AlignmentPiece]]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
-        print "Attempting recruitment:", resolved, str(resolved.contig)
+        sys.stdout.info("Attempting recruitment: " + str(resolved) + str(resolved.contig))
         resolved = resolved.suffix(length = min(len(resolved), params.k * 2))
         print "Considering resolved subsegment:", resolved
         line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k - 30,
@@ -275,7 +275,6 @@ class LineExtender:
             read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
         read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.id)
         print "Potential alignments:", read_alignments
-        # removing all reads that are already sorted to one of the contigs
         alignments_by_read = itertools.groupby(read_alignments, lambda al: al[0].seg_from.contig.id)
         new_recruits = []
         # TODO: parallel
@@ -303,9 +302,16 @@ class LineExtender:
                     break
             if skip:
                 continue
+            new_als = []
             for al in als:
-                al = (self.scorer.polyshAlignment(al[0], params.alignment_correction_radius), al[1])
-            winner, seg = self.tournament(als) #type: AlignmentPiece, Segment
+                if not al[0].contradictingRTC(tail_size=params.bad_end_length):
+                    new_als.append((self.scorer.polyshAlignment(al[0], params.alignment_correction_radius), al[1]))
+            if len(new_als) == 0:
+                sys.stdout.warn("No noncontradicting alignments of a read")
+                winner = None
+                seg = None
+            else:
+                winner, seg = self.tournament(new_als) #type: AlignmentPiece, Segment
             if winner is None:
                 print "No winner"
             else:
@@ -320,8 +326,7 @@ class LineExtender:
                     line.addReadAlignment(winner)
                     new_recruits.append((seg, winner))
         new_recruits = sorted(new_recruits, key = lambda rec: (rec[0].contig.id, rec[0].left, rec[0].right))
-        # print "New recruits:"
-        # print new_recruits
+        sys.stdout.info("Recruited " + str(len(new_recruits)) + " new reads")
         return [(seg, [al for seg, al in it]) for seg, it in itertools.groupby(new_recruits, key = lambda rec: rec[0])]
 
     def fight(self, c1, c2):
@@ -353,16 +358,27 @@ class LineExtender:
     def tournament(self, candidates):
         # type: (List[Tuple[AlignmentPiece, Segment]]) -> Tuple[Optional[AlignmentPiece], Optional[Segment]]
         best = None
-        for candidate in candidates:
+        best_id = None
+        wins = []
+        for i, candidate in enumerate(candidates):
             if best is None:
                 best = candidate
+                best_id = i
             else:
                 best = self.fight(candidate, best)
+                if best is None:
+                    best_id = None
+                    wins = []
+                elif best == candidates[best_id]:
+                    wins.append(i)
+                else:
+                    best_id = i
+                    wins = []
         if best is None:
             return None, None
         if len(candidates) > 2:
-            for candidate in candidates:
-                if candidate == best:
+            for i, candidate in enumerate(candidates):
+                if i == best_id or i in wins:
                     continue
                 fight_results = self.fight(candidate, best)
                 if fight_results is None or fight_results != best:
@@ -586,16 +602,18 @@ class LineExtender:
         for al in rec:
             if al.seg_to.left > bound:
                 break
-            if al.seg_from.left > params.k / 2 and al.rc.seg_from.left > params.k / 2:
+            if al.seg_from.left > min(params.bad_end_length, params.k / 2) and \
+                    al.rc.seg_from.left > min(params.bad_end_length, params.k / 2):
                 bad_segments.add(al.seg_to)
         for al in self.dot_plot.allInter(rec.line.segment(rec.resolved.right - params.k, bound)):
-            if al.seg_from.left > params.k / 2 and al.rc.seg_from.left > params.k / 2:
+            if al.seg_from.left > min(params.bad_end_length, params.k / 2) and \
+                    al.rc.seg_from.left > min(params.bad_end_length, params.k / 2):
                 bad_segments.add(al.seg_to)
-        bad_segments.mergeSegments()
+        bad_segments.mergeSegments(params.k - 200)
         print "Bad segments:", bad_segments
-        good_segments = bad_segments.reverse(rec.line).reduce(rec.line.segment(rec.resolved.right - params.k, bound))
+        good_segments = bad_segments.reverse(rec.line, params.k - 100).reduce(rec.line.segment(rec.resolved.right - params.k, bound))
         for seg in good_segments:
-            seg = Segment(seg.contig, max(0, seg.left - params.k), seg.right)
+            seg = Segment(seg.contig, max(0, seg.left), seg.right)
             for seg1 in self.segmentsWithGoodCopies(seg, params.k):
                 if len(seg1) >= params.k and seg1.right > rec.resolved.right:
                     rec.setResolved(seg1)
@@ -620,4 +638,4 @@ class LineExtender:
                     print "Relevant unpolished k-mer segment alignment:", seg1, seg2
         segs.mergeSegments(inter_size - 1)
         print "All incorrect", segs
-        return list(segs.reverse(seg.contig, inter_size - 1 - min(100, inter_size / 10)).reduce(seg))
+        return list(segs.reverse(seg.contig, inter_size - 1 - max(100, inter_size / 10)).reduce(seg))
