@@ -97,6 +97,8 @@ def main(flye_dir, rf, dir, edge_id, k):
         print c.id
         SeqIO.write(c, res, "fasta")
     res.close()
+    if rf == "none":
+        return
     old_ids = list(edge_ids)
     print "Finding reads that align to", edge_ids
     relevant_read_ids = set()
@@ -109,8 +111,6 @@ def main(flye_dir, rf, dir, edge_id, k):
             print s[2][1:], s[6].split("_")[1]
     print "Reading reads"
     res_reads = []
-    if rf == "none":
-        return
     res = open(os.path.join(dir, "reads.fasta"), "w")
     for read in SeqIO.parse_by_name(rf):
         if read.id in relevant_read_ids and len(read) > k * 1.2:

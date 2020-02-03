@@ -62,7 +62,7 @@ class SimpleGraph:
             v_from = toint(s[0])
             v_to = toint(s[2])
             label = tmp
-            l = float(tmp[tmp.find("\\l") + 2: tmp.find("k ")])
+            l = int(float(tmp[tmp.find("\\l") + 2: tmp.find("k ")]) * 1000)
             id = tmp[tmp.find("id ") + 3: tmp.find("\\l")]
             self.AddEdge(id, v_from, v_to, l, label)
         return self
@@ -73,8 +73,10 @@ class SimpleGraph:
                 s.id = str(basic.parseNumber(s.id))
             if s.id in self.e:
                 self.e[s.id].seq = s.seq
+                self.e[s.id].len = len(s.seq)
             if "-" + s.id in self.e:
                 self.e["-" + s.id].seq = basic.RC(s.seq)
+                self.e["-" + s.id].len = len(s.seq)
         return self
 
     def ReadGFA(self, f):
