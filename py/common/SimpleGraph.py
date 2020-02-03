@@ -17,7 +17,7 @@ class Edge:
         self.seq = seq # type: str
         self.label = label # type: str
         self.start = start # type: str
-        self.len = len
+        self.len = len # type: int
         self.end = fin # type: str
 
 

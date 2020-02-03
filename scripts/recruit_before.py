@@ -7,19 +7,36 @@ import sys
 sys.path.append("py")
 
 from common.seq_records import NamedSequence
-from common.SimpleGraph import SimpleGraph
+from common.SimpleGraph import SimpleGraph, Edge
 from common.sequences import ContigStorage, Contig
 from alignment.align_tools import DirDistributor, Aligner
 from common import basic, params, SeqIO
 
+def uniquePathForward(graph, edge, k):
+    # type: (SimpleGraph, Edge, int) -> str
+    if edge.len >= k:
+        return edge.seq[:k]
+    v = graph.v[edge.end]
+    if len(v.out) == 1:
+        return edge.seq + uniquePathForward(graph, v.out[0], k - edge.len)
+    else:
+        return edge.seq
+
+def uniquePathBackward(graph, edge, k):
+    # type: (SimpleGraph, Edge, int) -> str
+    if edge.len >= k:
+        return edge.seq[-k:]
+    v = graph.v[edge.start]
+    if len(v.inc) == 1:
+        return uniquePathBackward(graph, v.inc[0], k - edge.len) + edge.seq
+    else:
+        return edge.seq
 
 
 def main(flye_dir, rf, dir, edge_id, k):
     params.technology = "nano"
-    params.k = k
     basic.ensure_dir_existance(dir)
     basic.CreateLog(dir)
-    dd = DirDistributor(os.path.join(dir, "alignments"))
     print "Reading graph"
     graph = SimpleGraph().ReadDot(os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv"))
     graph.FillSeq(os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta"), True)
@@ -36,10 +53,12 @@ def main(flye_dir, rf, dir, edge_id, k):
                 id = e.id[1:]
             else:
                 id = e.id
-            if len(e.seq) < 10000:
-                seq = e.seq
+            if len(e.seq) < k + params.bad_end_length:
+                seq = uniquePathBackward(graph, e, k + params.bad_end_length)
+                id = id + "p"
+                # seq = e.seq
             else:
-                seq = e.seq[-5000:]
+                seq = e.seq[-k - params.bad_end_length:]
                 if e.id.startswith("-"):
                     id = id + "l"
                 else:
@@ -55,10 +74,12 @@ def main(flye_dir, rf, dir, edge_id, k):
                 id = e.id[1:]
             else:
                 id = e.id
-            if len(e.seq) < 10000:
-                seq = e.seq
+            if len(e.seq) < k + params.bad_end_length:
+                seq = uniquePathForward(graph, e, k + params.bad_end_length)
+                id = id + "p"
+                # seq = e.seq
             else:
-                seq = e.seq[:5000]
+                seq = e.seq[:k + params.bad_end_length]
                 if e.id.startswith("-"):
                     id = id + "r"
                 else:
@@ -85,6 +106,8 @@ def main(flye_dir, rf, dir, edge_id, k):
             print s[2][1:], s[6].split("_")[1]
     print "Reading reads"
     res_reads = []
+    if rf == "none":
+        return
     res = open(os.path.join(dir, "reads.fasta"), "w")
     for read in SeqIO.parse_by_name(rf):
         if read.id in relevant_read_ids and len(read) > k * 1.2:
