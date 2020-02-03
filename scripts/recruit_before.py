@@ -14,6 +14,7 @@ from common import basic, params, SeqIO
 
 def uniquePathForward(graph, edge, k):
     # type: (SimpleGraph, Edge, int) -> str
+    print "Forward", edge.id, k
     if edge.len >= k:
         return edge.seq[:k]
     v = graph.v[edge.end]
@@ -24,6 +25,7 @@ def uniquePathForward(graph, edge, k):
 
 def uniquePathBackward(graph, edge, k):
     # type: (SimpleGraph, Edge, int) -> str
+    print "Backward", edge.id, k
     if edge.len >= k:
         return edge.seq[-k:]
     v = graph.v[edge.start]
@@ -37,6 +39,7 @@ def main(flye_dir, rf, dir, edge_id, k):
     params.technology = "nano"
     basic.ensure_dir_existance(dir)
     basic.CreateLog(dir)
+    print " ".join(sys.argv)
     print "Reading graph"
     graph = SimpleGraph().ReadDot(os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv"))
     graph.FillSeq(os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta"), True)
@@ -54,7 +57,7 @@ def main(flye_dir, rf, dir, edge_id, k):
             else:
                 id = e.id
             if len(e.seq) < k + params.bad_end_length:
-                seq = uniquePathBackward(graph, e, k + params.bad_end_length)
+                seq = uniquePathForward(graph, e, k + params.bad_end_length)
                 id = id + "p"
                 # seq = e.seq
             else:
@@ -75,7 +78,7 @@ def main(flye_dir, rf, dir, edge_id, k):
             else:
                 id = e.id
             if len(e.seq) < k + params.bad_end_length:
-                seq = uniquePathForward(graph, e, k + params.bad_end_length)
+                seq = uniquePathBackward(graph, e, k + params.bad_end_length)
                 id = id + "p"
                 # seq = e.seq
             else:
