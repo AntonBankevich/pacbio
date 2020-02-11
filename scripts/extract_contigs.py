@@ -4,14 +4,14 @@ sys.path.append("py")
 import common.SeqIO as SeqIO
 from common.basic import RC
 
-names = sys.argv[1].split(";")
+names = sys.argv[2:]
 tmp = dict()
 for s in names:
     s = s.split(",")
     tmp[s[0]] = s
 names = tmp
 
-for rec in SeqIO.parse_fasta(open(sys.argv[2], "r")):
+for rec in SeqIO.parse_fasta(open(sys.argv[1], "r")):
     if rec.id in names:
         s = names[rec.id]
         if "RC" in s:

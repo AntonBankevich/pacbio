@@ -88,12 +88,16 @@ class LineExtender:
             self.updateAllStructures(list(new_line.completely_resolved))
             return 1
         self.updateAllStructures(line.completely_resolved)
+        print "Listeners before:", line.id, line.listeners.__len__()
         while True:
             seg_to_resolve = line.completely_resolved.find(bound.suffix(), params.k)
             if seg_to_resolve is None:
                 break
             if line.knot is not None and seg_to_resolve.right == len(line):
                 break
+            if seg_to_resolve.right <= line.initial[0].seg_to.left + params.k:
+                bound = LinePosition(line, seg_to_resolve.right - params.k + 1)
+                continue
             result = self.attemptCleanResolution(seg_to_resolve)
             total = sum([len(arr) for seg, arr in result])
             new_recruits += total
@@ -105,6 +109,7 @@ class LineExtender:
             if new_line is not None:
                 self.updateAllStructures(list(new_line.completely_resolved))
                 return new_recruits + 1
+        print "Listeners after:", line.id, line.listeners.__len__()
         return new_recruits
 
     # input: a collection of segments that had reads recruited to.
@@ -606,9 +611,11 @@ class LineExtender:
                     al.rc.seg_from.left > min(params.bad_end_length, params.k / 2):
                 bad_segments.add(al.seg_to)
         for al in self.dot_plot.allInter(rec.line.segment(rec.resolved.right - params.k, bound)):
-            if al.seg_from.left > min(params.bad_end_length, params.k / 2) and \
-                    al.rc.seg_from.left > min(params.bad_end_length, params.k / 2):
-                bad_segments.add(al.seg_to)
+            if al.seg_from.left > min(params.bad_end_length, params.k / 2):
+                if al.rc.seg_from.left > min(params.bad_end_length, params.k / 2):
+                    bad_segments.add(al.seg_to)
+                else:
+                    bad_segments.add(al.seg_to.contig.suffix(al.seg_to.left))
         bad_segments.mergeSegments(params.k - 200)
         print "Bad segments:", bad_segments
         good_segments = bad_segments.reverse(rec.line, params.k - 100).reduce(rec.line.segment(rec.resolved.right - params.k, bound))
@@ -631,6 +638,10 @@ class LineExtender:
                 cap = al.seg_from.cap(line.suffix(pos=line.initial[0].seg_to.left))
                 incorrect = line.correct_segments.reverse(line, inter_size - 1).reduce(cap)
                 matching = al.matchingSequence()
+                if len(incorrect) > 0 and al.rc.seg_from.left < 0:
+                    print "Inmerging line. Marking suffix as incorrect."
+                    incorrect.add(line.suffix(al.seg_to.right - inter_size))
+                    incorrect.mergeSegments(inter_size - 1)
                 print "Incorrect: ", line, cap, incorrect
                 for seg1 in incorrect:
                     seg2 = matching.mapSegDown(seg.contig, seg1, mapIn=False)
