@@ -546,38 +546,30 @@ class AlignmentPiece:
         #     for b1, b2 in self.blocks:
         #         yield b1, b2
 
+    def split(self, gap_threshold):
+        # type: (int) -> Generator[AlignmentPiece]
+        res = [] # type: List[Tuple[Segment, Segment]]
+        for seg_from, seg_to in self.matchingBlocks():
+            if len(res) > 0 and (seg_from.left - res[-1][0].right > gap_threshold or seg_to.left - res[-1][1].right > gap_threshold):
+                tmp = AlignmentPiece.FromBlocks(res)
+                if tmp is not None:
+                    yield tmp
+                res = []
+            res.append((seg_from, seg_to))
+        if res[0][0].left == self.seg_from.left:
+            yield self
+        else:
+            tmp = AlignmentPiece.FromBlocks(res)
+            if tmp is not None:
+                yield tmp
 
     def splitRead(self):
-        res = [] # type: List[Tuple[Segment, Segment]]
-        for seg_from, seg_to in self.matchingBlocks():
-            if len(res) > 0 and (seg_from.left - res[-1][0].right > 100 or seg_to.left - res[-1][1].right > 100):
-                tmp = AlignmentPiece.FromBlocks(res)
-                if tmp is not None:
-                    yield tmp
-                res = []
-            res.append((seg_from, seg_to))
-        if res[0][0].left == self.seg_from.left:
-            yield self
-        else:
-            tmp = AlignmentPiece.FromBlocks(res)
-            if tmp is not None:
-                yield tmp
+        for al in self.split(100):
+            yield al
 
     def splitRef(self):
-        res = [] # type: List[Tuple[Segment, Segment]]
-        for seg_from, seg_to in self.matchingBlocks():
-            if len(res) > 0 and (seg_from.left - res[-1][0].right > 150 or seg_to.left - res[-1][1].right > 150):
-                tmp = AlignmentPiece.FromBlocks(res)
-                if tmp is not None:
-                    yield tmp
-                res = []
-            res.append((seg_from, seg_to))
-        if res[0][0].left == self.seg_from.left:
-            yield self
-        else:
-            tmp = AlignmentPiece.FromBlocks(res)
-            if tmp is not None:
-                yield tmp
+        for al in self.split(150):
+            yield al
 
     @staticmethod
     def FromBlocks(blocks):

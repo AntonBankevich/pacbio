@@ -461,6 +461,16 @@ class LineExtender:
 
         def add(self, al):
             # type: (AlignmentPiece) -> None
+            tmp = list(al.split(100))
+            if len(tmp) > 1:
+                al = Scorer().polyshAlignment(al, params.alignment_correction_radius)
+                for al1 in al.split(100):
+                    self.innerAdd(al)
+            else:
+                self.innerAdd(al)
+
+        def innerAdd(self, al):
+            # type: (AlignmentPiece) -> None
             if al.seg_from.left < params.bad_end_length:
                 self.potential_good.append(al)
             else:
@@ -614,8 +624,6 @@ class LineExtender:
             if al.seg_from.left > min(params.bad_end_length, params.k / 2):
                 if al.rc.seg_from.left > min(params.bad_end_length, params.k / 2):
                     bad_segments.add(al.seg_to)
-                else:
-                    bad_segments.add(al.seg_to.contig.suffix(al.seg_to.left))
         bad_segments.mergeSegments(params.k - 200)
         print "Bad segments:", bad_segments
         good_segments = bad_segments.reverse(rec.line, params.k - 100).reduce(rec.line.segment(rec.resolved.right - params.k, bound))
@@ -638,10 +646,6 @@ class LineExtender:
                 cap = al.seg_from.cap(line.suffix(pos=line.initial[0].seg_to.left))
                 incorrect = line.correct_segments.reverse(line, inter_size - 1).reduce(cap)
                 matching = al.matchingSequence()
-                if len(incorrect) > 0 and al.rc.seg_from.left < 0:
-                    print "Inmerging line. Marking suffix as incorrect."
-                    incorrect.add(line.suffix(al.seg_to.right - inter_size))
-                    incorrect.mergeSegments(inter_size - 1)
                 print "Incorrect: ", line, cap, incorrect
                 for seg1 in incorrect:
                     seg2 = matching.mapSegDown(seg.contig, seg1, mapIn=False)
