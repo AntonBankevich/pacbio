@@ -30,7 +30,8 @@ def main(contigs_file, contig_name, reads_file, dir, k):
         tmp.append(al)
     als = tmp
     als = sorted(als, key=lambda al: al.seg_to.left / 50 * 1000000 + al.seg_to.right - al.seg_to.left)
-    w = 50
+    w = 30
+    f = open(os.path.join(dir, "reads.fasta"), "w")
     for al in als:
         if len(al) < k:
             continue
@@ -65,10 +66,13 @@ def main(contigs_file, contig_name, reads_file, dir, k):
                         elif a - b < -15:
                             sys.stdout.write("d")
                         else:
-                            sys.stdout.write(min(9, max(a, b) - len(tmp[i])))
+                            sys.stdout.write(str(min(8, max(a, b) + 1 - len(tmp[i]))))
             else:
                 sys.stdout.write("*")
-        print ""
+        print " ", al.seg_from.contig.id
+        if len(al.seg_to) > len(contig) - 100:
+            SeqIO.write(al.seg_from.contig, f, "fasta")
+    f.close()
 
 
 if __name__ == "__main__":
