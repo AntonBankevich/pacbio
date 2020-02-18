@@ -22,7 +22,7 @@ def main(contigs_file, contig_name, reads_file, dir, k):
     contigs = ContigStorage()
     contigs.add(contig)
     reads = ContigStorage().loadFromFasta(open(reads_file, "r"), False)
-    als = list(aligner.localAlign(reads, contigs))
+    als = list(aligner.localAlign(reads.unique(), contigs))
     tmp = []
     for al in als:
         if al.seg_to.contig != contig:
@@ -30,18 +30,42 @@ def main(contigs_file, contig_name, reads_file, dir, k):
         tmp.append(al)
     als = tmp
     als = sorted(als, key = lambda al: al.seg_to.left)
+    w = 50
     for al in als:
         if len(al) < k:
             continue
-        for i in range(len(contig) / 100):
-            seg = contig.segment(i * 100, i * 100 + 100)
+        m = al.matchingSequence(True)
+        tmp = []
+        for i in range(len(contig) / w):
+            tmp.append([])
+        for a, b in m.matches:
+            tmp[b / w].append((a, b))
+        for i in range(len(contig) / w):
+            if i + 1 < len(tmp) and len(tmp[i + 1]) > 0:
+                tmp[i].append(tmp[i+1][0])
+        for i in range(len(contig) / w):
+            seg = contig.segment(i * w, i * w + w)
             if al.seg_to.inter(seg):
                 if al.seg_to.left >= seg.left and al.seg_from.left > params.bad_end_length:
                     sys.stdout.write("B")
                 elif al.seg_to.right <= seg.right and al.rc.seg_from.left > params.bad_end_length:
                     sys.stdout.write("E")
                 else:
-                    sys.stdout.write(al.reduce(target=seg).oneCharPI())
+                    if len(tmp[i]) == 0:
+                        sys.stdout.write("*")
+                    else:
+                        a = tmp[i][-1][0] - tmp[i][0][0]
+                        a = tmp[i][-1][1] - tmp[i][0][1]
+                        if a - b > 30:
+                            sys.stdout.write("I")
+                        elif a - b > 15:
+                            sys.stdout.write("i")
+                        elif a - b < -30:
+                            sys.stdout.write("D")
+                        elif a - b < -15:
+                            sys.stdout.write("d")
+                        else:
+                            sys.stdout.write(min(9, max(a, b) - len(tmp[i])))
             else:
                 sys.stdout.write("*")
         print ""
