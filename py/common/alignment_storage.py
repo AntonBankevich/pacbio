@@ -174,6 +174,17 @@ class AlignmentPiece:
     def isIdentical(self):
         return self.seg_from == self.seg_to
 
+    def oneCharPI(self):
+        if len(self.seg_from) - len(self.seg_to) > 40:
+            return "I"
+        if len(self.seg_from) - len(self.seg_to) > 20:
+            return "i"
+        if len(self.seg_from) - len(self.seg_to) < -40:
+            return "D"
+        if len(self.seg_from) - len(self.seg_to) < -20:
+            return "d"
+        return str(min(9, max(len(self.seg_from), len(self.seg_to)) - len(list(self.matchingPositions(True)))))
+
     def windowPI(self, w):
         res = []
         preva = self.seg_from.left

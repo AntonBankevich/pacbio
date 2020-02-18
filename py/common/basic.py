@@ -258,6 +258,7 @@ def CreateLog(dir):
     sys.stdout = OStreamWrapper(sys.stdout, log)
     sys.stdout.prefix = lambda s: time.strftime("%y.%m.%d %H:%M:%S") + "  "
     sys.stderr = sys.stdout
+    sys.stdout.write(" ".join(sys.argv))
 
 def letterToIndex(char):
     # type: (str) -> int

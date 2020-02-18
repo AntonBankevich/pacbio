@@ -14,6 +14,7 @@ def extractSubgraph(gf):
     vertex_ids = graph1.v.keys()
     # print "{|}|" + "|".join(["id " + r + "\\\\" for r in edge_ids])
     print "{|}|" + "|".join(["\"" + str(r) + "\"" for r in vertex_ids])
+    print " ".join(graph1.e.keys())
 
 
 if __name__ == "__main__":
