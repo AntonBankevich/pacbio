@@ -29,14 +29,14 @@ def main(contigs_file, contig_name, reads_file, dir, k):
             al = al.rc
         tmp.append(al)
     als = tmp
-    als = sorted(als, key = lambda al: al.seg_to.left)
+    als = sorted(als, key=lambda al: al.seg_to.left / 50 * 1000000 + al.seg_to.right - al.seg_to.left)
     w = 50
     for al in als:
         if len(al) < k:
             continue
         m = al.matchingSequence(True)
         tmp = []
-        for i in range(len(contig) / w):
+        for i in range(len(contig) / w + 1):
             tmp.append([])
         for a, b in m.matches:
             tmp[b / w].append((a, b))
@@ -55,7 +55,7 @@ def main(contigs_file, contig_name, reads_file, dir, k):
                         sys.stdout.write("*")
                     else:
                         a = tmp[i][-1][0] - tmp[i][0][0]
-                        a = tmp[i][-1][1] - tmp[i][0][1]
+                        b = tmp[i][-1][1] - tmp[i][0][1]
                         if a - b > 30:
                             sys.stdout.write("I")
                         elif a - b > 15:
