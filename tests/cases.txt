@@ -31,8 +31,8 @@ AlignmentCompositionTest 0
 
 CorrectionMappingTest 0
 
-LineExtensionTest 9
-List aaabacadaeafagahaiaj 5 0 b
+LineExtensionTest 1
+List aaabacadae 5 0 b
 List abbbcdefBBBghij 5 0 ja de
 List abCDEFGHijklcdemnodgfp 5 0 pa jk mn
 List abcdefghijaklDEFGmnopaqrsDeFgHtuv 5 0 ab ij no

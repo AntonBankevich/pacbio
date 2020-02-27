@@ -519,6 +519,13 @@ class LineExtender:
                 if al.seg_from.contig.id not in self.good_reads or necessary_contig_support > self.read_bounds[al.seg_from.contig.id]:
                     yield al
 
+        def unsupportedAlignments(self, inter_size):
+            for al in self.reads[::-1]:
+                necessary_contig_support = min(len(al.seg_from.contig), al.seg_from.left + inter_size + 100)
+                if al.seg_from.contig.id not in self.good_reads or necessary_contig_support > self.read_bounds[al.seg_from.contig.id]:
+                    yield al
+
+
         def updateGood(self):
             self.sort()
             while len(self.reads) > 0 and self.reads[-1].seg_to.left <= self.resolved.right - params.k:
@@ -565,7 +572,7 @@ class LineExtender:
     def findResolvedBound(self, rec, inter_size):
         # type: (Record, int) -> int
         bad_reads = []
-        for read in rec:
+        for read in rec.unsupportedAlignments(inter_size):
             if len(read.seg_to) >= inter_size:
                 bad_reads.append(read)
             if len(bad_reads) >= params.min_contra_for_break:
@@ -651,9 +658,9 @@ class LineExtender:
                 for seg1 in incorrect:
                     seg2 = matching.mapSegDown(seg.contig, seg1, mapIn=False)
                     print "Relevant unpolished k-mer segment alignment:", seg1, seg2
-                    if al.rc.seg_from.left < 200:
-                        seg2 = seg2.contig.suffix(seg2.left)
-                        print "Alignment is inmerging. Marking line suffix as bad:", seg2
+                    # if len(al.seg_to) > inter_size - 100 and al.rc.seg_from.left < 200:
+                    #     seg2 = seg2.contig.suffix(seg2.left)
+                    #     print "Alignment is inmerging. Marking line suffix as bad:", seg2
                     segs.add(seg2)
         segs.mergeSegments(inter_size - 1)
         print "All incorrect", segs
