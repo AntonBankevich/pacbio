@@ -3,9 +3,8 @@ import shutil
 import subprocess
 import sys
 
-from alignment.polishing import Polisher
-
 sys.path.append("py")
+from alignment.polishing import Polisher
 
 from common.seq_records import NamedSequence
 from common.SimpleGraph import SimpleGraph, Edge
@@ -28,20 +27,24 @@ def main(contigs_file, contig_name, reads_file, dir, k, initial_reads):
     dd = DirDistributor(os.path.join(dir, "alignments"))
     aligner = Aligner(dd)
     contigs = ContigStorage().loadFromFasta(open(contigs_file, "r"), False)
+#    contig = contigs[contig_name].asSegment().prefix(length=2000).asContig()
     contig = contigs[contig_name]
     reads = ContigStorage().loadFromFasta(open(reads_file, "r"), False)
     reads1 = ContigStorage()
     reads2 = ContigStorage()
-    for read in reads:
-        if read.id in initial_reads:
+    cnt = 0
+    for read in reads.unique():
+        cnt += 1
+        if cnt % 2 == 0:
+#        if read.id in initial_reads:
             reads1.add(read)
         else:
             reads2.add(read)
     polisher = Polisher(aligner, dd)
     contig1 = contig
     contig2 = contig
-    diff = 0
-    for i in range(10):
+    for i in range(4):
+        diff = 0
         print "Iteration", i
         als1 = fixAlDir(aligner.overlapAlign(reads1.unique(), ContigStorage([contig])), contig)
         als2 = fixAlDir(aligner.overlapAlign(reads2.unique(), ContigStorage([contig])), contig)
@@ -54,6 +57,7 @@ def main(contigs_file, contig_name, reads_file, dir, k, initial_reads):
         reads1 = ContigStorage()
         reads2 = ContigStorage()
         for al1, al2 in zip(als1, als2):
+            print al1, al2
             assert al1.seg_from.contig == al2.seg_from.contig
             pi1 = al1.percentIdentity()
             pi2 = al2.percentIdentity()
@@ -62,10 +66,18 @@ def main(contigs_file, contig_name, reads_file, dir, k, initial_reads):
             else:
                 reads2.add(al2.seg_from.contig)
             diff += abs(pi1 - pi2)
-        print diff, len(reads1), len(reads2)
+        print float(diff) / len(als1), len(reads1) / 2, len(reads2) / 2
     al = aligner.overlapAlign([contig1], ContigStorage([contig2])).next()
     print al
     print "\n".join(al.asMatchingStrings2())
+    for read in reads1:
+        if read.id in initial_reads:
+            sys.stdout.write(read.id + " ")
+    print ""
+    for read in reads2:
+        if read.id in initial_reads:
+            sys.stdout.write(read.id + " ")
+    print ""
 
 
 
