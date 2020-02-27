@@ -296,16 +296,16 @@ class Polisher:
                     else:
                         positions.append(al.seg_to.right)
                 positions = sorted(positions)[::-1]
-                contra = sorted(contra)[::-1]
+                contra = sorted(contra)
                 print "Supporting positions:", positions
                 print "Contra:", contra
                 if min_cov >= len(positions):
                     continue
-                break_num = int(len(positions) * (1 - min_cov_frac))
-                if break_num < len(contra):
-                    break_pos = len(polished_base)
-                else:
+                break_num = int((len(positions) + len(contra)) * (1 - min_cov_frac))
+                if break_num <= len(contra):
                     break_pos = contra[break_num - 1]
+                else:
+                    break_pos = len(polished_base)
                 cutoff_pos = max(min(positions[min_cov - 1], break_pos), len(start))
                 if cutoff_pos > len(start) + 100:
                     print "Chose to use read", base_al, "Alignments:"
