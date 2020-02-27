@@ -302,8 +302,8 @@ class Polisher:
                 if min_cov >= len(positions):
                     continue
                 break_num = int((len(positions) + len(contra)) * (1 - min_cov_frac))
-                if break_num <= len(contra):
-                    break_pos = contra[break_num - 1]
+                if break_num < len(contra):
+                    break_pos = contra[break_num]
                 else:
                     break_pos = len(polished_base)
                 cutoff_pos = max(min(positions[min_cov - 1], break_pos), len(start))
