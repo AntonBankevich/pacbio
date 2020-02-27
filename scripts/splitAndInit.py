@@ -159,7 +159,7 @@ def main(flye_dir, rf, dir, edge_id, to_resolve, min_contig_length):
     res = open(os.path.join(dir, "reads.fasta"), "w")
     for read in SeqIO.parse_by_name(rf):
         if read.id in relevant_read_ids:
-            res_reads.add(read)
+            res_reads.add(Contig(read.seq, read.id))
             SeqIO.write(read, res, "fasta")
     res.close()
     random_down = open(os.path.join(dir, "random_down.fasta"), "w")
