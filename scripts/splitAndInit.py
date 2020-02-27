@@ -5,9 +5,9 @@ import sys
 
 from typing import List, Dict
 
+sys.path.append("py")
 from alignment.polishing import Polisher
 
-sys.path.append("py")
 
 from common.seq_records import NamedSequence
 from common.SimpleGraph import SimpleGraph, Edge
@@ -148,10 +148,12 @@ def main(flye_dir, rf, dir, edge_id, to_resolve, min_contig_length):
     for rid, eid in parseReadDump(os.path.join(flye_dir, "20-repeat", "read_alignment_dump")):
         if eid in edge_ids:
             relevant_read_ids.add(rid)
-        print rid, eid
+            print rid, eid
     for rid, eid in parseReadDump(os.path.join(flye_dir, "20-repeat", "read_alignment_dump")):
         if rid in relevant_read_ids and eid in reads_to_resolve:
             reads_to_resolve[eid].append(rid)
+    for eid in reads_to_resolve:
+        reads_to_resolve[eid] = list(set(reads_to_resolve))
     print "Reading reads"
     res_reads = ContigStorage()
     res = open(os.path.join(dir, "reads.fasta"), "w")
