@@ -106,6 +106,11 @@ class ContigStorage:
             for item in UniqueList(self).__iter__():
                 yield item
 
+    def uniqueSorted(self):
+        lids = sorted([l.id for l in self.unique()])
+        for lid in lids:
+            yield self.items[lid]
+
     def __contains__(self, item):
         # type: (Contig) -> bool
         return item.id in self.items

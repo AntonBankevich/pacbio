@@ -110,10 +110,10 @@ class SimpleGraph:
     def Find(self, minlen, v):
         self.visited.add(v)
         for e in self.v[v].out:
-            if e.len <= minlen and e.end not in self.visited:
+            if e.len <= minlen and e.label.find("black") == -1 and e.end not in self.visited:
                 self.Find(minlen, e.end)
         for e in self.v[v].inc:
-            if e.len <= minlen and e.start not in self.visited:
+            if e.len <= minlen and e.label.find("black") == -1 and e.start not in self.visited:
                 self.Find(minlen, e.start)
 
     def Split(self, minlen):

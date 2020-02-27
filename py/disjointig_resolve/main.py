@@ -1,3 +1,4 @@
+import itertools
 import os
 import subprocess
 import sys
@@ -26,7 +27,7 @@ from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params, parseFlyeDir
 from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
-    CreateReadCollection, constructDisjointigs
+    CreateReadCollection, constructDisjointigs, LoadLineCollection
 
 
 def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
@@ -133,7 +134,15 @@ def main(args):
 
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
-        dot_plot, extender, lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split)
+        if cl_params.init_file is None:
+            dot_plot, lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split)
+        else:
+            dot_plot, lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads)
+
+        sys.stdout.info("Updating sequences and resolved segments.")
+        knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
+        extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
+        extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
 
         print "Saving initial state"
         try:

@@ -3,20 +3,19 @@ import os
 import subprocess
 import sys
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common import params, basic
 from common.alignment_storage import ReadCollection, AlignmentPiece
 from common.dot_parser import DotParser
+from common.save_load import TokenReader
 from common.sequences import ContigCollection, ContigStorage, Contig
 from disjointig_resolve.accurate_line import NewLine
 from disjointig_resolve.analysis import CoverageAnalyser
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
-from disjointig_resolve.knotter import LineMerger
-from disjointig_resolve.line_extender import LineExtender
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.unique_marker import UniqueMarker
 
@@ -50,19 +49,19 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
                 line1, line2 = lines.splitLine(line.segment(left, right))
                 line_list.extend([line1, line2])
             else:
-                if line.initial[-1].seg_to.right + 5000 < len(line) - 5000:
-                    print "Cut line of the right because too long unresolved segment:", line, str(line.completely_resolved)
+                if line.initial[-1].seg_to.right + 5000 < len(line):
+                    print "Cut line on the right because too long unresolved segment:", line, str(line.completely_resolved)
                     line.cutRight(line.initial[-1].seg_to.right + 3000)
                 if line.initial[0].seg_to.left > 5000:
                     print "Cut line of the left because too long unresolved segment:", line, str(line.completely_resolved)
                     line.rc.cutRight(len(line) - line.initial[0].seg_to.left + 3000)
                 if len(line.completely_resolved[0]) > 40000:
                     print "Splitted line because it is too long", str(line.completely_resolved)
-                    line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=10000).prefix(length=1000))
-                    line1, line2 = lines.splitLine(line12.completely_resolved[0].prefix(length=10000).suffix(length=1000))
+                    line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=max(10000, params.k + params.bad_end_length)).prefix(length=1000))
+                    line1, line2 = lines.splitLine(line12.completely_resolved[0].prefix(length=max(10000, params.k + params.bad_end_length)).suffix(length=1000))
                     line1.tie(line2, -1000, "")
                     line2.tie(line3, -1000, "")
-        line_list = sorted(lines.unique(), key = lambda line: line.id)
+        line_list = sorted(lines.unique(), key=lambda line: line.id)
         print "Final list of lines:"
         for line in line_list:
             print line, line.completely_resolved
@@ -73,12 +72,37 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     dot_plot = LineDotPlot(lines, aligner)
     dot_plot.construct(aligner)
     dot_plot.printAll(sys.stdout)
-    sys.stdout.info("Updating sequences and resolved segments.")
-    knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
-    extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
-    extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
     lines.writeToFasta(open(os.path.join(dir, "initial_prolonged_lines.fasta"), "w"))
-    return dot_plot, extender, lines
+    return dot_plot, lines
+
+
+def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads):
+    # type: (str, str, Aligner, ContigStorage, DisjointigCollection, ReadCollection) -> Tuple[LineDotPlot, NewLineStorage]
+    print "Initializing lines from init file", lc_file
+    lines = NewLineStorage(disjointigs, aligner)
+    f = TokenReader(open(lc_file, "r"))
+    for contig in contigs.uniqueSorted():
+        id = f.readToken()
+        assert contig.id == id
+        line = lines.addNew(contig.seq, contig.id)
+        read_ids = f.readTokens()
+        for al in aligner.localAlign([reads[rid] for rid in read_ids], ContigStorage([line])):
+            if len(al.seg_to) >= params.k:
+                tmp_line = al.seg_to.contig # type: NewLine
+                tmp_line.addReadAlignment(al)
+        line.correct_segments.add(line.asSegment())
+        line.completely_resolved.add(line.asSegment())
+        line.initial.add(AlignmentPiece.Identical(line.asSegment().asContig().asSegment(), line.asSegment()))
+    print "Final list of lines:"
+    for line in lines.unique():
+        print line, line.completely_resolved
+    lines.writeToFasta(open(os.path.join(dir, "initial_lines.fasta"), "w"))
+    lines.alignDisjointigs()
+    sys.stdout.info("Constructing line dot plot")
+    dot_plot = LineDotPlot(lines, aligner)
+    dot_plot.construct(aligner)
+    dot_plot.printAll(sys.stdout)
+    return dot_plot, lines
 
 
 def CreateDisjointigCollection(d_files, dir, aligner, reads):

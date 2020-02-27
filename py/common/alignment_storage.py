@@ -408,6 +408,28 @@ class AlignmentPiece:
             return True
         return False
 
+    def contradictingRTCRight(self,
+                         seg=None, tail_size = params.bad_end_length):  # contradiction between read and consensus sequence. Stricter consensus condition
+        # type: (Segment, int) -> bool
+        if seg is None:
+            seg = self.seg_to.contig.asSegment()
+        if not self.seg_to.inter(seg):
+            return False
+        if self.rc.seg_from.left >= tail_size and self.seg_to.right <= seg.right - 50:
+            return True
+        return False
+
+    def contradictingRTCLeft(self,
+                         seg=None, tail_size = params.bad_end_length):  # contradiction between read and consensus sequence. Stricter consensus condition
+        # type: (Segment, int) -> bool
+        if seg is None:
+            seg = self.seg_to.contig.asSegment()
+        if not self.seg_to.inter(seg):
+            return False
+        if self.seg_from.left >= tail_size and self.seg_to.left >= seg.left + 50:
+            return True
+        return False
+
     def contradictingRTC(self,
                          seg=None, tail_size = params.bad_end_length):  # contradiction between read and consensus sequence. Stricter consensus condition
         # type: (Segment, int) -> bool

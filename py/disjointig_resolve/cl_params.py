@@ -21,7 +21,8 @@ class Params:
         self.args = None
         self.threads = 8
         self.test = False
-        self.long_params = "test stats size= mode= nano cut-reads= homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.init_file = None
+        self.long_params = "test stats init-file= size= mode= nano cut-reads= homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
@@ -67,6 +68,8 @@ class Params:
                 self.set_flye_dir(self.flye_dir, self.mode)
             elif key == "--stats":
                 self.stats = True
+            elif key == "--init-file":
+                self.init_file = value
             elif key == "--nosplit":
                 self.split = False
             elif key == "--cut-reads":

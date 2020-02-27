@@ -184,6 +184,7 @@ class LineExtender:
                                 next_start = len(line)
                             else:
                                 next_start = next.left
+                        next_start = min(next_start, len(line) - 200)
                         records[seg_resolved] = self.createRecord(seg_resolved, next_start, seg_correct, good_reads, read_bounds)
         records = list(records.values())  # type: List[LineExtender.Record]
         return records
@@ -649,8 +650,11 @@ class LineExtender:
                 print "Incorrect: ", line, cap, incorrect
                 for seg1 in incorrect:
                     seg2 = matching.mapSegDown(seg.contig, seg1, mapIn=False)
-                    segs.add(seg2)
                     print "Relevant unpolished k-mer segment alignment:", seg1, seg2
+                    if al.rc.seg_from.left < 200:
+                        seg2 = seg2.contig.suffix(seg2.left)
+                        print "Alignment is inmerging. Marking line suffix as bad:", seg2
+                    segs.add(seg2)
         segs.mergeSegments(inter_size - 1)
         print "All incorrect", segs
         return list(segs.reverse(seg.contig, inter_size - 1 - max(100, inter_size / 10)).reduce(seg))

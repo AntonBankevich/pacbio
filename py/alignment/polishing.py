@@ -281,6 +281,7 @@ class Polisher:
                         if al.seg_to.left == 0 and ((candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right)):
                             candidate_alignments[-1] = al
                 positions = []
+                contra = []
                 # print "CA:", candidate_alignments
                 for i, al in enumerate(candidate_alignments):
                     if al is None:
@@ -289,14 +290,23 @@ class Polisher:
                         print reduced_read_list[i].seq
                         print polished_base.seq
                     assert al is not None, reduced_read_list[i]
-                    positions.append(al.trimByQuality(0.3, 100).seg_to.right)
-                print "Positions before sorting:", positions
+                    al.trimByQuality(0.3, 100)
+                    if al.rc.seg_from.left > params.bad_end_length:
+                        contra.append(al.seg_to.right)
+                    else:
+                        positions.append(al.seg_to.right)
                 positions = sorted(positions)[::-1]
-                print "Positions after sorting:", positions
-                num = max(min_cov, int(len(relevant_als)  * min_cov_frac))
-                if num >= len(positions):
+                contra = sorted(contra)[::-1]
+                print "Supporting positions:", positions
+                print "Contra:", contra
+                if min_cov >= len(positions):
                     continue
-                cutoff_pos = max(positions[num - 1], len(start))
+                break_num = int(len(positions) * (1 - min_cov_frac))
+                if break_num < len(contra):
+                    break_pos = len(polished_base)
+                else:
+                    break_pos = contra[break_num - 1]
+                cutoff_pos = max(min(positions[min_cov - 1], break_pos), len(start))
                 if cutoff_pos > len(start) + 100:
                     print "Chose to use read", base_al, "Alignments:"
                     print map(str, reduced_read_list)
