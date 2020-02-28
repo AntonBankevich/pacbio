@@ -7,7 +7,7 @@ from alignment.align_tools import Aligner, DirDistributor
 from alignment.polishing import Polisher
 from common import basic, params
 from common.line_align import Scorer
-from common.sequences import Segment
+from common.sequences import Segment, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
@@ -185,7 +185,20 @@ class LineExtender:
                             else:
                                 next_start = next.left
                         next_start = min(next_start, len(line) - 200)
-                        records[seg_resolved] = self.createRecord(seg_resolved, next_start, seg_correct, good_reads, read_bounds)
+                        focus = line.segment(seg_resolved.right - params.k, min(seg_correct.right, next_start + params.k))
+                        als = list(line.getRelevantAlignmentsFor(focus))
+                        reads  = ContigStorage()
+                        for al in als:
+                            reads.add(al.seg_from.contig)
+                        als = list(self.aligner.localAlign(reads.unique(), ContigStorage([line])))
+                        final_als = []
+                        for al in als:
+                            if al.seg_to.contig == line.rc:
+                                al = al.rc
+                            if al.seg_to.interSize(focus) >= params.k - 100:
+                                final_als.append(al)
+                        sys.stdout.trace("Finished realignment of reads")
+                        records[seg_resolved] = self.createRecord(seg_resolved, next_start, seg_correct, final_als, good_reads, read_bounds)
         records = list(records.values())  # type: List[LineExtender.Record]
         return records
 
@@ -547,8 +560,8 @@ class LineExtender:
         def __str__(self):
             return str([self.resolved, self.correct, self.next_resolved_start, self.reads])
 
-    def createRecord(self, resolved, next_start, correct, good_reads, read_bounds):
-        # type: (Segment, int, Segment, Set[str], Dict[str, int]) -> Record
+    def createRecord(self, resolved, next_start, correct, als, good_reads, read_bounds):
+        # type: (Segment, int, Segment, List[AlignmentPiece], Set[str], Dict[str, int]) -> Record
         line = resolved.contig # type: NewLine
         focus = line.segment(resolved.right - params.k, min(correct.right, next_start + params.k))
         # for al in self.dot_plot.allInter(focus):
@@ -564,7 +577,7 @@ class LineExtender:
         res = self.Record(resolved, next_start, correct, good_reads, read_bounds)
         # print "Getting relevant alignments", str(focus)
         # als = filter(lambda al: al.seg_from.left > params.k / 2 + 20, als)
-        res.addAll(line.getRelevantAlignmentsFor(focus))
+        res.addAll(als)
         res.updateGood()
 
         return res
