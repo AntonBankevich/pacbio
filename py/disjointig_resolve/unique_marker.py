@@ -76,12 +76,13 @@ class UniqueMarker:
         events = []
         for seg, val in inc:
             if val >= params.min_k_mer_cov:
-                events.append((seg.right, -1))
+                events.append((seg.left, -1))
         for seg, val in out:
             if val >= params.min_k_mer_cov:
-                events.append((seg.left, 1))
+                events.append((seg.right, 1))
         events= sorted(events)
         sys.stdout.trace("Events collected and sorted", len(events))
+        events = [(pos, dir) for pos, dir in events if (dir == -1 or pos < len(line) - 200) and (dir == 1 or pos > - 200)]
         print events
         segs = SegmentStorage()
         for e1, e2 in zip(events[:-1], events[1:]):

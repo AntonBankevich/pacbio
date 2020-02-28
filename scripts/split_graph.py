@@ -18,7 +18,11 @@ for comp in g.Split(1000000):
             pass
         else:
             oppa.extend(comp)
-        continue
+        if len(oppa) > 30:
+            comp = list(oppa)
+            oppa = []
+        else:
+            continue
     print cnt, len(comp)
     f = open(os.path.join(sys.argv[2], str(cnt) + ".dot"), "w")
     g.Draw(comp, f)
