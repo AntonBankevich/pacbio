@@ -59,42 +59,47 @@ def fixAlDir(als, contig):
 def splitSeg(aligner, seg, mult, all_reads_list):
     all_reads = ContigStorage()
     base = seg.asContig()
+    tmp = []
     for al in fixAlDir(aligner.overlapAlign(all_reads_list, ContigStorage([base])), base):
         all_reads.add(al.seg_from.contig)
-    all_reads_list = list(all_reads.unique())
+        tmp.append(al.seg_from)
+    all_reads_list = tmp
     split_reads = []
     split_contigs = []
     for i in range(mult):
         split_reads.append([])
         split_contigs.append(base)
     cnt = 0
-    for read in all_reads:
+    for read in all_reads_list:
         split_reads[cnt % mult].append(read)
     polisher = Polisher(aligner, aligner.dir_distributor)
-    diff = 0
     for i in range(10):
         print "Iteration", i
         split_contigs = []
         for reads in split_reads:
             tmp_als = fixAlDir(aligner.overlapAlign(reads, ContigStorage([base])), base)
             split_contigs.append(Contig(polisher.polishSmallSegment(base.asSegment(), tmp_als).seg_from.Seq(), str(len(split_contigs))))
-        als = []
+        bestals = dict()
+        for read in all_reads_list:
+            bestals[read.id] = None
         for contig in split_contigs:
-            als.append(fixAlDir(aligner.overlapAlign(all_reads_list, ContigStorage([contig])), contig))
-            als[-1] = sorted(als[-1], key = lambda al: al.seg_from.contig.id)
+            for al in fixAlDir(aligner.overlapAlign(all_reads_list, ContigStorage([contig])), contig):
+                if al.seg_from.contig.id not in bestals:
+                    print bestals.keys()
+                    print al
+                if bestals[al.seg_from.contig.id] is None or al.percentIdentity() > bestals[al.seg_from.contig.id].percentIdentity():
+                    bestals[al.seg_from.contig.id] = al
+#            als.append(fixAlDir(aligner.overlapAlign(all_reads_list, ContigStorage([contig])), contig))
+#            als[-1] = sorted(als[-1], key = lambda al: al.seg_from.contig.id)
         for i in range(mult):
             split_reads[i] = []
-        for i in range(len(all_reads_list)):
-            best_pi = 0
-            best = 0
-            for j in range(mult):
-                assert als[j][i].seg_from.contig == als[0][i].seg_from.contig
-                pi = als[j][i].percentIdentity()
-                if best_pi > pi:
-                    best = j
-                    best_pi = pi
-                split_reads[best].append(all_reads_list[i])
-        print diff, " ".join(map(str, map(len, split_reads)))
+        for rid in bestals:
+            al = bestals[rid]
+            if al is None:
+                print "Warning: no alignment for read", rid
+            else:
+                split_reads[int(al.seg_to.contig.id)].append(al.seg_from.contig)
+        print " ".join(map(str, map(len, split_reads)))
     maxpi = 0
     print "pi matrix:"
     for i in range(mult):
@@ -153,7 +158,7 @@ def main(flye_dir, rf, dir, edge_id, to_resolve, min_contig_length):
         if rid in relevant_read_ids and eid in reads_to_resolve:
             reads_to_resolve[eid].append(rid)
     for eid in reads_to_resolve:
-        reads_to_resolve[eid] = list(set(reads_to_resolve))
+        reads_to_resolve[eid] = list(set(reads_to_resolve[eid]))
     print "Reading reads"
     res_reads = ContigStorage()
     res = open(os.path.join(dir, "reads.fasta"), "w")
@@ -173,6 +178,8 @@ def main(flye_dir, rf, dir, edge_id, to_resolve, min_contig_length):
     lcf = open(os.path.join(dir, "contigs.lc"), "w")
     for eid, mult in to_resolve:
         repeat_reads = [res_reads[rid] for rid in reads_to_resolve[eid]]
+        print reads_to_resolve[eid]
+        print map(str, repeat_reads)
         split_contigs = splitRepeat(aligner, graph.e[eid].seq, mult, repeat_reads, min_contig_length)
         print "Edge", eid, "was split into", mult, "copies"
         for contig, contig_reads in split_contigs:
