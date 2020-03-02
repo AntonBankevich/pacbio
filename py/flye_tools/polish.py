@@ -67,8 +67,8 @@ def _run_polish_bin(bubbles_in, subs_matrix, hopo_matrix,
     """
     Invokes polishing binary
     """
-    cmdline = [POLISH_BIN, "-t", str(num_threads), bubbles_in, subs_matrix,
-               hopo_matrix, consensus_out]
+    cmdline = [POLISH_BIN, "--threads", str(num_threads), "--bubbles", bubbles_in, "--subs-mat", subs_matrix, "--hopo-mat",
+               hopo_matrix, "--out", consensus_out]
     try:
         subprocess.check_call(cmdline, stdout = open("/dev/null", "w"), stderr = open("/dev/null", "w"))
     except subprocess.CalledProcessError as e:
