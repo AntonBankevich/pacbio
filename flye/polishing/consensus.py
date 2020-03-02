@@ -6,19 +6,25 @@
 Quick and dirty alignment consensus
 """
 
+from __future__ import absolute_import
+from __future__ import division
 import logging
 from collections import defaultdict
-from itertools import izip
+from flye.six.moves import range
+from flye.six import itervalues
+
 import multiprocessing
 import signal
 
-from flye.polishing.alignment import shift_gaps, SynchronizedSamReader
+from flye.polishing.alignment import shift_gaps, get_uniform_alignments
+from flye.utils.sam_parser import SynchronizedSamReader
 import flye.config.py_cfg as cfg
 import flye.utils.fasta_parser as fp
+from flye.six.moves import zip
 
 logger = logging.getLogger()
 
-class Profile:
+class Profile(object):
     __slots__ = ("insertions", "matches", "nucl")
 
     def __init__(self):
@@ -41,6 +47,8 @@ def _thread_worker(aln_reader, contigs_info, platform, results_queue,
             sequence = _flatten_profile(profile)
             results_queue.put((ctg_id, sequence, aln_errors))
 
+        aln_reader.stop_reading()
+
     except Exception as e:
         error_queue.put(e)
 
@@ -52,7 +60,8 @@ def get_consensus(alignment_path, contigs_path, contigs_info, num_proc,
     """
     aln_reader = SynchronizedSamReader(alignment_path,
                                        fp.read_sequence_dict(contigs_path),
-                                       cfg.vals["max_read_coverage"])
+                                       max_coverage=cfg.vals["max_read_coverage"],
+                                       use_secondary=True)
     manager = multiprocessing.Manager()
     results_queue = manager.Queue()
     error_queue = manager.Queue()
@@ -60,7 +69,7 @@ def get_consensus(alignment_path, contigs_path, contigs_info, num_proc,
     #making sure the main process catches SIGINT
     orig_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
     threads = []
-    for _ in xrange(num_proc):
+    for _ in range(num_proc):
         threads.append(multiprocessing.Process(target=_thread_worker,
                                                args=(aln_reader, contigs_info,
                                                      platform, results_queue,
@@ -93,8 +102,8 @@ def get_consensus(alignment_path, contigs_path, contigs_info, num_proc,
         if len(ctg_seq) > 0:
             out_fasta[ctg_id] = ctg_seq
 
-    mean_aln_error = float(sum(total_aln_errors)) / (len(total_aln_errors) + 1)
-    logger.info("Alignment error rate: {0}".format(mean_aln_error))
+    mean_aln_error = sum(total_aln_errors) / (len(total_aln_errors) + 1)
+    logger.info("Alignment error rate: %f", mean_aln_error)
 
     return out_fasta
 
@@ -103,9 +112,13 @@ def _contig_profile(alignment, platform, genome_len):
     """
     Computes alignment profile
     """
-    max_aln_err = cfg.vals["err_modes"][platform]["max_aln_error"]
+
+    #leave the best uniform alignments
+    alignment = get_uniform_alignments(alignment, genome_len)
+
     aln_errors = []
-    profile = [Profile() for _ in xrange(genome_len)]
+    profile = [Profile() for _ in range(genome_len)]
+    #max_aln_err = cfg.vals["err_modes"][platform]["max_aln_error"]
     for aln in alignment:
         #if aln.err_rate > max_aln_err: continue
         aln_errors.append(aln.err_rate)
@@ -116,12 +129,13 @@ def _contig_profile(alignment, platform, genome_len):
         trg_seq = shift_gaps(qry_seq, aln.trg_seq)
 
         trg_pos = aln.trg_start
-        for trg_nuc, qry_nuc in izip(trg_seq, qry_seq):
+        for trg_nuc, qry_nuc in zip(trg_seq, qry_seq):
             if trg_nuc == "-":
                 trg_pos -= 1
             if trg_pos >= genome_len:
                 trg_pos -= genome_len
 
+            #total += 1
             prof_elem = profile[trg_pos]
             if trg_nuc == "-" and qry_nuc != "-":
                 prof_elem.insertions[aln.qry_id] += qry_nuc
@@ -130,6 +144,11 @@ def _contig_profile(alignment, platform, genome_len):
                 prof_elem.matches[qry_nuc] += 1
 
             trg_pos += 1
+
+    #print "len", genome_len, "median coverage", cov_threshold
+    #print "total bases: ", total, "discarded bases: ", discarded
+    #print "filtered", float(discarded) / total
+    #print ""
 
     return profile, aln_errors
 
@@ -144,10 +163,11 @@ def _flatten_profile(profile):
         pos_nucl = elem.nucl
 
         ins_group.clear()
-        for ins_str in pos_insertions.values():
+        for ins_str in itervalues(pos_insertions):
             ins_group[ins_str] += 1
 
-        coverage = sum(pos_matches.values())
+        match_and_del_num = sum(itervalues(pos_matches))
+        num_ins = len(pos_insertions)
 
         max_match = pos_nucl
         if len(pos_matches):
@@ -158,7 +178,7 @@ def _flatten_profile(profile):
 
         if max_match != "-":
             growing_seq.append(max_match)
-        if max_insert and max_insert != "-" and ins_group[max_insert] > coverage / 2:
+        if max_insert and max_insert != "-" and num_ins > match_and_del_num // 2:
             growing_seq.append(max_insert)
 
     return "".join(growing_seq)

@@ -8,10 +8,11 @@ This module provides repeat graph parsing/serializing functions,
 as well as some basic operations
 """
 
-class RgEdge:
+from __future__ import division
+class RgEdge(object):
     __slots__ = ("node_left", "node_right", "edge_id", "repetitive",
                  "self_complement", "resolved", "mean_coverage",
-                 "edge_sequences")
+                 "alt_group", "edge_sequences")
 
     def __init__(self, node_left=None, node_right=None,
                  edge_id=None):
@@ -24,13 +25,14 @@ class RgEdge:
         self.resolved = False
         self.mean_coverage = 0
         self.edge_sequences = []
+        self.alt_group = -1
 
     def length(self):
         if not self.edge_sequences:
             return 0
 
-        return sum(map(lambda s: s.edge_seq_len,
-                       self.edge_sequences)) / len(self.edge_sequences)
+        return sum([s.edge_seq_len
+                    for s in self.edge_sequences]) // len(self.edge_sequences)
 
     def __repr__(self):
         return "(id={0}, len={1}, cov={2} rep={3})" \
@@ -38,7 +40,7 @@ class RgEdge:
                         self.mean_coverage, self.repetitive)
 
 
-class EdgeSequence:
+class EdgeSequence(object):
     __slots__ = ("edge_seq_name", "edge_seq_len", "orig_seq_id", "orig_seq_len",
                  "orig_seq_start", "orig_seq_end")
 
@@ -53,19 +55,19 @@ class EdgeSequence:
         self.orig_seq_end = orig_seq_end
 
 
-class RgNode:
-    __slots__ = ("in_edges", "out_edge")
+class RgNode(object):
+    __slots__ = ("in_edges", "out_edges")
 
     def __init__(self):
         self.in_edges = []
         self.out_edges = []
 
     def is_bifurcation(self):
-	return len(self.in_edges) != 1 or len(self.out_edges) != 1
+        return len(self.in_edges) != 1 or len(self.out_edges) != 1
 
 
-class RepeatGraph:
-    __slots__ = ("nodes", "edges")
+class RepeatGraph(object):
+    __slots__ = ("nodes", "edges", "edges_fasta")
 
     def __init__(self, edges_fasta):
         self.nodes = []
@@ -133,7 +135,7 @@ class RepeatGraph:
                 tokens = line.strip().split()
                 if tokens[0] == "Edge":
                     (edge_id, left_node, right_node, repetitive,
-                     self_complement, resolved, mean_coverage) = tokens[1:]
+                     self_complement, resolved, mean_coverage, alt_group) = tokens[1:]
                     if left_node not in id_to_node:
                         id_to_node[left_node] = self.add_node()
                     if right_node not in id_to_node:
@@ -146,6 +148,7 @@ class RepeatGraph:
                     cur_edge.self_complement = bool(int(self_complement))
                     cur_edge.resolved = bool(int(resolved))
                     cur_edge.mean_coverage = int(mean_coverage)
+                    cur_edge.alt_group = int(alt_group)
                     self.add_edge(cur_edge)
 
                 elif tokens[0] == "Sequence":
@@ -168,11 +171,11 @@ class RepeatGraph:
 
         with open(filename, "w") as f:
             for edge in self.edges.values():
-                f.write("Edge\t{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n"
+                f.write("Edge\t{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n"
                     .format(_to_unsigned_id(edge.edge_id), node_ids[edge.node_left],
                             node_ids[edge.node_right], int(edge.repetitive),
                             int(edge.self_complement), int(edge.resolved),
-                            int(edge.mean_coverage)))
+                            int(edge.mean_coverage), int(edge.alt_group)))
 
                 for seq in edge.edge_sequences:
                     f.write("\tSequence\t{0} {1} {2} {3} {4} {5}\n"
@@ -216,7 +219,7 @@ class RepeatGraph:
             left_node.in_edges.append(edges_path[0])
 
             path_coverage = (edges_path[0].mean_coverage +
-                             edges_path[-1].mean_coverage) / 2
+                             edges_path[-1].mean_coverage) // 2
             for mid_edge in edges_path[1:-1]:
                 mid_edge.resolved = True
                 mid_edge.mean_coverage -= path_coverage
@@ -259,9 +262,9 @@ def _remove_from_list(lst, elem):
 
 
 def _to_signed_id(unsigned_id):
-    return -(unsigned_id + 1) / 2 if unsigned_id % 2 else unsigned_id / 2 + 1
+    return -(unsigned_id + 1) // 2 if unsigned_id % 2 else unsigned_id // 2 + 1
 
 
 def _to_unsigned_id(signed_id):
-    unsigned_id = abs(signed_id) * 2 - 2;
+    unsigned_id = abs(signed_id) * 2 - 2
     return unsigned_id + int(signed_id < 0)

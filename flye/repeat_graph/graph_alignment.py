@@ -8,7 +8,8 @@ to the repreat graph (as used internally in Flye)
 """
 
 
-class OverlapRange:
+from __future__ import division
+class OverlapRange(object):
     __slots__ = ("cur_id", "cur_len", "cur_start", "cur_end",
                  "ext_id", "ext_len", "ext_start", "ext_end",
                  "left_shift", "right_shift", "score", "divergence")
@@ -30,8 +31,8 @@ class OverlapRange:
         self.divergence = divergence
 
 
-class GraphAlignment:
-    __slots__ = ("edge", "overlap")
+class GraphAlignment(object):
+    __slots__ = ("edge_id", "overlap")
 
     def __init__(self, edge_id, overlap):
         self.edge_id = edge_id
@@ -74,14 +75,14 @@ def iter_alignments(filename):
 
 
 #TODO:
-def write_alignments(alignments, filename):
-    pass
+#def write_alignments(alignments, filename):
+#    pass
 
 
 def _to_signed_id(unsigned_id):
-    return -(unsigned_id + 1) / 2 if unsigned_id % 2 else unsigned_id / 2 + 1
+    return -(unsigned_id + 1) // 2 if unsigned_id % 2 else unsigned_id // 2 + 1
 
 
 def _to_unsigned_id(signed_id):
-    unsigned_id = abs(signed_id) * 2 - 2;
+    unsigned_id = abs(signed_id) * 2 - 2
     return unsigned_id + int(signed_id < 0)

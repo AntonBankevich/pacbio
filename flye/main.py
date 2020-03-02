@@ -7,6 +7,7 @@ Main logic of the package
 """
 
 from __future__ import print_function
+from __future__ import absolute_import
 import sys
 import os
 import logging
@@ -25,11 +26,13 @@ from flye.__version__ import __version__
 import flye.config.py_cfg as cfg
 from flye.config.configurator import setup_params
 from flye.utils.bytes2human import human2bytes, bytes2human
+from flye.utils.sam_parser import AlignmentException
 import flye.utils.fasta_parser as fp
 import flye.short_plasmids.plasmids as plas
 import flye.trestle.trestle as tres
 import flye.trestle.graph_resolver as tres_graph
 from flye.repeat_graph.repeat_graph import RepeatGraph
+from flye.six.moves import range
 
 logger = logging.getLogger()
 
@@ -51,17 +54,17 @@ class Job(object):
         self.log_file = None
 
     def run(self):
-        logger.info(">>>STAGE: {0}".format(self.name))
+        logger.info(">>>STAGE: %s", self.name)
 
     def save(self, save_file):
         Job.run_params["stage_name"] = self.name
 
-        with open(save_file, "w") as fp:
-            json.dump(Job.run_params, fp)
+        with open(save_file, "w") as f:
+            json.dump(Job.run_params, f)
 
     def load(self, save_file):
-        with open(save_file, "r") as fp:
-            data = json.load(fp)
+        with open(save_file, "r") as f:
+            data = json.load(f)
             if (not "pipeline_version" in data or
                     data["pipeline_version"] != cfg.vals["pipeline_version"]):
                 raise ResumeException("Inconsistent pipeline version")
@@ -69,11 +72,11 @@ class Job(object):
             Job.run_params = data
 
     def completed(self, save_file):
-        with open(save_file, "r") as fp:
-            data = json.load(fp)
+        with open(save_file, "r") as f:
+            dummy_data = json.load(f)
 
-            for file in self.out_files.values():
-                if not os.path.exists(file):
+            for file_path in self.out_files.values():
+                if not os.path.exists(file_path):
                     return False
 
             return True
@@ -117,7 +120,7 @@ class JobAssembly(Job):
                                         "please check if the read type and genome "
                                         "size parameters are correct")
         asm_len, asm_n50 = scf.short_statistics(self.assembly_filename)
-        logger.debug("Disjointigs length: {0}, N50: {1}".format(asm_len, asm_n50))
+        logger.debug("Disjointigs length: %d, N50: %d", asm_len, asm_n50)
 
 
 class JobShortPlasmidsAssembly(Job):
@@ -222,16 +225,16 @@ class JobContigger(Job):
 
 
 def _list_files(startpath, maxlevel=1):
-    for root, dirs, files in os.walk(startpath):
+    for root, _, files in os.walk(startpath):
         level = root.replace(startpath, "").count(os.sep)
         if level > maxlevel:
             continue
         indent = " " * 4 * (level)
-        logger.debug("{}{}/".format(indent, os.path.basename(root)))
+        logger.debug(indent + os.path.basename(root) + "/")
         subindent = " " * 4 * (level + 1)
         for f in files:
             fsize = bytes2human(os.path.getsize(os.path.join(root, f)))
-            logger.debug("{}{:12}{}".format(subindent, fsize, f))
+            logger.debug("%s%-12s%s", subindent, fsize, f)
 
 
 class JobFinalize(Job):
@@ -252,7 +255,7 @@ class JobFinalize(Job):
         self.work_dir = work_dir
 
         #self.out_files["contigs"] = os.path.join(work_dir, "contigs.fasta")
-        self.out_files["scaffolds"] = os.path.join(work_dir, "scaffolds.fasta")
+        #self.out_files["scaffolds"] = os.path.join(work_dir, "scaffolds.fasta")
         self.out_files["assembly"] = os.path.join(work_dir, "assembly.fasta")
         self.out_files["stats"] = os.path.join(work_dir, "assembly_info.txt")
         self.out_files["graph"] = os.path.join(work_dir, "assembly_graph.gv")
@@ -268,21 +271,21 @@ class JobFinalize(Job):
                                            self.out_files["assembly"])
 
         #create the scaffolds.fasta symlink for backward compatability
-        try:
-            if os.path.lexists(self.out_files["scaffolds"]):
-                os.remove(self.out_files["scaffolds"])
-            relative_link = os.path.relpath(self.out_files["assembly"],
-                                            self.work_dir)
-            os.symlink(relative_link, self.out_files["scaffolds"])
-        except OSError as e:
-            logger.debug(e)
+        #try:
+        #    if os.path.lexists(self.out_files["scaffolds"]):
+        #        os.remove(self.out_files["scaffolds"])
+        #    relative_link = os.path.relpath(self.out_files["assembly"],
+        #                                    self.work_dir)
+        #    os.symlink(relative_link, self.out_files["scaffolds"])
+        #except OSError as e:
+        #    logger.debug(e)
 
         logger.debug("---Output dir contents:----")
         _list_files(os.path.abspath(self.args.out_dir))
         logger.debug("--------------------------")
         scf.generate_stats(self.repeat_stats, self.polished_stats, scaffolds,
                            self.out_files["stats"])
-        logger.info("Final assembly: {0}".format(self.out_files["assembly"]))
+        logger.info("Final assembly: %s", self.out_files["assembly"])
 
 
 class JobConsensus(Job):
@@ -341,10 +344,10 @@ class JobPolishing(Job):
 
         self.name = "polishing"
         final_contigs = os.path.join(self.polishing_dir,
-                                     "polished_{0}.fasta".format(args.num_iters))
+                                     "filtered_contigs.fasta")
         self.out_files["contigs"] = final_contigs
         self.out_files["stats"] = os.path.join(self.polishing_dir,
-                                               "contigs_stats.txt")
+                                               "filtered_stats.txt")
         self.out_files["polished_gfa"] = os.path.join(self.polishing_dir,
                                                       "polished_edges.gfa")
 
@@ -353,16 +356,19 @@ class JobPolishing(Job):
         if not os.path.isdir(self.polishing_dir):
             os.mkdir(self.polishing_dir)
 
-        pol.polish(self.in_contigs, self.args.reads, self.polishing_dir,
-                   self.args.num_iters, self.args.threads, self.args.platform,
-                   output_progress=True)
-
-        polished_file = os.path.join(self.polishing_dir, "polished_{0}.fasta"
-                                     .format(self.args.num_iters))
+        contigs, stats = \
+            pol.polish(self.in_contigs, self.args.reads, self.polishing_dir,
+                       self.args.num_iters, self.args.threads, self.args.platform,
+                       output_progress=True)
+        #contigs = os.path.join(self.polishing_dir, "polished_1.fasta")
+        #stats = os.path.join(self.polishing_dir, "contigs_stats.txt")
+        pol.filter_by_coverage(self.args, stats, contigs,
+                               self.out_files["stats"], self.out_files["contigs"])
         pol.generate_polished_edges(self.in_graph_edges, self.in_graph_gfa,
-                                    polished_file,
+                                    self.out_files["contigs"],
                                     self.polishing_dir, self.args.platform,
                                     self.args.threads)
+        os.remove(contigs)
 
 
 class JobTrestle(Job):
@@ -503,7 +509,7 @@ def _run_polisher_only(args):
     Runs standalone polisher
     """
     logger.info("Running Flye polisher")
-    logger.debug("Cmd: {0}".format(" ".join(sys.argv)))
+    logger.debug("Cmd: %s", " ".join(sys.argv))
 
     pol.polish(args.polish_target, args.reads, args.out_dir,
                args.num_iters, args.threads, args.platform,
@@ -515,7 +521,8 @@ def _run(args):
     Runs the pipeline
     """
     logger.info("Starting Flye " + _version())
-    logger.debug("Cmd: {0}".format(" ".join(sys.argv)))
+    logger.debug("Cmd: %s", " ".join(sys.argv))
+    logger.debug("Python version: " + sys.version)
 
     for read_file in args.reads:
         if not os.path.exists(read_file):
@@ -523,6 +530,10 @@ def _run(args):
 
     save_file = os.path.join(args.out_dir, "params.json")
     jobs = _create_job_list(args, args.out_dir, args.log_file)
+
+    if args.stop_after and not args.stop_after in [j.name for j in jobs]:
+        raise ResumeException("Stop after: unkown stage '{0}'"
+                                .format(args.stop_after))
 
     current_job = 0
     if args.resume or args.resume_from:
@@ -536,7 +547,7 @@ def _run(args):
             job_to_resume = json.load(open(save_file, "r"))["stage_name"]
 
         can_resume = False
-        for i in xrange(len(jobs)):
+        for i in range(len(jobs)):
             if jobs[i].name == job_to_resume:
                 jobs[i].load(save_file)
                 current_job = i
@@ -550,9 +561,14 @@ def _run(args):
             raise ResumeException("Can't resume: stage {0} does not exist"
                                   .format(job_to_resume))
 
-    for i in xrange(current_job, len(jobs)):
+    for i in range(current_job, len(jobs)):
         jobs[i].save(save_file)
         jobs[i].run()
+        if args.stop_after == jobs[i].name:
+            if i + 1 < len(jobs):
+                jobs[i + 1].save(save_file)
+            logger.info("Pipeline stopped as requested by --stop-after")
+            break
 
 
 def _enable_logging(log_file, debug, overwrite):
@@ -581,10 +597,11 @@ def _enable_logging(log_file, debug, overwrite):
 def _usage():
     return ("flye (--pacbio-raw | --pacbio-corr | --nano-raw |\n"
             "\t     --nano-corr | --subassemblies) file1 [file_2 ...]\n"
-            "\t     --genome-size SIZE --out-dir PATH\n"
+            "\t     --genome-size SIZE --out-dir PATH\n\n"
             "\t     [--threads int] [--iterations int] [--min-overlap int]\n"
             "\t     [--meta] [--plasmids] [--no-trestle] [--polish-target]\n"
-            "\t     [--debug] [--version] [--help] [--resume]")
+            "\t     [--keep-haplotypes] [--debug] [--version] [--help] \n"
+            "\t     [--resume] [--resume-from] [--stop-after]")
 
 
 def _epilog():
@@ -614,7 +631,7 @@ def _version():
     repo_root = os.path.dirname((os.path.dirname(__file__)))
     try:
         git_label = subprocess.check_output(["git", "-C", repo_root, "describe"],
-                                            stderr=open(os.devnull, "w"))
+                                            stderr=open(os.devnull, "w")).decode()
         commit_id = git_label.strip("\n").rsplit("-", 1)[-1]
         return __version__ + "-" + commit_id
     except (subprocess.CalledProcessError, OSError):
@@ -626,7 +643,7 @@ def main():
     def check_int_range(value, min_val, max_val, require_odd=False):
         ival = int(value)
         if ival < min_val or ival > max_val:
-             raise argparse.ArgumentTypeError("value should be in the "
+            raise argparse.ArgumentTypeError("value should be in the "
                             "range [{0}, {1}]".format(min_val, max_val))
         if require_odd and ival % 2 == 0:
             raise argparse.ArgumentTypeError("should be an odd number")
@@ -678,6 +695,9 @@ def main():
     parser.add_argument("--meta", action="store_true",
                         dest="meta", default=False,
                         help="metagenome / uneven coverage mode")
+    parser.add_argument("--keep-haplotypes", action="store_true",
+                        dest="keep_haplotypes", default=False,
+                        help="do not collapse alternative haplotypes")
     parser.add_argument("--no-trestle", action="store_true",
                         dest="no_trestle", default=False,
                         help="skip Trestle stage")
@@ -689,6 +709,8 @@ def main():
                         help="resume from the last completed stage")
     parser.add_argument("--resume-from", dest="resume_from", metavar="stage_name",
                         default=None, help="resume from a custom stage")
+    parser.add_argument("--stop-after", dest="stop_after", metavar="stage_name",
+                        default=None, help="stop after the specified stage completed")
     #parser.add_argument("--kmer-size", dest="kmer_size",
     #                    type=lambda v: check_int_range(v, 11, 31, require_odd=True),
     #                    default=None, help="kmer size (default: auto)")
@@ -746,7 +768,7 @@ def main():
         else:
             _run_polisher_only(args)
 
-    except (aln.AlignmentException, pol.PolishException,
+    except (AlignmentException, pol.PolishException,
             asm.AssembleException, repeat.RepeatException,
             ResumeException, fp.FastaError) as e:
         logger.error(e)
