@@ -17,6 +17,7 @@ max_jump = 6000
 assert_pi = False
 min_pi = 0.35
 max_allowed_unaligned = 200
+min_isolated_length = 15000
 k = 1500
 l = 2500
 bad_end_length = 500

@@ -19,6 +19,8 @@ class Edge:
         self.start = start # type: str
         self.len = len # type: int
         self.end = fin # type: str
+        self.unique = (self.label.find("black") != -1)
+        self.cov = None
 
 
 class Vertex:
@@ -47,6 +49,7 @@ class SimpleGraph:
         self.e[id] = edge
         v1.out.append(edge)
         v2.inc.append(edge)
+        return edge
 
 
     def ReadDot(self, f):
@@ -62,9 +65,11 @@ class SimpleGraph:
             v_from = toint(s[0])
             v_to = toint(s[2])
             label = tmp
+            cov = basic.parseNumber(tmp, tmp.find("k "))
             l = int(float(tmp[tmp.find("\\l") + 2: tmp.find("k ")]) * 1000)
             id = tmp[tmp.find("id ") + 3: tmp.find("\\l")]
-            self.AddEdge(id, v_from, v_to, l, label)
+            edge = self.AddEdge(id, v_from, v_to, l, label)
+            edge.cov = cov
         return self
 
     def FillSeq(self, f, numeric = True):

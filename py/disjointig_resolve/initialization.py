@@ -8,6 +8,7 @@ from typing import Dict, List, Tuple
 from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common import params, basic
+from common.SimpleGraph import SimpleGraph
 from common.alignment_storage import ReadCollection, AlignmentPiece
 from common.dot_parser import DotParser
 from common.save_load import TokenReader
@@ -143,13 +144,19 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
 
 def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher, reads):
     sys.stdout.info("Creating contig collection")
-    if graph_file is not None:
-        nonunique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if not (val[4].unique and val[4].cov >= min_cov)]
-    else:
-        nonunique = []
+    graph = SimpleGraph().ReadDot(graph_file)
+    graph.FillSeq(contigs_file)
+    # if graph_file is not None:
+    #     nonunique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if not (val[4].unique and val[4].cov >= min_cov)]
+    # else:
+    #     nonunique = []
     contigs = ContigCollection()
-    contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
-    contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
+    for edge in graph.e.values():
+        if basic.isCanonocal(edge.id) and edge.unique and edge.cov >= min_cov and \
+                (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
+            contigs.add(Contig(edge.seq, edge.id))
+    # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
+    # contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
     sys.stdout.info("Created", len(contigs), "initial contigs")
     sys.stdout.info("Polishing contigs")
     polished_contigs = polisher.polishMany(reads, list(contigs.unique()))
