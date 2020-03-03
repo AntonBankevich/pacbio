@@ -3,7 +3,11 @@ from common.scoring_model import SimpleScores
 MINIMAP_BIN = "bin/flye-minimap2"
 
 clean = False
-reliable_coverage = 10
+reliable_coverage = 9
+k_cov = reliable_coverage + 2
+l_cov = 6
+maxCoverageThreshold = 20
+uncoveredFractionForK = 0.001
 radius = 8
 alignment_correction_radius = 30
 alignment_smoothing_radius = 60
@@ -48,3 +52,5 @@ downsample = 100000000
 
 flanking_size = 500
 window_size = 1500
+
+

@@ -3,7 +3,7 @@ import itertools
 from typing import List
 
 from alignment.align_tools import Aligner
-from common import basic
+from common import basic, params
 from common.alignment_storage import ReadCollection
 from common.sequences import Segment, ContigStorage
 from disjointig_resolve.accurate_line import NewLine
@@ -15,9 +15,23 @@ class CoverageAnalyser:
         # type: (Aligner, ReadCollection) -> None
         self.aligner = aligner
         self.reads = reads
+        self.recs = None #type: List[CoverageAnalyser.CoverageRecord]
+
+    class CoverageRecord:
+        def __init__(self, k, covs):
+            self.k = k
+            self.covs = covs
+            for i in range(0, len(covs) - 1):
+                self.covs[i + 1] += self.covs[i]
+
+        def __str__(self):
+            if len(self.covs) > 0:
+                return "k:" + str(self.k) + ": " + " ".join(map(lambda cov: "%0.3f" % (float(cov) / sum(self.covs[-1])), self.covs))
+            else:
+                return "None"
 
     def analyseSegments(self, segs):
-        # type: (List[Segment]) -> List[List[int]]
+        # type: (List[Segment]) -> None
         contigs = ContigStorage()
         contigs.addAll([seg.asContig() for seg in segs if len(seg) > 5000])
         res = [] # type: List[Segment]
@@ -27,7 +41,7 @@ class CoverageAnalyser:
             else:
                 res.append(al.seg_to.RC())
         res = sorted(res, key=lambda seg: (seg.contig.id, seg.left))
-        covs = [[0] * 20 for i in range(100)]
+        covs = [[0] * params.maxCoverageThreshold for i in range(100)]
         for contig, it in itertools.groupby(res, key = lambda seg: seg.contig):
             segs = list(it)
             shrink = contig.asSegment().shrink(1000)
@@ -50,19 +64,27 @@ class CoverageAnalyser:
                 assert cur_cov == 0
                 if prev < len(contig) - 1000 - k + 1:
                     covs[i][0] += len(contig) - 1000 - k + 1 - prev
-        return covs
+        self.recs = [CoverageAnalyser.CoverageRecord(500 + i * 100, covs[i]) for i in range(len(covs))]
 
     def analyseLines(self, lines):
-        # type: (NewLineStorage) -> List[List[int]]
+        # type: (NewLineStorage) -> None
         segs = []
         for line in lines.unique(): #type: NewLine
             segs.extend(line.completely_resolved)
-        return self.analyseSegments(segs)
+        self.analyseSegments(segs)
 
 
-    def printAnalysis(self, covs):
-        for i in range(len(covs)):
-            if sum(covs[i]) > 0:
-                print 500 + i * 100, ":", map(lambda cov: "%0.3f" % (float(cov) / sum(covs[i])), covs[i])
+    def printAnalysis(self):
+        for cov in self.recs:
+            print cov
+
+    def chooseK(self, threshold):
+        assert threshold < params.maxCoverageThreshold
+        res = None
+        for rec in self.recs:
+            if rec.covs[threshold] < params.uncoveredFractionForK:
+                res = rec.k
             else:
-                print 500 + i * 100, ":", "contigs too short"
+                break
+        return res
+

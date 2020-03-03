@@ -94,7 +94,7 @@ class UniqueMarker:
                         segs.add(seg)
             elif len(seg) > 50000:
                 segs.add(seg.shrink(3000))
-        sys.stdout.trace("Unique segmetns selected")
+        sys.stdout.trace("Unique segments selected")
         # inc = SegmentStorage().addAll([seg for seg, cov in inc if cov >= params.min_k_mer_cov]).reverse(line)
         # out = SegmentStorage().addAll([seg for seg, cov in out if cov >= params.min_k_mer_cov]).reverse(line)
         # print "inc:", inc

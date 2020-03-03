@@ -21,7 +21,7 @@ from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.unique_marker import UniqueMarker
 
 
-def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
+def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoKL):
     sys.stdout.info("Creating line collection")
     lines = NewLineStorage(disjointigs, aligner)
     if split:
@@ -35,6 +35,28 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     UniqueMarker(aligner).markAllUnique(lines, reads)
     for line in lines.unique():
         print line, line.completely_resolved
+    if autoKL:
+        analyser = CoverageAnalyser(aligner, reads)
+        sys.stdout.info("Analysing k-mer coverage by reads.")
+        analyser.analyseLines(lines)
+        analyser.printAnalysis()
+        newK = analyser.chooseK(params.k_cov)
+        newL = analyser.chooseK(params.l_cov)
+        sys.stdout.info("Chosen k and l:", newK, newL)
+        newK = max(newK, params.k)
+        newL = max(newL, newK + 200)
+        newL = min(newL, newK + 1000)
+        sys.stdout.info("Adjusted k and l:", newK, newL)
+        if newK > params.k:
+            print "Expanding resolved segments according to increased k"
+            for line in lines.unique(): # type: NewLine
+                new_resolved = line.completely_resolved.expand(newK - params.k).cap(line.correct_segments)
+                new_resolved.mergeSegments(newK)
+                print line, line.correct_segments, line.completely_resolved, new_resolved
+                line.completely_resolved.clean()
+                line.completely_resolved.addAll(new_resolved)
+        params.k = newK
+        params.l = newL
     if not split:
         print "Splitting lines into parts"
         line_list = list(lines.unique()) # type: List[NewLine]
@@ -66,19 +88,12 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
         print "Final list of lines:"
         for line in line_list:
             print line, line.completely_resolved
-    analyser = CoverageAnalyser(aligner, reads)
-    sys.stdout.info("Analysing k-mer coverage by reads.")
-    analyser.printAnalysis(analyser.analyseLines(lines))
-    sys.stdout.info("Constructing line dot plot")
-    dot_plot = LineDotPlot(lines, aligner)
-    dot_plot.construct(aligner)
-    dot_plot.printAll(sys.stdout)
     lines.writeToFasta(open(os.path.join(dir, "initial_prolonged_lines.fasta"), "w"))
-    return dot_plot, lines
+    return lines
 
 
 def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads):
-    # type: (str, str, Aligner, ContigStorage, DisjointigCollection, ReadCollection) -> Tuple[LineDotPlot, NewLineStorage]
+    # type: (str, str, Aligner, ContigStorage, DisjointigCollection, ReadCollection) -> NewLineStorage
     print "Initializing lines from init file", lc_file
     lines = NewLineStorage(disjointigs, aligner)
     f = TokenReader(open(lc_file, "r"))
@@ -100,10 +115,7 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads):
     lines.writeToFasta(open(os.path.join(dir, "initial_lines.fasta"), "w"))
     lines.alignDisjointigs()
     sys.stdout.info("Constructing line dot plot")
-    dot_plot = LineDotPlot(lines, aligner)
-    dot_plot.construct(aligner)
-    dot_plot.printAll(sys.stdout)
-    return dot_plot, lines
+    return lines
 
 
 def CreateDisjointigCollection(d_files, dir, aligner, reads):

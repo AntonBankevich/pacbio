@@ -7,6 +7,7 @@ import traceback
 
 from typing import Iterable
 
+from disjointig_resolve.dot_plot import LineDotPlot
 
 sys.path.append("py")
 sys.path.append(".")
@@ -135,9 +136,14 @@ def main(args):
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
         if cl_params.init_file is None:
-            dot_plot, lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split)
+            lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split, cl_params.autoKL)
         else:
-            dot_plot, lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads)
+            lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads)
+
+        sys.stdout.info("Constructing line dot plot")
+        dot_plot = LineDotPlot(lines, aligner)
+        dot_plot.construct(aligner)
+        dot_plot.printAll(sys.stdout)
 
         sys.stdout.info("Updating sequences and resolved segments.")
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)

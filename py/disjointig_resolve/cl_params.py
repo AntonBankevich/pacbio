@@ -32,6 +32,7 @@ class Params:
         self.downsample = 1.
         self.mode = "before"
         self.cut_reads = None
+        self.autoKL = True
 
     def check(self):
         if self.dir is None:
@@ -93,8 +94,10 @@ class Params:
             elif key == "-k":
                 params.k = int(value)
                 params.l = max(params.l, params.k + 100)
+                self.autoKL = False
             elif key == "-l":
                 params.l = int(value)
+                self.autoKL = False
             elif key == "--focus":
                 self.focus = value.split(",")
             elif key == "--nofocus":
