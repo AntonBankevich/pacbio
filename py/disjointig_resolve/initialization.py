@@ -243,5 +243,6 @@ def constructDisjointigs(reads, total_length, dir):
     disjointigs_file = os.path.join(dir, "disjointigs.fasta")
     log_file = os.path.join(dir, "log.txt")
     reads.print_fasta(open(reads_file, "w"))
-    subprocess.check_call(["./bin/flye-assemble", reads_file, disjointigs_file, str(total_length), "flye/config/bin_cfg/asm_raw_reads.cfg", "-v", "1500", "-t", "16", "-u", "-l", log_file])
+    subprocess.check_call(["./bin/flye-assemble", "--reads", reads_file, "--out-asm", disjointigs_file, str(total_length),
+                           "flye/config/bin_cfg/asm_raw_reads.cfg", "--genome-size", "1500", "--threads", str(params.threads), "--log", log_file])
     return disjointigs_file
