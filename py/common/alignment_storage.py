@@ -1322,6 +1322,8 @@ class ReadCollection:
 
     def loadFromFasta(self, handler, downsample = 1000000000, cut_reads = None):
         # type: (BinaryIO, int, Optional[int]) -> ReadCollection
+        if downsample is None:
+            downsample = 1000000000
         cnt = 0
         for rec in SeqIO.parse_fasta(handler):
             cnt += 1
