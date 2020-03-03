@@ -25,7 +25,7 @@ class CoverageAnalyser:
                 self.covs[i + 1] += self.covs[i]
 
         def __str__(self):
-            if len(self.covs) > 0:
+            if len(self.covs) > 0 and self.covs[-1] > 0:
                 return "k:" + str(self.k) + ": " + " ".join(map(lambda cov: "%0.3f" % (float(cov) / self.covs[-1]), self.covs))
             else:
                 return "None"
