@@ -61,8 +61,10 @@ def splitSeg(aligner, seg, mult, all_reads_list):
     base = seg.asContig()
     tmp = []
     for al in fixAlDir(aligner.overlapAlign(all_reads_list, ContigStorage([base])), base):
+        if len(al.seg_to) < len(base) - 100:
+            continue
         all_reads.add(al.seg_from.contig)
-        tmp.append(al.seg_from)
+        tmp.append(al.seg_from.contig)
     all_reads_list = tmp
     split_reads = []
     split_contigs = []
@@ -84,6 +86,8 @@ def splitSeg(aligner, seg, mult, all_reads_list):
             bestals[read.id] = None
         for contig in split_contigs:
             for al in fixAlDir(aligner.overlapAlign(all_reads_list, ContigStorage([contig])), contig):
+                if len(al.seg_to) < len(base) - 100:
+                    continue
                 if al.seg_from.contig.id not in bestals:
                     print bestals.keys()
                     print al
@@ -181,6 +185,8 @@ def main(flye_dir, rf, dir, edge_id, to_resolve, min_contig_length):
         print reads_to_resolve[eid]
         print map(str, repeat_reads)
         split_contigs = splitRepeat(aligner, graph.e[eid].seq, mult, repeat_reads, min_contig_length)
+        if split_contigs is None:
+            print "Failed to resove edge", eid, "Aborting"
         print "Edge", eid, "was split into", mult, "copies"
         for contig, contig_reads in split_contigs:
             print contig.id
