@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 
+from sklearn.cluster import KMeans
 from typing import List, Dict
 
 sys.path.append("py")
@@ -118,14 +119,115 @@ def splitSeg(aligner, seg, mult, all_reads_list):
     else:
         return None
 
+w = 50
+
+def toVector(al):
+    res = []
+    contig = al.seg_to
+    m = al.matchingSequence(True)
+    tmp = []
+    for i in range(len(contig) / w + 1):
+        tmp.append([])
+    for a, b in m.matches:
+        tmp[b / w].append((a, b))
+    for i in range(len(contig) / w):
+        if i + 1 < len(tmp) and len(tmp[i + 1]) > 0:
+            tmp[i].append(tmp[i + 1][0])
+    for i in range(len(contig) / w):
+        seg = contig.segment(i * w, i * w + w)
+        if al.seg_to.left >= seg.left and al.seg_from.left > params.bad_end_length:
+            sys.stdout.write("B")
+        elif al.seg_to.right <= seg.right and al.rc.seg_from.left > params.bad_end_length:
+            sys.stdout.write("E")
+        else:
+            res.append(w - len(tmp[i]))
+    return res
+
+class ReadRecord:
+    def __init__(self, al):
+        self.read = al.seg_from
+        self.al = al
+        self.v = []
+
+    def extend(self, v):
+        self.v.extend(v)
+        return self
+
+def readsToVectors(aligner, reads_list, base):
+    als = []
+    rtv = dict()
+    for al in fixAlDir(aligner.overlapAlign(reads_list, ContigStorage([base])), base):
+        if len(al.seg_to) < len(base) - 30:
+            continue
+        else:
+            als.append(al)
+            rtv[al.seg_from.contig.id] = ReadRecord(al).extend(toVector(al))
+    reads_list = [al.seg_from.contig for al in als]
+    bases = [base]
+    for base_al in als:
+        rtr_als = []
+        base_candidate = base_al.seg_from.asContig()
+        for al in fixAlDir(aligner.overlapAlign(reads_list, ContigStorage([base_candidate])), base_candidate):
+            if len(al.seg_to) < len(base_candidate) - 30:
+                continue
+            else:
+                rtr_als.append(al)
+        if len(rtr_als) == len(als):
+            bases.append(base_candidate)
+            for al in rtr_als:
+                rtv[al.seg_from.contig.id].extend(toVector(al))
+            if len(bases) > 10:
+                break
+    return rtv
+
+
+def splitSegKmeans(aligner, seg, mult, all_reads_list):
+    polisher = Polisher(aligner, aligner.dir_distributor)
+    all_reads = ContigStorage()
+    base = seg.asContig()
+    tmp = []
+    rtv = readsToVectors(aligner, all_reads_list, base)
+    kmeans = KMeans(n_clusters=mult, precompute_distances=True)
+    recs = list(rtv.values())
+    result = kmeans.fit_predict(X=[rec.v for rec in recs])
+    print result
+    clusters = dict()
+    for i, c in enumerate(result):
+        if c not in clusters:
+            clusters[c] = []
+        clusters[c].append(recs[i].al)
+    for c in clusters.values():
+        print str(c), ":", len(c)
+    split_contigs = []
+    split_reads = []
+    for c in clusters.values():
+        split_contigs.append(Contig(polisher.polishSmallSegment(base.asSegment(), c).seg_from.Seq(), str(len(split_contigs))))
+        split_reads.append([al.seg_from.contig for al in c])
+    maxpi = 1
+    for i in range(mult):
+        for j in range(mult):
+            if i == j:
+                sys.stdout.write("1.0 ")
+                continue
+            al = aligner.overlapAlign([split_contigs[i]], ContigStorage([split_contigs[j]])).next()
+            sys.stdout.write(str(al.percentIdentity()) + " ")
+            maxpi = max(maxpi, al.percentIdentity())
+        print ""
+    print "Maxpi:", maxpi
+    if maxpi < 0.985:
+        return zip(split_contigs, split_reads)
+    else:
+        return None
+
+
 
 def splitRepeat(aligner, seq, mult, all_reads_list, min_contig_length):
     base = Contig(seq, "base")
     for i in range(len(seq) / min_contig_length):
-        res = splitSeg(aligner, base.segment(i * min_contig_length, i * min_contig_length + min_contig_length), mult, all_reads_list)
+        res = splitSegKmeans(aligner, base.segment(i * min_contig_length, i * min_contig_length + min_contig_length), mult, all_reads_list)
         if res is not None:
              return res
-    res = splitSeg(aligner, base.asSegment().suffix(length=min(min_contig_length, len(seq))), mult, all_reads_list)
+    res = splitSegKmeans(aligner, base.asSegment().suffix(length=min(min_contig_length, len(seq))), mult, all_reads_list)
     return res
 
 
