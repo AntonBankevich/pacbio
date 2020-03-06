@@ -253,7 +253,7 @@ class Polisher:
             # TODO replace with position search in cigar
             if len(relevant_als) < min_cov:
                 break
-            start = "ACGTTCGA" + basic.randomSequence(params.flanking_size) + new_contig.asSegment().suffix(length=params.flanking_size).Seq()
+            start = "ACGTTCGA" + basic.randomSequence(params.flanking_size) + new_contig.asSegment().suffix(length=min(params.flanking_size, len(new_contig)).Seq()
             reduced_read_list = [
                 AlignedRead.new(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), str(i) + "_" + al.seg_from.contig.id)
                 for i, al in enumerate(relevant_als)]

@@ -123,7 +123,7 @@ w = 50
 
 def toVector(al):
     res = []
-    contig = al.seg_to
+    contig = al.seg_to.contig
     m = al.matchingSequence(True)
     tmp = []
     for i in range(len(contig) / w + 1):
@@ -133,19 +133,17 @@ def toVector(al):
     for i in range(len(contig) / w):
         if i + 1 < len(tmp) and len(tmp[i + 1]) > 0:
             tmp[i].append(tmp[i + 1][0])
-    for i in range(len(contig) / w):
+    for i in range(2, len(contig) / w - 2):
         seg = contig.segment(i * w, i * w + w)
-        if al.seg_to.left >= seg.left and al.seg_from.left > params.bad_end_length:
-            sys.stdout.write("B")
-        elif al.seg_to.right <= seg.right and al.rc.seg_from.left > params.bad_end_length:
-            sys.stdout.write("E")
+        if len(tmp[i]) < 2:
+            res.append(w)
         else:
-            res.append(w - len(tmp[i]))
+            res.append(max(w, tmp[i][-1][0] - tmp[i][0][0]) + 1 - len(tmp[i]))
     return res
 
 class ReadRecord:
     def __init__(self, al):
-        self.read = al.seg_from
+        self.read = al.seg_from.contig
         self.al = al
         self.v = []
 
@@ -157,7 +155,7 @@ def readsToVectors(aligner, reads_list, base):
     als = []
     rtv = dict()
     for al in fixAlDir(aligner.overlapAlign(reads_list, ContigStorage([base])), base):
-        if len(al.seg_to) < len(base) - 30:
+        if len(al.seg_to) < len(base) - 100:
             continue
         else:
             als.append(al)
@@ -166,18 +164,22 @@ def readsToVectors(aligner, reads_list, base):
     bases = [base]
     for base_al in als:
         rtr_als = []
+        read_ids = set()
         base_candidate = base_al.seg_from.asContig()
         for al in fixAlDir(aligner.overlapAlign(reads_list, ContigStorage([base_candidate])), base_candidate):
-            if len(al.seg_to) < len(base_candidate) - 30:
+            if len(al.seg_to) < len(base_candidate) - 100:
                 continue
             else:
                 rtr_als.append(al)
-        if len(rtr_als) == len(als):
+                read_ids.add(al.seg_from.contig.id)
+        if len(read_ids) == len(als):
             bases.append(base_candidate)
             for al in rtr_als:
                 rtv[al.seg_from.contig.id].extend(toVector(al))
             if len(bases) > 10:
                 break
+    for rec in rtv.values():
+        print rec.read.id, len(rec.v), rec.v
     return rtv
 
 
