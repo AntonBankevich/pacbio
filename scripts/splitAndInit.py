@@ -154,6 +154,7 @@ class ReadRecord:
 def readsToVectors(aligner, reads_list, base):
     als = []
     rtv = dict()
+    polisher = Polisher(aligner, aligner.dir_distributor)
     for al in fixAlDir(aligner.overlapAlign(reads_list, ContigStorage([base])), base):
         if len(al.seg_to) < len(base) - 100:
             continue
@@ -162,10 +163,11 @@ def readsToVectors(aligner, reads_list, base):
             rtv[al.seg_from.contig.id] = ReadRecord(al).extend(toVector(al))
     reads_list = [al.seg_from.contig for al in als]
     bases = [base]
-    for base_al in als:
+    for base_al1, base_al2, base_al3 in zip(als[0::3], als[1::3], als[2::3]):
+        base_candidate = Contig(polisher.polishSmallSegment(base.asSegment(), [base_al1, base_al2, base_al3]).seg_from.Seq(), str(len(bases)))
         rtr_als = []
         read_ids = set()
-        base_candidate = base_al.seg_from.asContig()
+#        base_candidate = base_al.seg_from.asContig()
         for al in fixAlDir(aligner.overlapAlign(reads_list, ContigStorage([base_candidate])), base_candidate):
             if len(al.seg_to) < len(base_candidate) - 100:
                 continue
