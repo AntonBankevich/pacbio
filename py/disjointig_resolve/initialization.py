@@ -47,10 +47,16 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoK
         newL = max(newL, newK + 300)
         newL = min(newL, newK + 1000)
         sys.stdout.info("Adjusted k and l:", newK, newL)
+        polisher = Polisher(aligner, aligner.dir_distributor)
         if newK > params.k:
             print "Expanding resolved segments according to increased k"
+            # TODO: Merge lines instead of deleting.
             for line in list(lines.unique()): # type: NewLine
-                polisher = Polisher(aligner, aligner.dir_distributor)
+                if len(line) < newK + 500:
+                    if line.knot is not None or line.rc.knot is not None:
+                        lines.removeLine(line)
+
+            for line in list(lines.unique()):  # type: NewLine
                 if len(line) < newK + 500:
                     new_contig, als = polisher.polishEnd(list(line.read_alignments))
                     line.extendRight(new_contig.suffix(pos=len(line)).Seq(), als)

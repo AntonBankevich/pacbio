@@ -395,6 +395,10 @@ class NewLine(Contig):
         if self == other:
             self.setCircular()
 
+    def unTie(self):
+        self.knot.line_right.rc.knot = None
+        self.knot = None
+
 
 class LinePosition(LineListener):
     def __init__(self, line, pos, rc=None):

@@ -296,7 +296,7 @@ class Polisher:
                 for al in sorted(candidate_alignments, key = lambda al: al.seg_to.right):
                     while contra_index < len(contra) and contra[contra_index].seg_to.right < al.seg_to.right - 50:
                         contra_index += 1
-                    if support >= min_cov and len(contra) - contra_index + 1 <= (1 - min_cov_frac) * support:
+                    if support >= min_cov and len(contra) - contra_index <= (1 - min_cov_frac) * support:
                         cutoff_pos = al.seg_to.right
                         support -= 1
                         if al.contradictingRTCRight():

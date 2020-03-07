@@ -104,6 +104,11 @@ class NewLineStorage(ContigStorage):
         line1 = alignment.seg_from.contig #type: NewLine
         line2 = alignment.seg_to.contig #type: NewLine
         assert line1 != line2
+        if len(alignment) < k + 100:
+            sys.stdout.trace("Prolonging line to ensure alignment of at least k")
+            seg = line2.segment(alignment.seg_to.right, alignment.seg_to.right + k + 100 - len(alignment))
+            line1.extendRight(seg.Seq())
+            alignment = alignment.mergeDistant(AlignmentPiece.Identical(line1.asSegment().suffix(length=len(seg)), seg))
         # Cutting hanging tips of both lines
         al_storage = AlignmentStorage()
         al_storage.add(alignment)
@@ -322,6 +327,10 @@ class NewLineStorage(ContigStorage):
                 line.knot.line_right.rc.knot = knot.rc
 
     def remove(self, line):
+        if line.knot is not None:
+            line.unTie()
+        if line.rc.knot is not None:
+            line.rc.unTie()
         del self.items[line.id]
         del self.items[line.rc.id]
 
