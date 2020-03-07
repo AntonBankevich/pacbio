@@ -142,7 +142,7 @@ class Scorer:
         res = []
         curl = 0
         curr = 1
-        # dec.append(vals[0])
+        dec.append(vals[0])
         for i in range(vals[0][1], vals[-1][1] + 1):
             while curr + 1 < len(vals) and i + r >= vals[curr + 1][1]:
                 curr += 1
