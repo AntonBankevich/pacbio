@@ -6,6 +6,9 @@ import sys
 from sklearn.cluster import KMeans
 from typing import List, Dict
 
+from common.alignment_storage import MatchingSequence
+from common.line_align import Scorer
+
 sys.path.append("py")
 from alignment.polishing import Polisher
 
@@ -136,9 +139,10 @@ def toVector(al):
     for i in range(2, len(contig) / w - 2):
         seg = contig.segment(i * w, i * w + w)
         if len(tmp[i]) < 2:
-            res.append(20)
+            res.append(w / 2)
         else:
-            res.append(min(20, max(w, tmp[i][-1][0] - tmp[i][0][0]) + 1 - len(tmp[i])))
+            ms = MatchingSequence(al.seg_from.contig.seq, al.seg_to.contig.seq, tmp[i])
+            res.append(Scorer().accurateScore(ms, 10))
     return res
 
 class ReadRecord:

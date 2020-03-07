@@ -27,6 +27,46 @@ class EventCounter:
 events = EventCounter()
 
 class Scorer:
+
+    def accurateScore(self, alignment, radius): #This score is nonsymmetric!!! Insertions and deletions have different cost
+        # type: (MatchingSequence, int) -> int
+        # print "Accurate scoring:", alignment[0], alignment[-1]
+        prev = Storage(alignment[0][1], alignment[1][1] + radius, self.scores.inf)
+        prev.set(alignment[0][1], 0)
+        cur_del = 0
+        for j in range(alignment[0][1] + 1, min(alignment[1][1] + radius + 1, len(alignment.seq_to))):
+            cur_del += self.scores.scoreDel(alignment.seq_to[j - 1])
+            prev.set(j, cur_del)
+        cur = 0
+        bounds = self.generateBounds(alignment, params.alignment_smoothing_radius)
+        total = []
+        for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
+            j_min = max(min(bounds[i - alignment[0][0]][0], alignment[cur][1]) - radius, alignment[0][1])
+            if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
+                cur += 1
+                if alignment[cur + 1][1] - alignment[cur][1] > 10 and alignment[cur + 1][0] - alignment[cur][0] > 10:
+                    print "Long gap:", alignment[cur], alignment[cur + 1]
+            j_max = min(max(bounds[i - alignment[0][0]][1], alignment[cur + 1][1]) + radius, alignment[-1][1])
+            total.append(j_max - j_min)
+            ne = Storage(j_min, j_max + 1, self.scores.inf)
+            c1 = alignment.seq_from[i]
+            for j in range(j_min, j_max + 1):
+                res = self.scores.inf
+                c2 = alignment.seq_to[j]
+                if c1 == c2:
+                    res = min(res, prev.get(j - 1) + self.scores.scoreMatch(alignment.seq_from[i - 1]))
+                    if i > 0 and j > 0 and alignment.seq_from[i - 1] == c1 and alignment.seq_to[j - 1] == c2:
+                        if i > 1 and alignment.seq_from[i - 2] == alignment.seq_from[i - 1]:
+                            res = min(res, prev.get(j) + self.scores.scoreHomo(c1))
+                        if j > 1 and alignment.seq_to[j - 2] == alignment.seq_to[j - 1]:
+                            res = min(res, ne.get(j - 1) + self.scores.scoreHomo(c2))
+                else:
+                    res = min(res, prev.get(j - 1) + self.scores.scoreMM(c1, c2))
+                res = min(res, prev.get(j) + self.scores.scoreIns(c1))
+                res = min(res, ne.get(j - 1) + self.scores.scoreDel(c2))
+                ne.set(j, res)
+            prev = ne
+        return prev.get(alignment[-1][1])
     def __init__(self, scores = None):
         if scores is None:
             scores = params.scores
@@ -39,9 +79,6 @@ class Scorer:
                 break
             cpos += step
         return (cpos - pos) * step
-
-    def score(self, alignment):
-        assert False
     #     # type: (MatchingSequence) -> int
     #     matches = alignment.matches
     #     res = 0
@@ -61,6 +98,9 @@ class Scorer:
     #             homo = min(homo, l[0] - l[1])
     #             res += self.scores.sub_score * l[1] + homo * self.scores.homo_score + (l[0] - l[1] - homo) * self.scores.del_score
     #     return res
+
+    def score(self, alignment):
+        assert False
 
     def countEvents(self, alignment):
         # type: (MatchingSequence) -> Tuple[int, int, int, int]
@@ -116,52 +156,12 @@ class Scorer:
             res[i] = max(res[i], res[max(0, i - r)])
         return res
 
+
     def generateBounds(self, alignment, r):
         # type: (MatchingSequence, int) -> List[Tuple[int, int]]
         upper = self.maxInRange([(b - a, a) for a, b in alignment.matches], r)
         lower = self.maxInRange([(a - b, a) for a, b in alignment.matches], r)
         return [(-a + i, b + i) for a, b, i in zip(lower, upper, range(alignment.matches[0][0], alignment.matches[-1][0] + 1))]
-
-
-    def accurateScore(self, alignment, radius): #This score is nonsymmetric!!! Insertions and deletions have different cost
-        # type: (MatchingSequence, int) -> int
-        # print "Accurate scoring:", alignment[0], alignment[-1]
-        prev = Storage(alignment[0][1], alignment[1][1] + radius, self.scores.inf)
-        prev.set(alignment[0][1], 0)
-        cur_del = 0
-        for j in range(alignment[0][1] + 1, min(alignment[1][1] + radius + 1, len(alignment.seq_to))):
-            cur_del += self.scores.scoreDel(alignment.seq_to[j - 1])
-            prev.set(j, cur_del)
-        cur = 0
-        bounds = self.generateBounds(alignment, params.alignment_smoothing_radius)
-        total = []
-        for i in range(alignment[0][0] + 1, alignment[-1][0] + 1):
-            j_min = max(min(bounds[i - alignment[0][0]][0], alignment[cur][1]) - radius, alignment[0][1])
-            if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
-                cur += 1
-                if alignment[cur + 1][1] - alignment[cur][1] > 10 and alignment[cur + 1][0] - alignment[cur][0] > 10:
-                    print "Long gap:", alignment[cur], alignment[cur + 1]
-            j_max = min(max(bounds[i - alignment[0][0]][1], alignment[cur + 1][1]) + radius, alignment[-1][1])
-            total.append(j_max - j_min)
-            ne = Storage(j_min, j_max + 1, self.scores.inf)
-            c1 = alignment.seq_from[i]
-            for j in range(j_min, j_max + 1):
-                res = self.scores.inf
-                c2 = alignment.seq_to[j]
-                if c1 == c2:
-                    res = min(res, prev.get(j - 1) + self.scores.scoreMatch(alignment.seq_from[i - 1]))
-                    if i > 0 and j > 0 and alignment.seq_from[i - 1] == c1 and alignment.seq_to[j - 1] == c2:
-                        if i > 1 and alignment.seq_from[i - 2] == alignment.seq_from[i - 1]:
-                            res = min(res, prev.get(j) + self.scores.scoreHomo(c1))
-                        if j > 1 and alignment.seq_to[j - 2] == alignment.seq_to[j - 1]:
-                            res = min(res, ne.get(j - 1) + self.scores.scoreHomo(c2))
-                else:
-                    res = min(res, prev.get(j - 1) + self.scores.scoreMM(c1, c2))
-                res = min(res, prev.get(j) + self.scores.scoreIns(c1))
-                res = min(res, ne.get(j - 1) + self.scores.scoreDel(c2))
-                ne.set(j, res)
-            prev = ne
-        return prev.get(alignment[-1][1])
 
     def adjustMin(self, old_val, old_shift, new_val, new_shift):
         # type: (int, Tuple[int, int], int, Tuple[int, int]) -> Tuple[int, Tuple[int, int]]
