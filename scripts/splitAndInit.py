@@ -119,7 +119,7 @@ def splitSeg(aligner, seg, mult, all_reads_list):
     else:
         return None
 
-w = 50
+w = 40
 
 def toVector(al):
     res = []
@@ -136,9 +136,9 @@ def toVector(al):
     for i in range(2, len(contig) / w - 2):
         seg = contig.segment(i * w, i * w + w)
         if len(tmp[i]) < 2:
-            res.append(w)
+            res.append(20)
         else:
-            res.append(max(w, tmp[i][-1][0] - tmp[i][0][0]) + 1 - len(tmp[i]))
+            res.append(min(20, max(w, tmp[i][-1][0] - tmp[i][0][0]) + 1 - len(tmp[i])))
     return res
 
 class ReadRecord:
