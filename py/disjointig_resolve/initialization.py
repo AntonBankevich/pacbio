@@ -51,12 +51,12 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoK
             print "Expanding resolved segments according to increased k"
             for line in list(lines.unique()): # type: NewLine
                 polisher = Polisher(aligner, aligner.dir_distributor)
-                if len(line) < params.k + 500:
+                if len(line) < newK + 500:
                     new_contig, als = polisher.polishEnd(list(line.read_alignments))
                     line.extendRight(new_contig.suffix(pos=len(line)).Seq(), als)
                     new_contig, als = polisher.polishEnd(list(line.rc.read_alignments))
                     line.rc.extendRight(new_contig.suffix(pos=len(line.rc)).Seq(), als)
-                    if len(line) < params.k + 100:
+                    if len(line) < newK + 100:
                         lines.removeLine(line)
                         print "Could not prolong line", line, "to match new k requirements. Removing line."
                         continue
