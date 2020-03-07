@@ -143,14 +143,14 @@ class LineExtender:
                 if self.attemptProlongResolved(rec):
                     print "Successfully prolonged resolved:", rec.line, rec.line.initial, rec.resolved, rec.line.completely_resolved
                     ok = True
-            if not ok:
-                print "Jumping attempts"
-                for rec in records: # type:LineExtender.Record
-                    print "Attempting to jump", rec
-                    if self.attemptJump(rec):
-                        print "Jumped", rec.line, rec.line.initial, len(rec.line), rec.next_resolved_start,\
-                            str(rec.old_resolved), rec.resolved
-                        ok = True
+            # if not ok:
+            #     print "Jumping attempts"
+            #     for rec in records: # type:LineExtender.Record
+            #         print "Attempting to jump", rec
+            #         if self.attemptJump(rec):
+            #             print "Jumped", rec.line, rec.line.initial, len(rec.line), rec.next_resolved_start,\
+            #                 str(rec.old_resolved), rec.resolved
+            #             ok = True
         for rec in records:
             line = rec.resolved.contig  # type: NewLine
             line.completely_resolved.add(rec.resolved)
@@ -538,7 +538,6 @@ class LineExtender:
                 if al.seg_from.contig.id not in self.good_reads or necessary_contig_support > self.read_bounds[al.seg_from.contig.id]:
                     yield al
 
-
         def updateGood(self):
             self.sort()
             while len(self.reads) > 0 and self.reads[-1].seg_to.left <= self.resolved.right - params.k:
@@ -618,7 +617,7 @@ class LineExtender:
         res = rec.resolved.right
         if bound > rec.resolved.right:
             print "Checking resolved bound against known copies"
-            candidates = self.segmentsWithGoodCopies(rec.line.segment(max(0, rec.resolved.right - sz), bound), sz)
+            candidates = self.segmentsWithGoodCopies(rec.resolved, rec.line.segment(max(0, rec.resolved.right - sz), bound), sz)
             print "Candidates:", candidates
             for candidate in candidates:
                 if candidate.left == max(0, rec.resolved.right - sz) and candidate.right > rec.resolved.right:
@@ -650,19 +649,20 @@ class LineExtender:
         good_segments = bad_segments.reverse(rec.line, params.k - 100).reduce(rec.line.segment(rec.resolved.right - params.k, bound))
         for seg in good_segments:
             seg = Segment(seg.contig, max(0, seg.left), seg.right)
-            for seg1 in self.segmentsWithGoodCopies(seg, params.k):
+            for seg1 in self.segmentsWithGoodCopies(rec.resolved, seg, params.k):
                 if len(seg1) >= params.k and seg1.right > rec.resolved.right:
                     rec.setResolved(seg1)
                     return True
         return False
 
-    def segmentsWithGoodCopies(self, seg, inter_size):
-        # type: (Segment, int) -> List[Segment]
+    def segmentsWithGoodCopies(self, resolved, seg, inter_size):
+        # type: (Segment, Segment, int) -> List[Segment]
         # print "Filtering good", seg
         als = [al for al in self.dot_plot.allInter(seg) if al.seg_from.left > 20 or al.rc.seg_to.left > 20 or al.isIdentical()]
         segs = SegmentStorage()
         for al in als:
             line = al.seg_from.contig # type: NewLine
+            print "Oppa", al, len(al.seg_to), inter_size
             if len(al.seg_to) >= inter_size and al.seg_from.right > line.initial[0].seg_to.left:
                 cap = al.seg_from.cap(line.suffix(pos=line.initial[0].seg_to.left))
                 incorrect = line.correct_segments.reverse(line, inter_size - 1).reduce(cap)
@@ -675,6 +675,9 @@ class LineExtender:
                     #     seg2 = seg2.contig.suffix(seg2.left)
                     #     print "Alignment is inmerging. Marking line suffix as bad:", seg2
                     segs.add(seg2)
+                if al.rc.seg_from.left < 50 and al.seg_to.right >= resolved.right:
+                    segs.add(al.seg_to.contig.suffix(pos=al.seg_to.right).expand(inter_size + 100))
+                    print "Incoming line:", resolved, seg, al
         segs.mergeSegments(inter_size - 1)
         print "All incorrect", segs
         return list(segs.reverse(seg.contig, inter_size - 1 - max(100, inter_size / 10)).reduce(seg))

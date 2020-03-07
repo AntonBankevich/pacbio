@@ -161,8 +161,6 @@ class Scorer:
                 res = min(res, ne.get(j - 1) + self.scores.scoreDel(c2))
                 ne.set(j, res)
             prev = ne
-        if len(total) > 0:
-            print "Oppa", sum(total) / len(total)
         return prev.get(alignment[-1][1])
 
     def adjustMin(self, old_val, old_shift, new_val, new_shift):

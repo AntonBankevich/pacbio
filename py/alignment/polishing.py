@@ -280,8 +280,6 @@ class Polisher:
                     for al in read.alignmentsTo(polished_base.asSegment()):
                         if al.seg_to.left == 0 and ((candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right)):
                             candidate_alignments[-1] = al
-                positions = []
-                contra = []
                 # print "CA:", candidate_alignments
                 for i, al in enumerate(candidate_alignments):
                     if al is None:
@@ -291,22 +289,22 @@ class Polisher:
                         print polished_base.seq
                     assert al is not None, reduced_read_list[i]
                     al.trimByQuality(0.3, 100)
-                    if al.rc.seg_from.left > params.bad_end_length:
-                        contra.append(al.seg_to.right)
+                contra_index = 0
+                contra = []
+                support = len(candidate_alignments)
+                cutoff_pos = len(start)
+                for al in sorted(candidate_alignments, key = lambda al: al.seg_to.right):
+                    while contra_index < len(contra) and contra[contra_index].seg_to.right < al.seg_to.right - 50:
+                        contra_index += 1
+                    if support >= min_cov and len(contra) - contra_index + 1 <= (1 - min_cov_frac) * support:
+                        cutoff_pos = al.seg_to.right
+                        support -= 1
+                        if al.contradictingRTCRight():
+                            contra.append(al)
                     else:
-                        positions.append(al.seg_to.right)
-                positions = sorted(positions)[::-1]
-                contra = sorted(contra)
-                print "Supporting positions:", positions
+                        break
+                print "Positions:", [al.seg_to.right for al in candidate_alignments]
                 print "Contra:", contra
-                if min_cov >= len(positions):
-                    continue
-                break_num = int((len(positions) + len(contra)) * (1 - min_cov_frac))
-                if break_num < len(contra):
-                    break_pos = contra[break_num]
-                else:
-                    break_pos = len(polished_base)
-                cutoff_pos = max(min(positions[min_cov - 1], break_pos), len(start))
                 if cutoff_pos > len(start) + 100:
                     print "Chose to use read", base_al, "Alignments:"
                     print map(str, reduced_read_list)

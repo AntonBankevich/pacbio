@@ -44,7 +44,7 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoK
         newL = analyser.chooseK(params.l_cov)
         sys.stdout.info("Chosen k and l:", newK, newL)
         newK = max(newK, params.k)
-        newL = max(newL, newK + 200)
+        newL = max(newL, newK + 300)
         newL = min(newL, newK + 1000)
         sys.stdout.info("Adjusted k and l:", newK, newL)
         if newK > params.k:
