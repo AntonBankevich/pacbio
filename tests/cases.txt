@@ -1,4 +1,4 @@
-15
+1
 WindowMaxTest 0
 
 UniqueRegionMarkingTest 3
