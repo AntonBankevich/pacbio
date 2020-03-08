@@ -64,7 +64,7 @@ class CoverageAnalyser:
                 assert cur_cov == 0
                 if prev < len(contig) - 1000 - k + 1:
                     covs[i][0] += len(contig) - 1000 - k + 1 - prev
-        self.recs = [CoverageAnalyser.CoverageRecord(500 + i * 100, covs[i]) for i in range(len(covs))]
+        self.recs = [CoverageAnalyser.CoverageRecord(500 + i * 100, covs[i]) for i in range(len(covs)) if covs[i] > 1000]
 
     def analyseLines(self, lines):
         # type: (NewLineStorage) -> None
@@ -82,7 +82,7 @@ class CoverageAnalyser:
         assert threshold < params.maxCoverageThreshold
         res = None
         for rec in self.recs:
-            if rec.covs[threshold] < params.uncoveredFractionForK:
+            if rec.covs[-1] > 0 and rec.covs[threshold] < params.uncoveredFractionForK:
                 res = rec.k
             else:
                 break
