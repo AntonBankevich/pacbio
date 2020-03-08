@@ -66,11 +66,13 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoK
                         lines.removeLine(line)
                         print "Could not prolong line", line, "to match new k requirements. Removing line."
                         continue
-                new_resolved = line.completely_resolved.expand(newK - params.k).cap(line.correct_segments)
+                new_resolved = line.completely_resolved.expand(newK - params.k)
                 new_resolved.mergeSegments(newK)
                 print line, line.correct_segments, line.completely_resolved, new_resolved
                 line.completely_resolved.clean()
                 line.completely_resolved.addAll(new_resolved)
+                line.correct_segments.clean()
+                line.correct_segments.addAll(new_resolved)
         params.k = newK
         params.l = newL
     if not split:
