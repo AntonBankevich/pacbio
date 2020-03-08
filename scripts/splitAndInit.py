@@ -6,12 +6,11 @@ import sys
 from sklearn.cluster import KMeans
 from typing import List, Dict
 
-from common.alignment_storage import MatchingSequence
-from common.line_align import Scorer
 
 sys.path.append("py")
 from alignment.polishing import Polisher
-
+from common.alignment_storage import MatchingSequence
+from common.line_align import Scorer
 
 from common.seq_records import NamedSequence
 from common.SimpleGraph import SimpleGraph, Edge
