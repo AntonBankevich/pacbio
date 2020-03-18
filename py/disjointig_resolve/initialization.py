@@ -195,9 +195,12 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
     #     nonunique = []
     contigs = ContigCollection()
     for edge in graph.e.values():
-        if basic.isCanonocal(edge.id) and edge.unique and edge.cov >= min_cov and edge.cov < 1.5 * avg_cov and \
+        if basic.isCanonocal(edge.id) and edge.unique and \
                 (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
-            contigs.add(Contig(edge.seq, edge.id))
+            if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 30000):
+                contigs.add(Contig(edge.seq, edge.id))
+            else:
+                sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
     # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
     # contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
     sys.stdout.info("Created", len(contigs), "initial contigs")
