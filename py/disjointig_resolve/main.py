@@ -148,6 +148,10 @@ def main(args):
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
+        for line in list(lines.unique()): # type: NewLine
+            line.completely_resolved.mergeSegments()
+            if len(line.completely_resolved) == 0:
+                lines.removeLine(line)
 
         print "Saving initial state"
         try:

@@ -212,6 +212,7 @@ class SegmentStorage(SmartStorage):
                     res[-1] = Segment(res[-1].contig, res[-1].left, max(res[-1].right, seg.right))
                 else:
                     res.append(seg)
+            res = [seg for seg in res if len(seg) >= inter_size]
             self.items = res
         else:
             self.rc.mergeSegments(inter_size)

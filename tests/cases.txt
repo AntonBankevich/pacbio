@@ -1,4 +1,4 @@
-1
+15
 WindowMaxTest 0
 
 UniqueRegionMarkingTest 3
@@ -32,8 +32,8 @@ AlignmentCompositionTest 0
 CorrectionMappingTest 0
 
 LineExtensionTest 1
-List aaabacadae 5 0 b
 List abbbcdefBBBghij 5 0 ja de
+List aaabacadae 5 0 b
 List abCDEFGHijklcdemnodgfp 5 0 pa jk mn
 List abcdefghijaklDEFGmnopaqrsDeFgHtuv 5 0 ab ij no
 List abbBbbcdefBBbBBghij 5 2 ja de
