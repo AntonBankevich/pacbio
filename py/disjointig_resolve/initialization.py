@@ -64,6 +64,7 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoK
                     line.rc.extendRight(new_contig.suffix(pos=len(line.rc)).Seq(), als)
                     if len(line) < newK + 100:
                         lines.removeLine(line)
+                        line.cleanReadAlignments()
                         print "Could not prolong line", line, "to match new k requirements. Removing line."
                         continue
                 new_resolved = line.completely_resolved.expand(newK - params.k)
@@ -176,13 +177,25 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
     sys.stdout.info("Creating contig collection")
     graph = SimpleGraph().ReadDot(graph_file)
     graph.FillSeq(contigs_file)
+    covs = []
+    for e in graph.e.values():
+        covs.append((e.len, e.cov))
+    tmp_cov = []
+    total = sum(l for c,l in covs) / 2
+    for l, c in sorted(covs)[::-1]:
+        if total < 0:
+            break
+        tmp_cov.append((l, c))
+        total -= l
+    avg_cov = float(sum([l * c for l, c in tmp_cov])) / sum(l for l, c in tmp_cov)
+    sys.stdout.info("Average coverage determined:", avg_cov)
     # if graph_file is not None:
     #     nonunique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if not (val[4].unique and val[4].cov >= min_cov)]
     # else:
     #     nonunique = []
     contigs = ContigCollection()
     for edge in graph.e.values():
-        if basic.isCanonocal(edge.id) and edge.unique and edge.cov >= min_cov and \
+        if basic.isCanonocal(edge.id) and edge.unique and edge.cov >= min_cov and edge.cov < 1.5 * avg_cov and \
                 (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
             contigs.add(Contig(edge.seq, edge.id))
     # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)

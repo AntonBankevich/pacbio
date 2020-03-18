@@ -172,15 +172,17 @@ class NewLineStorage(ContigStorage):
         # print line2.read_alignments
         # print line.read_alignments
         self.notifyMergedLines(al1, al2)
+        knot_right = line2.knot
+        knot_left = line1.rc.knot
         self.remove(line1)
         self.remove(line2)
-        if line2.knot is not None:
-            if line2.knot.line_right == line1:
-                line.tie(line, line2.knot.gap, line2.knot.gap_seq)
+        if knot_right is not None:
+            if knot_right.line_right == line1:
+                line.tie(line, knot_right.gap, knot_right.gap_seq)
             else:
-                line.tie(line2.knot.line_right, line2.knot.gap, line2.knot.gap_seq)
-        if line1.rc.knot is not None and line1.rc.knot.line_right != line2.rc:
-            line.rc.tie(line1.rc.knot.line_right, line1.rc.knot.gap, line1.rc.knot.gap_seq)
+                line.tie(knot_right.line_right, knot_right.gap, knot_right.gap_seq)
+        if knot_left is not None and knot_left.line_right != line2.rc:
+            line.rc.tie(knot_left.line_right, knot_left.gap, knot_left.gap_seq)
         return line
 
     def splitLine(self, seg):

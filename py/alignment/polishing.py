@@ -157,7 +157,8 @@ class Polisher:
                     als_by_segment[i].append(al)
         res_als = []
         for seg1, seg_als in zip(segs, als_by_segment):
-            res_als.append(self.polishSmallSegment(seg1, seg_als))
+            if seg1.inter(seg):
+                res_als.append(self.polishSmallSegment(seg1, seg_als))
         # print "Res als", res_als
         res = AlignmentPiece.GlueOverlappingAlignments(res_als)
         return res.reduce(target=seg)

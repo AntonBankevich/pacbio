@@ -232,6 +232,7 @@ class LineExtender:
                     line = seg.contig
             to_polysh = SegmentStorage()
             to_polysh.addAll(forward).addAll(backward.rc)
+            to_polysh.mergeSegments()
             line.addListener(to_polysh)
             line.addListener(forward)
             line.rc.addListener(backward)
