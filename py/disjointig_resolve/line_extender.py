@@ -423,10 +423,10 @@ class LineExtender:
         print "Extending", line, "for", tmp
         line.extendRight(new_contig.suffix(pos = len(line)).Seq(), relevant_als)
         print "Extended line", line, "for", tmp
-        print "Disjointigs:"
-        print line.disjointig_alignments
-        print "RC Disjointigs:"
-        print line.rc.disjointig_alignments
+        # print "Disjointigs:"
+        # print line.disjointig_alignments
+        # print "RC Disjointigs:"
+        # print line.rc.disjointig_alignments
         print "Reads:"
         print list(line.read_alignments.allInter(line.asSegment().suffix(length=min(len(line), 2000))))
         print "Sequence:"

@@ -27,7 +27,7 @@ from disjointig_resolve.saves_io import loadAll, saveAll
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.cl_params import Params, parseFlyeDir
 from disjointig_resolve.initialization import CreateLineCollection, CreateDisjointigCollection, CreateContigCollection, \
-    CreateReadCollection, constructDisjointigs, LoadLineCollection
+    CreateReadCollection, constructDisjointigs, LoadLineCollection, adjustKL, ExtendShortContigs
 
 
 def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
@@ -132,10 +132,15 @@ def main(args):
 
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads)
 
+        if cl_params.autoKL:
+            adjustKL(aligner, reads, contigs)
+
+        ExtendShortContigs(contigs, reads, aligner, polisher)
+
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
         if cl_params.init_file is None:
-            lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split, cl_params.autoKL)
+            lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split)
         else:
             lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads)
 

@@ -4,8 +4,9 @@ MINIMAP_BIN = "bin/flye-minimap2"
 
 clean = False
 reliable_coverage = 9
-k_cov = reliable_coverage + 2
-l_cov = 6
+k_cov = reliable_coverage
+l_cov = 5
+ss_for_kl_adjustment = 20000
 maxCoverageThreshold = 20
 uncoveredFractionForK = 0.001
 radius = 8

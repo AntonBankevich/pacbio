@@ -45,6 +45,7 @@ class Polisher:
         if same and not params.clean and os.path.exists(polished_file):
             print "Polishing reused:", polished_file
         else:
+            print "Running polishing:", polished_file
             job.run()
         return map(lambda rec: Contig(rec.seq, rec.id), SeqIO.parse_fasta(open(polished_file, "r")))
         # return SeqIO.parse_fasta(open(polished_file, "r"))
@@ -61,6 +62,7 @@ class Polisher:
         if same and not params.clean and os.path.exists(polished_file):
             print "Polishing reused:", polished_file
         else:
+            print "Running polishing:", polished_file
             job.run()
         return list(SeqIO.parse_fasta(open(polished_file, "r")))[0].seq
 
@@ -307,7 +309,7 @@ class Polisher:
                 print "Positions:", [al.seg_to.right for al in candidate_alignments]
                 print "Contra:", contra
                 if cutoff_pos > len(start) + 100:
-                    print "Chose to use read", base_al, "Alignments:"
+                    print "Chose to use read", base_al.__repr__(), "Extended for", cutoff_pos - len(start), "Alignments:"
                     print map(str, reduced_read_list)
                     found = True
                     new_contig_candidate = Contig(new_contig.seq + polished_base[len(start):cutoff_pos], "candidate")

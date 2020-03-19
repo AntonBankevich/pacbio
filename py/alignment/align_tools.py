@@ -175,15 +175,15 @@ class Aligner:
     #                     al.seg_to = new_al.seg_to
     #                     al.cigar = new_al.cigar
 
-    def separateAlignments(self, reads, contigs):
-        # type: (Iterable[NamedSequence], Iterable[Contig]) -> ReadCollection
-        contigs_collection = ContigCollection(list(contigs))
-        res = ReadCollection(contigs_collection)
-        for read in reads:
-            res.addNewRead(NamedSequence(read.seq, read.id)) # remove when all ids are str
-        for contig in contigs:
-            res.fillFromSam(self.align(res, [contig]), contigs_collection)
-        return res
+    # def separateAlignments(self, reads, contigs):
+    #     # type: (Iterable[NamedSequence], Iterable[Contig]) -> ReadCollection
+    #     contigs_collection = ContigCollection(list(contigs))
+    #     res = ReadCollection(contigs_collection)
+    #     for read in reads:
+    #         res.addNewRead(NamedSequence(read.seq, read.id)) # remove when all ids are str
+    #     for contig in contigs:
+    #         res.fillFromSam(self.align(res, [contig]), contigs_collection)
+    #     return res
 
     def align_files(self, reference_file, reads_files, threads, platform, mode, out_alignment):
         out_file = out_alignment + "_initial"
@@ -205,7 +205,7 @@ class Aligner:
                 cmdline.append("-Hk19")
         try:
             devnull = open(os.devnull, "w")
-            sys.stdout.log(common.log_params.LogPriority.alignment_files, "Running: " + " ".join(cmdline))
+            sys.stdout.log(common.log_params.LogPriority.alignment_files, "Performing alignment:", " ".join(cmdline))
             subprocess.check_call(cmdline, stderr=devnull, stdout=open(out_file, "w"))
             env = os.environ.copy()
             env["LC_ALL"] = "C"
@@ -231,7 +231,6 @@ class Aligner:
         else:
             if os.path.isfile(alignment_file):
                 os.remove(alignment_file)
-            sys.stdout.log(common.log_params.LogPriority.alignment_files, "Performing alignment:", alignment_file, str([(c.id, len(c)) for c in reference]))
             self.align_files(contigs_file, [reads_file], self.threads, params.technology, mode, alignment_file)
         return sam_parser.Samfile(open(alignment_file, "r"))
 

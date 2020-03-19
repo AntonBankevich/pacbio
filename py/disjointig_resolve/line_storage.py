@@ -69,7 +69,7 @@ class NewLineStorage(ContigStorage):
             line = self.addNew(contig.seq, "L" + contig.id)
             line.initial.add(AlignmentPiece.Identical(contig.asSegment(), line.asSegment()))
 
-    def splitFromContigs(self, contigs, max_contig = 40000, cut_size = 10000):
+    def splitFromContigs(self, contigs, max_contig = 50000, cut_size = 20000):
         # type: (ContigStorage, int, int) -> None
         for contig in contigs.unique():
             if not basic.isCanonocal(contig.id):
@@ -333,6 +333,7 @@ class NewLineStorage(ContigStorage):
             line.unTie()
         if line.rc.knot is not None:
             line.rc.unTie()
+        line.cleanReadAlignments()
         del self.items[line.id]
         del self.items[line.rc.id]
 

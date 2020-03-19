@@ -11,10 +11,11 @@ from disjointig_resolve.line_storage import NewLineStorage
 
 
 class CoverageAnalyser:
-    def __init__(self, aligner, reads):
-        # type: (Aligner, ReadCollection) -> None
+    def __init__(self, aligner, reads, seg_size = params.ss_for_kl_adjustment):
+        # type: (Aligner, ReadCollection, int) -> None
         self.aligner = aligner
         self.reads = reads
+        self.seg_size = seg_size
         self.recs = None #type: List[CoverageAnalyser.CoverageRecord]
 
     class CoverageRecord:
@@ -66,11 +67,15 @@ class CoverageAnalyser:
                     covs[i][0] += len(contig) - 1000 - k + 1 - prev
         self.recs = [CoverageAnalyser.CoverageRecord(500 + i * 100, covs[i]) for i in range(len(covs)) if covs[i] > 1000]
 
-    def analyseLines(self, lines):
-        # type: (NewLineStorage) -> None
+    def analyseSegmentCoverage(self, contigs):
+        # type: (ContigStorage) -> None
         segs = []
-        for line in lines.unique(): #type: NewLine
-            segs.extend(line.completely_resolved)
+        for contig in contigs.unique():
+            if len(contig) < 3 * self.seg_size:
+                segs.append(contig.prefix(self.seg_size))
+                segs.append(contig.suffix(pos=len(contig) - self.seg_size))
+            else:
+                segs.append(contig.asSegment())
         self.analyseSegments(segs)
 
 

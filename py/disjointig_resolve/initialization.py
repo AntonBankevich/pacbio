@@ -20,8 +20,27 @@ from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.unique_marker import UniqueMarker
 
+def adjustKL(aligner, reads, contigs):
+    # type: (Aligner, ReadCollection, ContigStorage) -> None
+    analyser = CoverageAnalyser(aligner, reads)
+    sys.stdout.info("Analysing k-mer coverage by reads.")
+    analyser.analyseSegmentCoverage(contigs)
+    analyser.printAnalysis()
+    newK = analyser.chooseK(params.k_cov) - 2 * params.bad_end_length
+    newL = analyser.chooseK(params.l_cov) - 2 * params.bad_end_length
+    sys.stdout.info("Chosen k and l:", newK, newL)
+    newK = min(newK, newL - 300)
+    newL = min(newL, newK + 1000)
+    sys.stdout.info("Adjusted k and l:", newK, newL)
+    if newK > params.k:
+        sys.stdout.info("k and l adjusted")
+        params.k = newK
+        params.l = newL
+    else:
+        sys.stdout.info("k and l not adjusted since k is too small. Returning to default values")
 
-def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoKL):
+
+def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     sys.stdout.info("Creating line collection")
     lines = NewLineStorage(disjointigs, aligner)
     if split:
@@ -35,47 +54,6 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split, autoK
     UniqueMarker(aligner).markAllUnique(lines, reads)
     for line in lines.unique():
         print line, line.completely_resolved
-    if autoKL:
-        analyser = CoverageAnalyser(aligner, reads)
-        sys.stdout.info("Analysing k-mer coverage by reads.")
-        analyser.analyseLines(lines)
-        analyser.printAnalysis()
-        newK = analyser.chooseK(params.k_cov)
-        newL = analyser.chooseK(params.l_cov)
-        sys.stdout.info("Chosen k and l:", newK, newL)
-        newK = max(newK, params.k)
-        newL = max(newL, newK + 300)
-        newL = min(newL, newK + 1000)
-        sys.stdout.info("Adjusted k and l:", newK, newL)
-        polisher = Polisher(aligner, aligner.dir_distributor)
-        if newK > params.k:
-            print "Expanding resolved segments according to increased k"
-            # TODO: Merge lines instead of deleting.
-            for line in list(lines.unique()): # type: NewLine
-                if len(line) < newK + 500:
-                    if line.knot is not None or line.rc.knot is not None:
-                        lines.removeLine(line)
-
-            for line in list(lines.unique()):  # type: NewLine
-                if len(line) < newK + 500:
-                    new_contig, als = polisher.polishEnd(list(line.read_alignments))
-                    line.extendRight(new_contig.suffix(pos=len(line)).Seq(), als)
-                    new_contig, als = polisher.polishEnd(list(line.rc.read_alignments))
-                    line.rc.extendRight(new_contig.suffix(pos=len(line.rc)).Seq(), als)
-                    if len(line) < newK + 100:
-                        lines.removeLine(line)
-                        line.cleanReadAlignments()
-                        print "Could not prolong line", line, "to match new k requirements. Removing line."
-                        continue
-                new_resolved = line.completely_resolved.expand(newK - params.k).cap(line.correct_segments)
-                new_resolved.mergeSegments(newK)
-                print line, line.correct_segments, line.completely_resolved, new_resolved
-                line.completely_resolved.clean()
-                line.completely_resolved.addAll(new_resolved)
-                line.correct_segments.clean()
-                line.correct_segments.addAll(new_resolved)
-        params.k = newK
-        params.l = newL
     if not split:
         print "Splitting lines into parts"
         line_list = list(lines.unique()) # type: List[NewLine]
@@ -207,8 +185,6 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
     sys.stdout.info("Polishing contigs")
     polished_contigs = polisher.polishMany(reads, list(contigs.unique()))
     contigs = ContigCollection().addAll(polished_contigs)
-    sys.stdout.info("Extending short lines")
-    ExtendShortLines(contigs, reads, aligner, polisher)
     return contigs
 
 
@@ -226,8 +202,9 @@ def CreateReadCollection(reads_file, cut_reads, downsample):
 
 
 # TODO: many short edges are not really unique. Need to address it properly
-def ExtendShortLines(contigs, reads, aligner, polisher):
+def ExtendShortContigs(contigs, reads, aligner, polisher):
     # type: (ContigStorage, ReadCollection, Aligner, Polisher) -> None
+    sys.stdout.info("Extending short lines")
     short_contigs = ContigStorage()
     als = dict() # type: Dict[str, List[AlignmentPiece]]
     for contig in contigs.unique():
