@@ -31,6 +31,27 @@ class CoverageAnalyser:
             else:
                 return "None"
 
+    def covSegments(self, region, segs, k):
+        tmp = []
+        for seg in segs:
+            if seg.interSize(region) >= k:
+                seg = seg.cap(region)
+                tmp.append((seg.left, -1))
+                tmp.append((seg.right - k + 1, 1))
+        tmp = sorted(tmp)
+        cur_cov = 0
+        prev = 1000
+        for pos, diff in tmp:
+            assert pos >= prev
+            if pos > prev:
+                yield cur_cov, pos - prev
+            # covs[i][min(cur_cov, len(covs[i]) - 1)] += pos - prev
+            cur_cov -= diff
+            prev = pos
+        assert cur_cov == 0
+        if prev < region.right - k + 1:
+            yield 0, region.right - k + 1 - prev
+
     def analyseSegments(self, segs):
         # type: (List[Segment]) -> None
         contigs = ContigStorage()
@@ -46,25 +67,16 @@ class CoverageAnalyser:
         for contig, it in itertools.groupby(res, key = lambda seg: seg.contig):
             segs = list(it)
             shrink = contig.asSegment().shrink(1000)
+            bad_seg = False
+            for cov, slen in self.covSegments(shrink, segs, 1):
+                if cov < 3:
+                    bad_seg = True
+            if bad_seg:
+                continue
             for i in range(len(covs)):
                 k = 500 + i * 100
-                tmp = []
-                for seg in segs:
-                    if seg.interSize(shrink) >= k:
-                        seg = seg.cap(shrink)
-                        tmp.append((seg.left, -1))
-                        tmp.append((seg.right - k + 1, 1))
-                tmp = sorted(tmp)
-                cur_cov = 0
-                prev = 1000
-                for pos, diff in tmp:
-                    assert pos >= prev
-                    covs[i][min(cur_cov, len(covs[i]) - 1)] += pos - prev
-                    cur_cov -= diff
-                    prev = pos
-                assert cur_cov == 0
-                if prev < len(contig) - 1000 - k + 1:
-                    covs[i][0] += len(contig) - 1000 - k + 1 - prev
+                for cov, slen in self.covSegments(shrink, segs, k):
+                    covs[i][min(cov, len(covs[i]) - 1)] += slen
         self.recs = [CoverageAnalyser.CoverageRecord(500 + i * 100, covs[i]) for i in range(len(covs)) if covs[i] > 1000]
 
     def analyseSegmentCoverage(self, contigs):
@@ -85,9 +97,9 @@ class CoverageAnalyser:
 
     def chooseK(self, threshold):
         assert threshold < params.maxCoverageThreshold
-        res = None
+        res = params.k
         for rec in self.recs:
-            if rec.covs[-1] > 0 and rec.covs[threshold] < params.uncoveredFractionForK:
+            if rec.covs[-1] > 0 and rec.covs[threshold] < params.uncoveredFractionForK * rec.covs[-1]:
                 res = rec.k
             else:
                 break
