@@ -284,6 +284,7 @@ class Polisher:
                         if al.seg_to.left == 0 and ((candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right)):
                             candidate_alignments[-1] = al
                 # print "CA:", candidate_alignments
+                trimmedAlignments = []
                 for i, al in enumerate(candidate_alignments):
                     if al is None:
                         print al, reduced_read_list[i]
@@ -291,12 +292,12 @@ class Polisher:
                         print reduced_read_list[i].seq
                         print polished_base.seq
                     assert al is not None, reduced_read_list[i]
-                    al.trimByQuality(0.3, 100)
+                    trimmedAlignments.append(al.trimByQuality(0.3, 100))
                 contra_index = 0
                 contra = []
-                support = len(candidate_alignments)
+                support = len(trimmedAlignments)
                 cutoff_pos = len(start)
-                for al in sorted(candidate_alignments, key = lambda al: al.seg_to.right):
+                for al in sorted(trimmedAlignments, key = lambda al: al.seg_to.right):
                     while contra_index < len(contra) and contra[contra_index].seg_to.right < al.seg_to.right - 50:
                         contra_index += 1
                     if support >= min_cov and len(contra) - contra_index <= (1 - min_cov_frac) * support:
@@ -306,7 +307,7 @@ class Polisher:
                             contra.append(al)
                     else:
                         break
-                print "Positions:", [al.seg_to.right for al in candidate_alignments]
+                print "Positions:", [al.seg_to.right for al in trimmedAlignments]
                 print "Contra:", contra
                 if cutoff_pos > len(start) + 100:
                     print "Chose to use read", base_al.__repr__(), "Extended for", cutoff_pos - len(start), "Alignments:"

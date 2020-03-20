@@ -226,15 +226,15 @@ class AlignmentPiece:
         right_ind = 0
         cur_indel = 0
         for left_ind, left in enumerate(blocks):
-            while right_ind < len(blocks) and blocks[right_ind][1].right - left[1].left < w:
-                if right_ind == len(blocks) - 1:
+            while right_ind + 1 < len(blocks) and blocks[right_ind + 1][1].right - left[1].right < w:
+                if blocks[right_ind][1].right - left[1].right < w:
                     return self
-                cur_indel += blocks[right_ind + 1][0].left - blocks[right_ind][0].right + blocks[right_ind + 1][1].left - blocks[right_ind][1].right
+                cur_indel += abs(blocks[right_ind + 1][0].left - blocks[right_ind][0].right + blocks[right_ind][1].right - blocks[right_ind + 1][1].left)
                 right_ind += 1
-            if cur_indel > div * (blocks[right_ind][1].right - left[1].left):
+            if cur_indel > div * w:
                 return AlignmentPiece.FromBlocks(blocks[:left_ind + 1])
             if left_ind  + 1 < len(blocks):
-                cur_indel -= blocks[left_ind + 1][0].left - blocks[left_ind][0].right + blocks[left_ind + 1][1].left - blocks[left_ind][1].right
+                cur_indel -= abs(blocks[left_ind + 1][0].left - blocks[left_ind][0].right + blocks[left_ind][1].right - blocks[left_ind + 1][1].left)
         return self
 
     def __repr__(self):
