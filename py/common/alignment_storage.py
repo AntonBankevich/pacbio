@@ -227,10 +227,10 @@ class AlignmentPiece:
         cur_indel = 0
         for left_ind, left in enumerate(blocks):
             while right_ind + 1 < len(blocks) and blocks[right_ind + 1][1].right - left[1].right < w:
-                if blocks[right_ind + 1][1].right - left[1].right < w:
-                    return self
                 cur_indel += abs(blocks[right_ind + 1][0].left - blocks[right_ind][0].right + blocks[right_ind][1].right - blocks[right_ind + 1][1].left)
                 right_ind += 1
+            if right_ind + 1 >= len(blocks) and blocks[right_ind + 1][1].right - left[1].right < w:
+                return self
             if cur_indel > div * w:
                 return AlignmentPiece.FromBlocks(blocks[:left_ind + 1])
             if left_ind  + 1 < len(blocks):
