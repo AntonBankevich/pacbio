@@ -39,8 +39,8 @@ class LineListener:
         # type: (accurate_line.NewLine, int) -> None
         pass
 
-    def fireAfterCorrect(self, line):
-        # type: (accurate_line.NewLine) -> None
+    def fireAfterCorrect(self, line, alignments):
+        # type: (accurate_line.NewLine, Correction) -> None
         pass
 
     def fireMerge(self, new_line, line_left, line_right):
@@ -198,6 +198,16 @@ class SegmentStorage(SmartStorage):
         else:
             return self.rc.inter(seg.RC(), min_size)
 
+    def interSize(self, seg):
+        # type: (Segment) -> bool
+        res = 0
+        if self.isCanonical():
+            for seg1 in self.items:
+                res = max(res, seg1.interSize(seg))
+            return False
+        else:
+            return self.rc.interSize(seg.RC())
+
     # Merge all segments that have intersection of at least inter_size and remove all subsegments
     # After this operation segment ordering is the same when we sort by left bound as if we sort by right bounds
     def mergeSegments(self, inter_size = 0):
@@ -276,8 +286,8 @@ class SegmentStorage(SmartStorage):
         # type: (accurate_line.NewLine, int) -> None
         pass
 
-    def fireAfterCorrect(self, line):
-        # type: (accurate_line.NewLine) -> None
+    def fireAfterCorrect(self, line, alignments):
+        # type: (accurate_line.NewLine, Correction) -> None
         self.makeCanonical()
         self.items = [seg.contigAsSegment(line.segment(line.left(), line.right())) for seg in self.items]
 
@@ -519,8 +529,8 @@ class AlignmentStorage(SmartStorage):
         self.makeCanonical()
         self.items = correction.composeQueryDifferences(self.items) # type: List[AlignmentPiece]
 
-    def fireAfterCorrect(self, line):
-        # type: (accurate_line.NewLine) -> None
+    def fireAfterCorrect(self, line, alignments):
+        # type: (accurate_line.NewLine, Correction) -> None
         self.makeCanonical()
         assert len(self) == 0 or len(self.items[0].seg_to.contig) == len(line), str([self.items[0].seg_to.contig, line])
         self.items = [al.targetAsSegment(line.asSegment()) for al in self.items] # type: List[AlignmentPiece]
@@ -817,8 +827,8 @@ class ReadAlignmentStorage(AlignmentStorage):
         self.makeCanonical()
         self.replaceAlignments(correction.composeQueryDifferences(self.items))
 
-    def fireAfterCorrect(self, line):
-        # type: (accurate_line.NewLine) -> None
+    def fireAfterCorrect(self, line, alignments):
+        # type: (accurate_line.NewLine, Correction) -> None
         self.makeCanonical()
         assert len(self) == 0 or len(self.items[0].seg_to.contig) == len(line), str([self.items[0].seg_to.contig, line])
         self.replaceAlignments([al.targetAsSegment(line.asSegment()) for al in self.items])

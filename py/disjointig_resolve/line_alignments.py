@@ -106,11 +106,11 @@ class AutoAlignmentStorage(LineListener):
         self.content.fireAfterCutRight(line, pos)
         # print "AC", self.content
 
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
-        self.content.fireAfterCorrect(line)
+    def fireAfterCorrect(self, line, alignments):
+        # type: (Any, Correction) -> None
+        self.content.fireAfterCorrect(line, alignments)
         self.reverse()
-        self.content.fireAfterCorrect(line)
+        self.content.fireAfterCorrect(line, alignments)
         # print "ACo", self.content
 
     def reverse(self):
@@ -210,11 +210,11 @@ class RCAlignmentStorage(LineListener):
         self.reverse()
         self.content.fireAfterCutRight(line, pos)
 
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
-        self.content.fireAfterCorrect(line)
+    def fireAfterCorrect(self, line, alignments):
+        # type: (Any, Correction) -> None
+        self.content.fireAfterCorrect(line, alignments)
         self.reverse()
-        self.content.fireAfterCorrect(line)
+        self.content.fireAfterCorrect(line, alignments)
     # This is CRAAAZY!!! But correct.
 
     def reverse(self):
@@ -314,9 +314,9 @@ class TwoLineAlignmentStorage(LineListener):
         self.content.fireAfterCutRight(line, pos)
         self.normalizeReverse()
 
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
-        self.content.fireAfterCorrect(line)
+    def fireAfterCorrect(self, line, alignments):
+        # type: (Any, Correction) -> None
+        self.content.fireAfterCorrect(line, alignments)
         self.normalizeReverse()
 
     def addAndMergeRight(self, al):

@@ -401,6 +401,7 @@ class DotPlotModificationTest(SimpleTest):
         self.test2()
         self.test3()
         self.test4()
+        self.test5()
 
     def test1(self):
         lines = NewLineStorage(DisjointigCollection(), self.aligner)
@@ -445,6 +446,21 @@ class DotPlotModificationTest(SimpleTest):
         line = lines[name]
         line.extendRight(dataset.alphabet["C"].seq)
         assert str(list(dp.auto_alignments[line.id])) == "[(C0_abcAB[0:1650]->C0_abcAB[1650:3302-0]:0.995), (C0_abcAB[1650:3302-0]->C0_abcAB[0:1650]:0.995), (C0_abcAB[0:3302-0]->C0_abcAB[0:3302-0]:1.000)]", str(list(dp.auto_alignments[line.id]))
+
+    def test5(self):
+        dataset = TestDataset("abcABC")
+        name1 = dataset.addContig("abc")
+        name2 = dataset.addContig("ABC")
+        lines, dp, reads = dataset.genAll(self.aligner)
+        line = lines[name1]
+        sa = dataset.alphabet["a"].seq
+        sb = dataset.alphabet["b"].seq
+        tmp = Contig(sa + "ACGACAGTAACTTGAACGACAGTAACTTGAACGACAGTAACTTGAACGACAGTAACTTGAACGACAGTAACTTGAACGACAGTAACTTGAACGACAGTAACTTGA" + sb, "tmp")
+        al1 = AlignmentPiece.Identical(tmp.prefix(len=len(sa)), line.prefix(len=len(sa)))
+        al2 = AlignmentPiece.Identical(tmp.asSegment().suffix(length=len(sb)), line.segment(len(sa), len(sa) + len(sb)))
+        al = AlignmentPiece.MergeFittingAlignments([al1, al2])
+        line.correctSequence([al])
+        assert str(list(dp.allInter(line.asSegment()))) == "[(C0_abc[0:1755-0]->C0_abc[0:1755-0]:1.000), (C1_ABC[0:1652-0]->C0_abc[0:1755-0]:0.94)]"
 
 
 class PotentialReadsTest(SimpleTest):

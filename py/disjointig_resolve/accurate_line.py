@@ -39,8 +39,8 @@ class ReadAlignmentListener(LineListener):
         # type: (Any, int) -> None
         self.refreshReadAlignments()
 
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
+    def fireAfterCorrect(self, line, alignments):
+        # type: (Any, Correction) -> None
         self.refreshReadAlignments()
 
 class Knot:
@@ -287,9 +287,11 @@ class NewLine(Contig):
         correction = Correction.constructCorrection(alignments)
         # print "Disjointigs before:", list(self.disjointig_alignments)
         self.notifyBeforeCorrect(correction)
+        old = Contig(self.seq, "old")
         self.seq = correction.seq_from.seq
         self.rc.seq = basic.RC(self.seq)
-        self.notifyAfterCorrect()
+        correction.changeQT(self, old)
+        self.notifyAfterCorrect(correction)
         # print "Disjointigs after:", list(self.disjointig_alignments)
 
     def notifyBeforeCorrect(self, alignments):
@@ -297,10 +299,10 @@ class NewLine(Contig):
         for listener in self.listeners:
             listener.fireBeforeCorrect(alignments)
 
-    def notifyAfterCorrect(self):
-        # type: () -> None
+    def notifyAfterCorrect(self, alignments):
+        # type: (Correction) -> None
         for listener in self.listeners:
-            listener.fireAfterCorrect(self)
+            listener.fireAfterCorrect(self, alignments)
 
     # def extendRightWithAlignment(self, alignment):
     #     # type: (AlignmentPiece) -> None

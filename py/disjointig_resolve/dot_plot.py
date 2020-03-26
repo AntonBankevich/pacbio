@@ -268,11 +268,13 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
     # alignments from new sequence to new sequence
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
-        line = alignments.seq_to # type: NewLine
-        for storage in self.alignmentsToFrom[line.id].values():
-            storage.fireBeforeCorrect(alignments)
-        self.auto_alignments[line.id].fireBeforeCorrect(alignments)
-        self.rc_alignments[line.id].fireBeforeCorrect(alignments)
+        print "oppa1", alignments.isSubstantial(), alignments.alignments
+        if not alignments.isSubstantial():
+            line = alignments.seq_to # type: NewLine
+            for storage in self.alignmentsToFrom[line.id].values():
+                storage.fireBeforeCorrect(alignments)
+            self.auto_alignments[line.id].fireBeforeCorrect(alignments)
+            self.rc_alignments[line.id].fireBeforeCorrect(alignments)
 
     def fireAfterExtendRight(self, line, seq, relevant_als = None):
         # type: (NewLine, str, Optional[List[AlignmentPiece]]) -> None
@@ -295,12 +297,16 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         self.auto_alignments[line.id].fireAfterCutRight(line, pos)
         self.rc_alignments[line.id].fireAfterCutRight(line, pos)
 
-    def fireAfterCorrect(self, line):
-        # type: (Any) -> None
-        for storage in self.alignmentsToFrom[line.id].values():
-            storage.fireAfterCorrect(line)
-        self.auto_alignments[line.id].fireAfterCorrect(line)
-        self.rc_alignments[line.id].fireAfterCorrect(line)
+    def fireAfterCorrect(self, line, alignments):
+        # type: (Any, Correction) -> None
+        print "oppa1", alignments.isSubstantial(), alignments.alignments
+        if alignments.isSubstantial():
+            self.realignLine(line)
+        else:
+            for storage in self.alignmentsToFrom[line.id].values():
+                storage.fireAfterCorrect(line, alignments)
+            self.auto_alignments[line.id].fireAfterCorrect(line, alignments)
+            self.rc_alignments[line.id].fireAfterCorrect(line, alignments)
 
     def addAndMergeRight(self, al):
         # type: (AlignmentPiece) -> None
@@ -312,6 +318,30 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
             if al.seg_from.contig.id not in self.alignmentsToFrom[al.seg_to.contig.id]:
                 self.addTwoLineStorage(al.seg_to.contig, al.seg_from.contig)
             self.alignmentsToFrom[al.seg_to.contig.id][al.seg_from.contig.id].addAndMergeRight(al)
+
+    def realignLine(self, line):
+        # type: (NewLine) -> None
+        for storage in self.alignmentsToFrom[line.id].values():
+            line_from = storage.line_from  # type: NewLine
+            storage.content.clean()
+            self.alignmentsToFrom[line.rc.id][line_from.rc.id].content.clean()
+        self.rc_alignments[line.id].content.clean()
+        self.rc_alignments[line.rc.id].content.clean()
+        self.auto_alignments[line.id].content.clean()
+        self.auto_alignments[line.rc.id].content.clean()
+        for al in self.aligner.dotplotAlign([line], self.lines):
+            if len(al) > params.k and al.percentIdentity() > 0.8:
+                if al.seg_from.contig.id == al.seg_to.contig.id:
+                    ok = al.seg_from <= al.seg_to
+                elif al.seg_from.contig == al.seg_to.contig.rc:
+                    if basic.isCanonocal(al.seg_from.contig.id):
+                        ok = al.seg_from < al.seg_to.RC()
+                    else:
+                        ok = al.seg_from.RC() < al.seg_to
+                else:
+                    ok = basic.canonical(al.seg_from.contig.id) < basic.canonical(al.seg_to.contig.id)
+                if ok:
+                    self.addAlignment(al)
 
     def removeLine(self, line):
         # type: (NewLine) -> None

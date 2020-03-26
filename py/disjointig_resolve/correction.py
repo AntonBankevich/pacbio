@@ -20,6 +20,16 @@ class Correction:
         # TODO: reduce alignment size to essentials
         self.scorer = Scorer()
 
+    def changeQT(self, contig_from, contig_to):
+        self.alignments = [al.changeTargetContig(contig_to).changeQueryContig(contig_from) for al in self.alignments]
+
+    def isSubstantial(self):
+        # type: () -> bool
+        for al in self.alignments:
+            if len(list(al.splitRef())) > 1 or (len(al) > 150 and al.percentIdentity() <0.98) or (len(al.seg_from) - len(al.seg_to)) > 50:
+                return True
+        return False
+
     def mapSegmentsUp(self, segments):
         # type: (List[Segment]) -> List[Segment]
         left = self.mapPositionsUp([seg.left for seg in segments])

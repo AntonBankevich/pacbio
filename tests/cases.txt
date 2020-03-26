@@ -1,4 +1,6 @@
 15
+DotPlotModificationTest 0
+
 WindowMaxTest 0
 
 UniqueRegionMarkingTest 3
@@ -12,8 +14,6 @@ KnottingTest 0
 
 
 PotentialReadsTest 0
-
-DotPlotModificationTest 0
 
 DotPlotConstructionTest 2
 List abcdefgh 0 1 abcdeab 0 ListD0_abcdeab0001D0_abcdeab01098D0_abcdeab27433837113M1I4M1I132M1I100M1I482M1D46M1I216M

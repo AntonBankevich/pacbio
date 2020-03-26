@@ -53,7 +53,6 @@ class Contig(NamedSequence):
         # type: (BinaryIO) -> None
         SeqIO.write(self, handler, "fasta")
 
-
 class ContigStorage:
     def __init__(self, contigs_list = None, add_rc = True):
         # type: (Optional[Iterable[Contig]], bool) -> None
@@ -131,9 +130,9 @@ class ContigStorage:
     def writeToFasta(self, handler):
         for contig in self.unique():
             SeqIO.write(contig, handler, "fasta")
-
-
 #TODO: Merge with EasyContigStorage
+
+
 class ContigCollection(ContigStorage):
     def __init__(self, contigs_list=None):
         # type: (Optional[Iterable[Contig]]) -> ContigCollection
@@ -189,8 +188,6 @@ class ContigCollection(ContigStorage):
             self.add(contig)
             if contig.rc.id in keys:
                 self.add(contig.rc)
-
-
 
 
 class TmpInfo:
