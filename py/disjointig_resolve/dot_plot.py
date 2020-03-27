@@ -323,7 +323,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         # type: (NewLine) -> None
         for storage in self.alignmentsToFrom[line.id].values():
             line_from = storage.line_from  # type: NewLine
-            storage.content.clean()
+            self.alignmentsToFrom[line_from.rc.id][line.rc.id].content.clean()
             self.alignmentsToFrom[line.rc.id][line_from.rc.id].content.clean()
         self.rc_alignments[line.id].content.clean()
         self.rc_alignments[line.rc.id].content.clean()
