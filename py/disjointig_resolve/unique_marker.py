@@ -109,6 +109,7 @@ class UniqueMarker:
         all = 0
         inter = 0
         contradicting = 0
+        bad_quality = 0
         print "Unique segments:", segs
         if len(segs) == 0:
             print "WARNING: line with no resolved segments. Removing", line
@@ -117,15 +118,17 @@ class UniqueMarker:
             all += 1
             if segs.inter(al.seg_to, params.k):
                 inter += 1
-                if not al.contradictingRTC(tail_size=params.bad_end_length):
-                    line.addReadAlignment(al)
-                    # print "Added read alignment", al, str(al.seg_from.contig.alignments)
-                else:
+                if al.contradictingRTC(tail_size=params.bad_end_length):
                     contradicting += 1
                     print "Contradicting read alignment", al, str(al.seg_from.contig.alignments)
-            # else:
-            #     print "Ambiguous read alignment", al, str(al.seg_from.contig.alignments)
-        sys.stdout.trace("Read recruitment results:", all, inter, float(contradicting) / inter)
+                elif al.percentIdentity() < 0.85: #TODO: replace with accurate check
+                    bad_quality += 1
+                    print "Read with bad alignment quality:", al
+                else:
+                    line.addReadAlignment(al)
+                    # print "Added read alignment", al, str(al.seg_from.contig.alignments)
+        sys.stdout.trace("Read recruitment results. All:", all, "In resolved regions:", inter,
+                         "Contradicting:", float(contradicting) / inter, "Bad quality", float(bad_quality) / inter)
         line.updateCorrectSegments(line.asSegment())
         segs = segs.cap(line.correct_segments, params.k)
         line.completely_resolved.addAll(segs)
