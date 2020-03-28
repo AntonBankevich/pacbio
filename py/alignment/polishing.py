@@ -292,7 +292,7 @@ class Polisher:
                         print reduced_read_list[i].seq
                         print polished_base.seq
                     assert al is not None, reduced_read_list[i]
-                    trimmedAlignments.append(al.trimByQuality(0.3, 100))
+                    trimmedAlignments.append(al.trimByQuality(0.4, 100))
                 contra_index = 0
                 contra = []
                 support = len(trimmedAlignments)

@@ -344,6 +344,27 @@ class AlignmentPiece:
             elif c == "I":
                 cur_query += n
 
+    def events(self):
+        # type: (bool) -> Generator[int]
+        assert self.cigar != "="
+        cur_query = self.seg_from.left
+        cur_tar = self.seg_to.left
+        for n, c in easy_cigar.CigarToList(self.cigar):
+            if c == 'M':
+                for i in range(n):
+                    if self.seg_from.contig[cur_query] == self.seg_to.contig[cur_tar]:
+                        yield 0
+                    else:
+                        yield 1
+                    cur_tar += 1
+                    cur_query += 1
+            elif c == "D":
+                for i in range(n):
+                    yield 2
+            elif c == "I":
+                for i in range(n):
+                    yield 3
+
     def asMatchingStrings(self):
         pos_pairs = list(self.matchingPositions())
         l1 = []

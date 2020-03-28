@@ -2,6 +2,7 @@ from typing import Dict, List
 
 from alignment.align_tools import Aligner
 from common import basic
+from common.alignment_storage import AlignmentPiece
 from common.sequences import ContigStorage, Segment
 from disjointig_resolve.smart_storage import SegmentStorage
 
@@ -42,3 +43,23 @@ def checkUnique(aligner, seqs, genome, k):
                 print "Confirmed candidate:", contig, al
             else:
                 print "Failed candidate:", contig, al
+
+
+class ReadState:
+    def __init__(self, name, pi, pd, pmm, weight, pend):
+        self.name = name
+        self.pi = pi
+        self.pd = pd
+        self.pmm = pmm
+        self.weight = weight
+
+states = [ReadState("Normal", 0.05, 0.03, 0.02, 0.99, 0.0001),
+         ReadState("HomoInsertion", 0.5, 0.1, 0.1, 0.005, 0.02),
+         ReadState("BadRegion", 0.1, 0.1, 0.1, 0.005, 0.02)]
+
+def markAlignmentQuality(al):
+    # type: (AlignmentPiece) -> SegmentStorage
+    events = list(al.events())
+    res = [[0] * len(states)]
+    res[0][0] = 1
+
