@@ -766,6 +766,15 @@ class MatchingSequence:
             right = self.mapDown(seg.right - 1, roundDown=False)
         return Segment(contig, left, right + 1)
 
+    def mapSegUp(self, contig, seg, mapIn = True):
+        if mapIn:
+            left = self.mapUp(seg.left, roundDown=False)
+            right = self.mapUp(seg.right - 1)
+        else:
+            left = self.mapUp(seg.left)
+            right = self.mapUp(seg.right - 1, roundDown=False)
+        return Segment(contig, left, right + 1)
+
     def mapUp(self, pos, roundDown = True):
         # type: (int, bool) -> Optional[int]
         if roundDown:

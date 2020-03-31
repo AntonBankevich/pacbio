@@ -167,7 +167,9 @@ class UniqueMarker:
 
     def splitBad(self, line, lines):
         # type: (NewLine, NewLineStorage) -> None
-        segs = list(line.read_alignments.filterByCoverage(mi=params.reliable_coverage, k=params.k)) # type: List[Segment]
+        s = AlignmentStorage()
+        s.addAll(al for al in line.read_alignments if not al.contradictingRTC())
+        segs = list(s.filterByCoverage(mi=params.reliable_coverage, k=params.k)) # type: List[Segment]
         segs = filter(lambda seg: len(seg) >= params.k, segs)
         if len(segs) == 0:
             sys.stdout.warn("No part of a unique edge is covered by reads", line.id)

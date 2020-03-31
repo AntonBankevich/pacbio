@@ -241,7 +241,7 @@ def ExtendShortContigs(contigs, reads, aligner, polisher):
 #            tmp_contig.seq = tmp_contig.seq[max(0, l - params.k):-max(1, r - params.k)]
         if len(tmp_contig) > params.k + 500:
             sys.stdout.info("Prolonged contig", contig.id, "for", l, "and", r, "nucleotides from left and right")
-            contigs.add(Contig(tmp_contig.seq, contig.id))
+            contigs.add(Contig(tmp_contig.rc.seq, contig.id))
         else:
             sys.stdout.warn("Could not prolong contig", contig.id, "enough. Removing it.")
             contigs.remove(contig)

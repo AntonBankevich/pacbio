@@ -127,6 +127,8 @@ class LineExtender:
             print "Reads from record:"
             for al in rec:
                 print al, al.seg_from.contig.alignments
+            print rec.reads
+            print rec.potential_good
         # Update resolved segments on all relevant contig positions
         self.updateResolved(records)
 
@@ -167,14 +169,16 @@ class LineExtender:
         for seg in corrected:
             # print "initial:", seg
             seg = seg.expandLeft(params.k)
+            print "Alignments relevant for", seg, list(self.dot_plot.allInter(seg))
             for al in self.dot_plot.allInter(seg):
                 # print "Alignment:", al
+                seg1 = al.matchingSequence().mapSegUp(al.seg_from.contig, seg)
                 line = al.seg_from.contig  # type:NewLine
-                for seg_correct in line.correct_segments.allInter(al.seg_from):
+                for seg_correct in line.correct_segments.allInter(seg):
                     # print "candidate correct segment:",seg_correct
                     for seg_resolved in line.completely_resolved.allInter(seg_correct):
                         # print "candidate resolved segment:", seg_resolved
-                        if seg_resolved in records:
+                        if seg_resolved in records or seg_resolved.interSize(seg1) < params.k - 100:
                             continue
                         if seg_resolved.right == len(line):
                             next_start = len(line)
@@ -185,18 +189,22 @@ class LineExtender:
                             else:
                                 next_start = next.left
                         next_start = min(next_start, len(line) - 200)
-                        focus = line.segment(seg_resolved.right - params.k, min(seg_correct.right, next_start + params.k))
+                        focus = line.segment(max(seg_resolved.left, min(seg_resolved.right - params.k, seg1.left)),
+                                             min(seg_correct.right, next_start + params.k))
                         als = list(line.getRelevantAlignmentsFor(focus))
                         reads  = ContigStorage()
                         for al in als:
                             reads.add(al.seg_from.contig)
                         als = list(self.aligner.localAlign(reads.unique(), ContigStorage([line])))
                         final_als = []
+                        print "Focus:", focus, seg_resolved
+                        print als
                         for al in als:
                             if al.seg_to.contig == line.rc:
                                 al = al.rc
                             if al.seg_to.interSize(focus) >= params.k - 100:
                                 final_als.append(al)
+                        print final_als
                         sys.stdout.trace("Finished realignment of reads")
                         records[seg_resolved] = self.createRecord(seg_resolved, next_start, seg_correct, final_als, good_reads, read_bounds)
         records = list(records.values())  # type: List[LineExtender.Record]
@@ -547,12 +555,16 @@ class LineExtender:
                     if al.seg_from.contig.id not in self.good_reads:
                         print "New good read:", al
                         self.good_reads.add(al.seg_from.contig.id)
+                else:
+                    print "Read does not overlap resolved", al, self.resolved
             while len(self.potential_good) > 0 and self.potential_good[-1].seg_to.left <= self.resolved.right - params.k:
                 al = self.potential_good.pop()
                 if al.seg_to.interSize(self.resolved) >= params.k:
                     if al.seg_from.contig.id not in self.good_reads:
                         print "New good read from potential:", al
                         self.good_reads.add(al.seg_from.contig.id)
+                else:
+                    print "Read does not overlap resolved", al, self.resolved
 
         def pop(self):
             return self.reads.pop()
@@ -579,7 +591,6 @@ class LineExtender:
         # als = filter(lambda al: al.seg_from.left > params.k / 2 + 20, als)
         res.addAll(als)
         res.updateGood()
-
         return res
 
     def findResolvedBound(self, rec, inter_size):
