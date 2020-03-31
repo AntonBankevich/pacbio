@@ -175,7 +175,7 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
     for edge in graph.e.values():
         if basic.isCanonocal(edge.id) and edge.unique and \
                 (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
-            if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 30000):
+            if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 40000):
                 contigs.add(Contig(edge.seq, edge.id))
             else:
                 sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
