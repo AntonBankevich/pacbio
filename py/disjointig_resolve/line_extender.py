@@ -167,18 +167,18 @@ class LineExtender:
         records = dict()  # type: Dict[Segment, LineExtender.Record]
         good_reads = set()
         for seg in corrected:
-            # print "initial:", seg
+            print "Oppa initial:", seg
             seg = seg.expandLeft(params.k)
             print "Alignments relevant for", seg, list(self.dot_plot.allInter(seg))
             for al in self.dot_plot.allInter(seg):
                 # print "Alignment:", al
                 seg1 = al.matchingSequence().mapSegUp(al.seg_from.contig, seg)
                 line = al.seg_from.contig  # type:NewLine
-                for seg_correct in line.correct_segments.allInter(seg):
+                for seg_correct in line.correct_segments.allInter(al.seg_from):
                     # print "candidate correct segment:",seg_correct
                     for seg_resolved in line.completely_resolved.allInter(seg_correct):
                         # print "candidate resolved segment:", seg_resolved
-                        if seg_resolved in records or seg_resolved.interSize(seg1) < params.k - 100:
+                        if seg_resolved in records:
                             continue
                         if seg_resolved.right == len(line):
                             next_start = len(line)
