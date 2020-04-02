@@ -127,6 +127,15 @@ class ContigStorage:
                 self.add(Contig(rec.seq, rec.id))
         return self
 
+    def loadFromFile(self, fname, num_names=True):
+        # type: (str, bool) -> ContigCollection
+        for rec in SeqIO.parse_by_name(fname):
+            if num_names:
+                self.add(Contig(rec.seq, str(basic.parseNegativeNumberAndMod(rec.id))))
+            else:
+                self.add(Contig(rec.seq, rec.id))
+        return self
+
     def writeToFasta(self, handler):
         for contig in self.unique():
             SeqIO.write(contig, handler, "fasta")
