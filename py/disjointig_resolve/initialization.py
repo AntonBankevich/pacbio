@@ -194,7 +194,7 @@ def CreateReadCollection(reads_file, cut_reads, downsample):
     if downsample < 1:
         sys.stdout.info("Downsampling:", downsample)
         reads = ReadCollection()
-        reads.loadFromFasta(open(reads_file, "r"))
+        reads.loadFromFile(reads_file)
         num = int(reads.__len__() * downsample)
     reads = ReadCollection()
     reads.loadFromFasta(open(reads_file, "r"), num, cut_reads)
