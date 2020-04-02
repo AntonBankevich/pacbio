@@ -341,7 +341,7 @@ if __name__ == "__main__":
     aln = Aligner(DirDistributor(dir))
     basic.CreateLog(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"), False)
-    for al in aln.localAlign(ReadCollection().loadFromFasta(open(query, "r")), contigs):
+    for al in aln.localAlign(ReadCollection().loadFromFile(query), contigs):
         sys.stdout.write(str(al))
         if len(al) > 40000:
             print ""

@@ -1368,6 +1368,24 @@ class ReadCollection:
                 break
         return self
 
+    def loadFromFile(self, fname, downsample = 1000000000, cut_reads = None):
+        # type: (str, int, Optional[int]) -> ReadCollection
+        if downsample is None:
+            downsample = 1000000000
+        cnt = 0
+        for rec in SeqIO.parse_by_name(fname):
+            cnt += 1
+            if cut_reads is not None and len(rec.seq) > cut_reads:
+                for i in range(len(rec.seq) / cut_reads):
+                    tmp = rec.subSequence(i* cut_reads, i * cut_reads + cut_reads)
+                    tmp.id = rec.id + "_" + str(i)
+                    self.add(AlignedRead(tmp))
+            else:
+                self.add(AlignedRead(rec))
+            if cnt >= downsample:
+                break
+        return self
+
     def nontontradictingCopy(self, contig):
         res = ReadCollection()
         for read in self.inter(contig.asSegment()):
