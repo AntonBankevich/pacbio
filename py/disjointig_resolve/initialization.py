@@ -129,13 +129,16 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
         if not al.contradictingRTC(al.seg_to.contig.asSegment(), params.bad_end_length) and len(al.seg_from.contig) > len(al) - 2 * params.bad_end_length:
             good_reads.add(al.seg_from.contig.id)
     sys.stdout.info("Fraction of reads without full alignment to disjointigs:", 1 - float(len(good_reads)) / len(reads))
+    if len(good_reads) > 0.99 * len(bad_reads):
+        sys.stdout.info("Alomst all reads have good alignments. Skipping disjointig collection extension.")
+        return disjointigs
     rf = os.path.join(dir, "badreads.fasta")
     bad_reads = bad_reads.filter(lambda read: read.id not in good_reads)
     tlen = sum(map(len, bad_reads))
     bad_reads.print_fasta(open(rf, "w"))
     l = tlen * clen / tlen0
     assembly_dir = os.path.join(dir, "assembly0")
-    disjointigs_file = constructDisjointigs(reads, l, assembly_dir)
+    disjointigs_file = constructDisjointigs(bad_reads, l, assembly_dir)
     code = 0
 
     if code == 0:
