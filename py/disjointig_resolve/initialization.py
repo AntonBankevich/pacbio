@@ -131,6 +131,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     sys.stdout.info("Fraction of reads without full alignment to disjointigs:", 1 - float(len(good_reads)) / len(reads))
     if len(good_reads) > 0.99 * len(bad_reads):
         sys.stdout.info("Alomst all reads have good alignments. Skipping disjointig collection extension.")
+        disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
         return disjointigs
     rf = os.path.join(dir, "badreads.fasta")
     bad_reads = bad_reads.filter(lambda read: read.id not in good_reads)
