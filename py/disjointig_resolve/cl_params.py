@@ -33,6 +33,7 @@ class Params:
         self.mode = "before"
         self.cut_reads = None
         self.autoKL = True
+        self.read_dump = None
 
     def check(self):
         if self.dir is None:
@@ -126,7 +127,7 @@ class Params:
 
     def set_flye_dir(self, value, mode):
         self.flye_dir = value
-        graph_file, contigs_file, disjointigs_file, rep_dir, graph_file_after, contigs_file_after = parseFlyeDir(self.flye_dir)
+        graph_file, contigs_file, disjointigs_file, rep_dir, read_dump, graph_file_after, contigs_file_after = parseFlyeDir(self.flye_dir)
         if mode == "after":
             graph_file = graph_file_after
             contigs_file = contigs_file_after
@@ -134,6 +135,7 @@ class Params:
             self.graph_file = graph_file
         if self.contigs_file is None:
             self.contigs_file = contigs_file
+        self.read_dump = read_dump
         self.disjointigs_file_list.append(disjointigs_file)
 
     def alignmentDir(self):
@@ -171,9 +173,9 @@ class Params:
 
 def parseFlyeDir(flye_dir):
     if "00-assembly" in os.listdir(flye_dir):
-        res = os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(flye_dir, "10-consensus", "consensus.fasta"), os.path.join(flye_dir, "20-repeat")
+        res = os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(flye_dir, "10-consensus", "consensus.fasta"), os.path.join(flye_dir, "20-repeat"), os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
     else:
-        res = os.path.join(flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(flye_dir, "2-repeat", "graph_before_rr.fasta"), os.path.join(flye_dir, "1-consensus", "consensus.fasta"), os.path.join(flye_dir, "2-repeat")
+        res = os.path.join(flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(flye_dir, "2-repeat", "graph_before_rr.fasta"), os.path.join(flye_dir, "1-consensus", "consensus.fasta"), os.path.join(flye_dir, "2-repeat"), os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
     if not os.path.isfile(os.path.join(flye_dir, "scaffolds.fasta")):
         res = res + (os.path.join(flye_dir, "assembly_graph.gv"), os.path.join(flye_dir, "assembly.fasta"))
     else:

@@ -135,7 +135,7 @@ def main(args):
         if cl_params.autoKL:
             adjustKL(aligner, reads, contigs)
 
-        ExtendShortContigs(contigs, reads, aligner, polisher)
+        ExtendShortContigs(contigs, reads, aligner, polisher, cl_params.read_dump)
 
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 

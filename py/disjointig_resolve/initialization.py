@@ -200,10 +200,23 @@ def CreateReadCollection(reads_file, cut_reads, downsample):
     reads.loadFromFasta(open(reads_file, "r"), num, cut_reads)
     return reads
 
+def RelevantReadsFromDump(read_dump, edges, reads):
+    relevant_read_ids = dict()
+    for eid in edges:
+        relevant_read_ids[eid] = []
+    for s in open(read_dump, "r").readlines():
+        s = s.split()
+        if s[0] != "Aln":
+            continue
+        eid = s[6].split("_")[1]
+        rid = s[2][1:]
+        if eid in relevant_read_ids:
+            relevant_read_ids[eid].append(reads[rid])
+    return relevant_read_ids
 
 # TODO: many short edges are not really unique. Need to address it properly
-def ExtendShortContigs(contigs, reads, aligner, polisher):
-    # type: (ContigStorage, ReadCollection, Aligner, Polisher) -> None
+def ExtendShortContigs(contigs, reads, aligner, polisher, read_dump):
+    # type: (ContigStorage, ReadCollection, Aligner, Polisher, str) -> None
     sys.stdout.info("Extending short lines")
     short_contigs = ContigStorage()
     als = dict() # type: Dict[str, List[AlignmentPiece]]
@@ -212,19 +225,29 @@ def ExtendShortContigs(contigs, reads, aligner, polisher):
             short_contigs.add(contig)
             als[contig.id] = []
             als[contig.rc.id] = []
-    for al in aligner.overlapAlign(reads, short_contigs):
-        if al.seg_to.left <= 20 and al.rc.seg_to.left <= 20:
-            added = False
-            for i, al1 in enumerate(als[al.seg_to.contig.id]):
-                if al1.seg_from.contig.id == al.seg_from.contig.id:
-                    added = True
-                    if al.percentIdentity() > al1.percentIdentity():
-                        als[al.seg_to.contig.id][i] = al
-                        als[al.seg_to.contig.rc.id][i] = al.rc
-                    break
-            if not added:
+
+    if read_dump is not None:
+        print "Using flye read dump file to extend short contigs"
+        relevant_reads = RelevantReadsFromDump(read_dump, short_contigs, reads)
+        for contig in short_contigs:
+            for al in aligner.overlapAlign(relevant_reads[contig.id], ContigStorage([contig])):
                 als[al.seg_to.contig.id].append(al)
                 als[al.seg_to.contig.rc.id].append(al.rc)
+    else:
+        print "Realigning all reads to extend short contigs"
+        for al in aligner.overlapAlign(reads, short_contigs):
+            if al.seg_to.left <= 20 and al.rc.seg_to.left <= 20:
+                added = False
+                for i, al1 in enumerate(als[al.seg_to.contig.id]):
+                    if al1.seg_from.contig.id == al.seg_from.contig.id:
+                        added = True
+                        if al.percentIdentity() > al1.percentIdentity():
+                            als[al.seg_to.contig.id][i] = al
+                            als[al.seg_to.contig.rc.id][i] = al.rc
+                        break
+                if not added:
+                    als[al.seg_to.contig.id].append(al)
+                    als[al.seg_to.contig.rc.id].append(al.rc)
     for contig in short_contigs.unique():
         if len(als[contig.id]) > 0:
             tmp_contig, new_als = polisher.polishEnd(als[contig.id], params.reliable_coverage)
