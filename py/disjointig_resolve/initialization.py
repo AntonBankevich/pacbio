@@ -9,7 +9,7 @@ from alignment.align_tools import Aligner
 from alignment.polishing import Polisher
 from common import params, basic
 from common.SimpleGraph import SimpleGraph
-from common.alignment_storage import ReadCollection, AlignmentPiece
+from common.alignment_storage import ReadCollection, AlignmentPiece, AlignedRead
 from common.dot_parser import DotParser
 from common.save_load import TokenReader
 from common.sequences import ContigCollection, ContigStorage, Contig
@@ -205,9 +205,10 @@ def CreateReadCollection(reads_file, cut_reads, downsample):
     return reads
 
 def RelevantReadsFromDump(read_dump, edges, reads):
+    # type: (str, ContigStorage, ReadCollection) -> Dict[str, List[AlignedRead]]
     relevant_read_ids = dict()
-    for eid in edges:
-        relevant_read_ids[eid] = []
+    for edge in edges:
+        relevant_read_ids[edge.id] = []
     for s in open(read_dump, "r").readlines():
         s = s.split()
         if s[0] != "Aln":
