@@ -22,7 +22,7 @@ class Params:
         self.threads = 8
         self.test = False
         self.init_file = None
-        self.long_params = "test stats init-file= size= mode= nano cut-reads= homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test stats force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
