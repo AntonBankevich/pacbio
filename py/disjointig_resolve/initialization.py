@@ -155,34 +155,39 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     return disjointigs
 
 
-def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher, reads):
+def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher, reads, force_unique):
     sys.stdout.info("Creating contig collection")
-    graph = SimpleGraph().ReadDot(graph_file)
-    graph.FillSeq(contigs_file)
-    covs = []
-    for e in graph.e.values():
-        covs.append((e.len, e.cov))
-    tmp_cov = []
-    total = sum(l for c,l in covs) / 2
-    for l, c in sorted(covs)[::-1]:
-        if total < 0:
-            break
-        tmp_cov.append((l, c))
-        total -= l
-    avg_cov = float(sum([l * c for l, c in tmp_cov])) / sum(l for l, c in tmp_cov)
-    sys.stdout.info("Average coverage determined:", avg_cov)
-    # if graph_file is not None:
-    #     nonunique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if not (val[4].unique and val[4].cov >= min_cov)]
-    # else:
-    #     nonunique = []
-    contigs = ContigCollection()
-    for edge in graph.e.values():
-        if basic.isCanonocal(edge.id) and edge.unique and \
-                (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
-            if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 40000):
-                contigs.add(Contig(edge.seq, edge.id))
-            else:
-                sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
+    if force_unique is None:
+        graph = SimpleGraph().ReadDot(graph_file)
+        graph.FillSeq(contigs_file)
+        covs = []
+        for e in graph.e.values():
+            covs.append((e.len, e.cov))
+        tmp_cov = []
+        total = sum(l for c,l in covs) / 2
+        for l, c in sorted(covs)[::-1]:
+            if total < 0:
+                break
+            tmp_cov.append((l, c))
+            total -= l
+        avg_cov = float(sum([l * c for l, c in tmp_cov])) / sum(l for l, c in tmp_cov)
+        sys.stdout.info("Average coverage determined:", avg_cov)
+        # if graph_file is not None:
+        #     nonunique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if not (val[4].unique and val[4].cov >= min_cov)]
+        # else:
+        #     nonunique = []
+        contigs = ContigCollection()
+        for edge in graph.e.values():
+            if basic.isCanonocal(edge.id) and edge.unique and \
+                    (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
+                if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 40000):
+                    contigs.add(Contig(edge.seq, edge.id))
+                else:
+                    sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
+    else:
+        print "Using forced unique edge set"
+        print force_unique
+        contigs = ContigCollection().loadFromFile(contigs_file).filter(lambda contig: contig.id in force_unique)
     # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
     # contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
     sys.stdout.info("Created", len(contigs), "initial contigs")

@@ -34,6 +34,7 @@ class Params:
         self.cut_reads = None
         self.autoKL = True
         self.read_dump = None
+        self.force_unique = None
 
     def check(self):
         if self.dir is None:
@@ -90,6 +91,8 @@ class Params:
                 self.min_cov = float(value)
             elif key == "--load":
                 self.load_from = value
+            elif key == "--force-unique":
+                self.force_unique = value.split(",")
             elif key == "-t":
                 self.threads = int(value)
             elif key == "-k":

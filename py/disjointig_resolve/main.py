@@ -130,7 +130,7 @@ def main(args):
             cl_params.disjointigs_file_list.append(disjointigs_file)
             params.min_contra_for_break = 8
 
-        contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads)
+        contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads, cl_params.force_unique)
 
         if cl_params.autoKL:
             adjustKL(aligner, reads, contigs)
