@@ -175,10 +175,10 @@ class Params:
         self.downsample = float(handler.readToken())
 
 def parseFlyeDir(flye_dir):
-    if "00-assembly" in os.listdir(flye_dir):
+    if "20-repeat" in os.listdir(flye_dir):
         res = os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv"), os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta"), os.path.join(flye_dir, "10-consensus", "consensus.fasta"), os.path.join(flye_dir, "20-repeat"), os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
     else:
-        res = os.path.join(flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(flye_dir, "2-repeat", "graph_before_rr.fasta"), os.path.join(flye_dir, "1-consensus", "consensus.fasta"), os.path.join(flye_dir, "2-repeat"), os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
+        res = os.path.join(flye_dir, "2-repeat", "graph_before_rr.gv"), os.path.join(flye_dir, "2-repeat", "graph_before_rr.fasta"), os.path.join(flye_dir, "1-consensus", "consensus.fasta"), os.path.join(flye_dir, "2-repeat"), os.path.join(flye_dir, "2-repeat", "read_alignment_dump")
     if not os.path.isfile(os.path.join(flye_dir, "scaffolds.fasta")):
         res = res + (os.path.join(flye_dir, "assembly_graph.gv"), os.path.join(flye_dir, "assembly.fasta"))
     else:
