@@ -260,9 +260,9 @@ def ExtendShortContigs(contigs, reads, aligner, polisher, read_dump):
                     als[al.seg_to.contig.rc.id].append(al.rc)
     for contig in short_contigs.unique():
         if len(als[contig.id]) > 0:
-            tmp_contig, new_als = polisher.polishEnd(als[contig.id], params.reliable_coverage)
+            tmp_contig, new_als = polisher.polishEnd(als[contig.id], params.reliable_coverage, params.l - len(contig))
             r = len(tmp_contig) - len(contig)
-            tmp_contig, new_als = polisher.polishEnd([al.rc for al in new_als], params.reliable_coverage)
+            tmp_contig, new_als = polisher.polishEnd([al.rc for al in new_als], params.reliable_coverage, params.l - len(contig))
             l = len(tmp_contig) - len(contig) - r
         else:
             tmp_contig, new_als = contig, als[contig.id]

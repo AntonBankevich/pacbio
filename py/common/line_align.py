@@ -279,17 +279,22 @@ class Scorer:
             return 0, 1000, 1000
         p1 = 0
         p2 = 0
-        alignment_length_penalty = min(self.scores.avgInsScore(), self.scores.avgDelScore())
+        alignment_length_penalty = min(self.scores.avgInsScore(), self.scores.avgDelScore()) / 3
         # we penalize alignment that ends earlier on the left by the alignment length differenth but only up to the start of alignment target
+        # if alignment is too close to contig end it is ignored.
         if al1.seg_from.left > al2.seg_from.left:
-            p1 += min(al1.seg_from.left - al2.seg_from.left, al1.seg_to.left) * alignment_length_penalty
+            if al1.seg_to.left > 50:
+                p1 += min(al1.seg_from.left - al2.seg_from.left, al1.seg_to.left) * alignment_length_penalty
         else:
-            p2 += min(al2.seg_from.left - al1.seg_from.left, al2.seg_to.left) * alignment_length_penalty
+            if al2.seg_to.left > 50:
+                p2 += min(al2.seg_from.left - al1.seg_from.left, al2.seg_to.left) * alignment_length_penalty
         # same for the right end
         if al1.seg_from.right > al2.seg_from.right:
-            p2 += min(al1.seg_from.right - al2.seg_from.right, len(al2.seg_to.contig) - al2.seg_to.right) * alignment_length_penalty
+            if al1.rc.seg_to.left > 50:
+                p2 += min(al1.seg_from.right - al2.seg_from.right, len(al2.seg_to.contig) - al2.seg_to.right) * alignment_length_penalty
         else:
-            p1 += min(al2.seg_from.right - al1.seg_from.right, len(al1.seg_to.contig) - al1.seg_to.right) * alignment_length_penalty
+            if al2.rc.seg_to.left > 50:
+                p1 += min(al2.seg_from.right - al1.seg_from.right, len(al1.seg_to.contig) - al1.seg_to.right) * alignment_length_penalty
         full_scores = self.scoreCommon(al1, al2)
         # On this segment both alignments go to correct sequences. We place larger weight on differences in this segment.
         q1 = al1.reduce(target=seg1).seg_from

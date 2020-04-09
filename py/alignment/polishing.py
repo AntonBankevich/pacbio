@@ -237,10 +237,11 @@ class Polisher:
             al = self.polishSmallSegment(contig.asSegment(), tmp_als)
             yield al.seg_to.contig, [al1.compose(al) for al1 in tmp_als]
 
-    def polishEnd(self, als, min_cov = 4, min_cov_frac = 0.8):
-        # type: (List[AlignmentPiece], int, int) -> Tuple[Contig, List[AlignmentPiece]]
+    def polishEnd(self, als, min_cov = 4, min_cov_frac = 0.8, max_extension = None):
+        # type: (List[AlignmentPiece], int, int, int) -> Tuple[Contig, List[AlignmentPiece]]
         scorer = Scorer()
         contig = als[0].seg_to.contig
+        max_len = max_extension + len(contig)
         print "Polishing end of", als[0].seg_to.contig
         new_contig = contig.asSegment().asContig()
         relevant_als = [al.changeTargetContig(new_contig) for al in als if al.rc.seg_to.left < 100]
@@ -306,6 +307,7 @@ class Polisher:
                         if al.contradictingRTCRight():
                             contra.append(al)
                     else:
+                        print "Stopped at:", support, contra_index, (1 - min_cov_frac) * support
                         break
                 print "Positions:", [al.seg_to.right for al in trimmedAlignments]
                 print "Contra:", contra
@@ -353,6 +355,8 @@ class Polisher:
                 else:
                     print "Could not prolong with read", base_al, "Alignments:"
                     print map(str, reduced_read_list)
+            if len(new_contig) >= max_len:
+                break
             if not found:
                 break
         return new_contig, relevant_als + finished_als
