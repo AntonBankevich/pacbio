@@ -239,6 +239,8 @@ class Polisher:
 
     def polishEnd(self, als, min_cov = 4, min_cov_frac = 0.8, max_extension = None):
         # type: (List[AlignmentPiece], int, int, int) -> Tuple[Contig, List[AlignmentPiece]]
+        if max_extension is None:
+            max_extension = 10000000000
         scorer = Scorer()
         contig = als[0].seg_to.contig
         max_len = max_extension + len(contig)
