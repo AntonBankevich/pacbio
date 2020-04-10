@@ -339,7 +339,7 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
                     else:
                         ok = al.seg_from.RC() < al.seg_to
                 else:
-                    ok = basic.canonical(al.seg_from.contig.id) < basic.canonical(al.seg_to.contig.id)
+                    ok = True
                 if ok:
                     self.addAlignment(al)
 

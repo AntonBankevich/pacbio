@@ -95,6 +95,7 @@ class Params:
                 self.force_unique = value.split(",")
             elif key == "-t":
                 self.threads = int(value)
+                params.threads = self.threads
             elif key == "-k":
                 params.k = int(value)
                 params.l = max(params.l, params.k + 100)

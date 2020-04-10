@@ -114,7 +114,7 @@ class DirDistributor:
 
 
 class Aligner:
-    def __init__(self, dir_distributor, threads = 16):
+    def __init__(self, dir_distributor, threads = params.threads):
         # type: (DirDistributor, int) -> Aligner
         self.dir_distributor = dir_distributor
         self.threads = threads
