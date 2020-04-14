@@ -331,9 +331,24 @@ class LineExtender:
             if skip:
                 continue
             new_als = []
+            if name == "-NCTC9002/40629/0_17137_0":
+                print "DO"
+                print "Contigs:"
+                for al in als:
+                    print al
+                    print al[0].seg_to.contig.seq
+                print "Alignments before correction:"
+                for al in als:
+                    print al
+                    print "\n".join(al[0].asMatchingStrings2())
             for al in als:
                 if not al[0].contradictingRTC(tail_size=params.bad_end_length):
                     new_als.append((self.scorer.polyshAlignment(al[0], params.alignment_correction_radius), al[1]))
+            if name == "-NCTC9002/40629/0_17137_0":
+                print "Alignments after correction:"
+                for al in als:
+                    print al
+                    print "\n".join(al[0].asMatchingStrings2())
             if len(new_als) == 0:
                 sys.stdout.warn("No noncontradicting alignments of a read")
                 winner = None

@@ -67,6 +67,7 @@ class Scorer:
                 ne.set(j, res)
             prev = ne
         return prev.get(alignment[-1][1])
+
     def __init__(self, scores = None):
         if scores is None:
             scores = params.scores
@@ -302,6 +303,12 @@ class Scorer:
         if q1.inter(q2):
             seg = q1.cap(q2)
             correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
+            if al1.seg_from.contig.id == "-NCTC9002/40629/0_17137_0":
+                print "Reduced:", seg
+                print al1, seg1, q1, al1.reduce(query=seg)
+                print "\n".join(al1.reduce(query=seg).asMatchingStrings2())
+                print al2, seg2, q2, al2.reduce(query=seg)
+                print "\n".join(al2.reduce(query=seg).asMatchingStrings2())
         else:
             correct_scores = full_scores
         if correct_scores[0] > correct_scores[1]:
