@@ -1,10 +1,9 @@
 import os
 import sys
 
-import common.log_params
-
 sys.path.append("py")
 sys.path.append(".")
+import common.log_params
 from common.basic import CreateLog
 from typing import Optional, List, Iterable, Tuple
 from alignment.align_tools import Aligner, DirDistributor

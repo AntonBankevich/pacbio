@@ -30,7 +30,7 @@ def main(contigs_file, contig_name, reads_file, dir, k):
         tmp.append(al)
     als = tmp
     als = sorted(als, key=lambda al: al.seg_to.left / 50 * 1000000 + al.seg_to.right - al.seg_to.left)
-    w = 30
+    w = 20
     f = open(os.path.join(dir, "reads.fasta"), "w")
     for al in als:
         if len(al) < k:
