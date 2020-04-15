@@ -171,7 +171,7 @@ class Scorer:
         return res
 
     def minInRange(self, vals, r):
-        res = self.maxInRange([-a for a in vals], r)
+        res = self.maxInRange([(-a, b) for a, b in vals], r)
         return [-a for a in res]
 
     def generateBounds(self, alignment, r):
