@@ -369,9 +369,9 @@ class FakePolishingArgs:
         self.threads = params.threads
 
 if __name__ == "__main__":
-    reads_file = sys.argv[1]
-    consensus_file = sys.argv[2]
-    dir = sys.argv[3]
+    reads_file = sys.argv[2]
+    consensus_file = sys.argv[3]
+    dir = sys.argv[1]
     CreateLog(dir)
     dd = DirDistributor(dir)
     aligner = Aligner(dd)
