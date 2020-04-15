@@ -172,18 +172,33 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
             total -= l
         avg_cov = float(sum([l * c for l, c in tmp_cov])) / sum(l for l, c in tmp_cov)
         sys.stdout.info("Average coverage determined:", avg_cov)
-        # if graph_file is not None:
-        #     nonunique = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if not (val[4].unique and val[4].cov >= min_cov)]
-        # else:
-        #     nonunique = []
+        nonunique = set()
+        for edge in graph.e.values():
+            if edge.unique and edge.len < 20000 and len(graph.v[edge.start].out) > 1:
+                if edge.cov >= min_cov and (edge.cov < 0.8 * avg_cov or edge.len > 40000):
+                    alter = ContigStorage()
+                    for e in graph.v[edge.start].out:
+                        if e != edge:
+                            alter.add(Contig(e.seq, e.id))
+                    for al in aligner.localAlign([Contig(edge.seq, edge.id)], alter):#type: AlignmentPiece
+                        if al.percentIdentity() > 0.98 and (al.seg_from.left < 100 and al.seg_to.left < 100 and len(al) > min(500, edge.len)):
+                            nonunique.add(edge.id)
+                            nonunique.add(basic.Reverse(edge.id))
         contigs = ContigCollection()
         for edge in graph.e.values():
-            if basic.isCanonocal(edge.id) and edge.unique and \
-                    (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
-                if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 40000):
+            if basic.isCanonocal(edge.id):
+                if edge.unique and (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
+                    if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 40000):
+                        if edge.id in nonunique:
+                            sys.stdout.info("Edge removed based on alignment to alternative:", edge.id, edge.cov, edge.len)
+                        else:
+                            contigs.add(Contig(edge.seq, edge.id))
+                    else:
+                        sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
+                elif edge.len > 100000 and edge.cov < 1.5 * avg_cov:
                     contigs.add(Contig(edge.seq, edge.id))
-                else:
-                    sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
+                    sys.stdout.info("Edge added based on length and coverage:", edge.id, edge.cov, edge.len)
+
     else:
         print "Using forced unique edge set"
         print force_unique

@@ -150,20 +150,35 @@ class Scorer:
                 while len(dec) > 0 and dec[-1][0] <= vals[curr][0]:
                     dec.pop()
                 dec.append(vals[curr])
-            while curl < len(vals) and len(dec) > 1 and i > dec[0][1]:
+            while curl < len(vals) and len(dec) > 0 and i > dec[0][1]:
                 dec.popleft()
                 curl += 1
-            res.append(dec[0][0])
+            if len(dec) > 0:
+                res.append(dec[0][0])
+            else:
+                res.append(None)
+        assert res[0] is not None and res[-1] is not None
+        res1 = list(res)
+        for i, val in enumerate(res):
+            if val is None:
+                res1[i] = res1[i - 1]
+        for i in range(len(res)):
+            if res[len(res) - 1 - i] is None:
+                res1[len(res) - 1 - i] = max(res1[len(res) - 1 - i], res1[len(res) - i])
+        res = res1
         for i in range(len(res))[::-1]:
             res[i] = max(res[i], res[max(0, i - r)])
         return res
 
+    def minInRange(self, vals, r):
+        res = self.maxInRange([-a for a in vals], r)
+        return [-a for a in res]
 
     def generateBounds(self, alignment, r):
         # type: (MatchingSequence, int) -> List[Tuple[int, int]]
         upper = self.maxInRange([(b - a, a) for a, b in alignment.matches], r)
-        lower = self.maxInRange([(a - b, a) for a, b in alignment.matches], r)
-        return [(-a + i, b + i) for a, b, i in zip(lower, upper, range(alignment.matches[0][0], alignment.matches[-1][0] + 1))]
+        lower = self.minInRange([(b - a, a) for a, b in alignment.matches], r)
+        return [(a + i, b + i) for a, b, i in zip(lower, upper, range(alignment.matches[0][0], alignment.matches[-1][0] + 1))]
 
     def adjustMin(self, old_val, old_shift, new_val, new_shift):
         # type: (int, Tuple[int, int], int, Tuple[int, int]) -> Tuple[int, Tuple[int, int]]
