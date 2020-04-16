@@ -622,7 +622,7 @@ class AlignmentPiece:
             yield al
 
     def splitRef(self):
-        for al in self.split(150):
+        for al in self.split(100):
             yield al
 
     @staticmethod
