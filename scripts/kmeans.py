@@ -22,6 +22,13 @@ def fixAlDir(als, contig):
             res.append(al)
     return res
 
+def prolong(aligner, polisher, contig, reads):
+    als = list(aligner.overlapAlign(reads, contig))
+    contig, als = polisher.polishEnd(als, min_cov=8)
+    contig, als = polisher.polishEnd(contig.rc, [al.rc for al in als])
+    return contig
+
+
 def main(contigs_file, contig_name, reads_file, dir, k, initial_reads1, initial_reads2):
     basic.ensure_dir_existance(dir)
     basic.CreateLog(dir)
@@ -82,6 +89,23 @@ def main(contigs_file, contig_name, reads_file, dir, k, initial_reads1, initial_
         if read.id in initial_reads2:
             sys.stdout.write(read.id + " ")
     print ""
+    contig1 = prolong(aligner, polisher, contig1, reads1)
+    contig2 = prolong(aligner, polisher, contig2, reads1)
+    contig1.id = "1"
+    contig2.id = "2"
+    out = open(os.path.join(dir, "copies.fasta"), "w")
+    SeqIO.write(contig1, out, "fasta")
+    SeqIO.write(contig2, out, "fasta")
+    out.close()
+    out = open(os.path.join(dir, "reads1.fasta"), "w")
+    for read in reads1:
+        SeqIO.write(read, out, "fasta")
+    out.close()
+    out = open(os.path.join(dir, "reads2.fasta"), "w")
+    for read in reads2:
+        SeqIO.write(read, out, "fasta")
+    out.close()
+
 
 
 
