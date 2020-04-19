@@ -293,8 +293,8 @@ class LineExtender:
             line = ltl.seg_from.contig # type: NewLine
             new_copy = line.correct_segments.find(ltl.seg_from)
             # assert new_copy is not None and new_copy.interSize(ltl.seg_from) >= max(len(ltl.seg_from) - 20, params.k), str([ltl, new_copy, str(line.correct_segments)])
-            assert new_copy is not None, str([ltl, line.correct_segments])
-            if not new_copy.contains(ltl.seg_from):
+            # assert new_copy is not None, str([ltl, line.correct_segments])
+            if new_copy is None or not new_copy.contains(ltl.seg_from):
                 print "Warning: alignment of resolved segment to uncorrected segment"
                 print ltl, new_copy, line.correct_segments
             correct_segments.append(new_copy)

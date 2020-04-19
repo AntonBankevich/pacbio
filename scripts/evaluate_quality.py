@@ -13,7 +13,7 @@ from disjointig_resolve import cl_params
 from common.dot_parser import DotParser
 from alignment.align_tools import Aligner, DirDistributor
 from common import basic
-from common.sequences import ContigCollection
+from common.sequences import ContigCollection, Contig
 from common.alignment_storage import AlignmentPiece
 
 
@@ -30,68 +30,72 @@ def CreateLog(dir):
     sys.stderr = sys.stdout
 
 def extract_transfers(contigs, als):
-    # type: (ContigCollection, List[AlignmentPiece]) -> Dict[Tuple[str, str], Tuple[AlignmentPiece, AlignmentPiece]]
+    # type: (ContigCollection, List[AlignmentPiece]) -> Tuple[Dict[str, Tuple[Contig, AlignmentPiece, AlignmentPiece]], Dict[str, Tuple[Contig, AlignmentPiece, AlignmentPiece]]]
     als = als + map(lambda al: al.rc, als)
-    als = sorted(als, key= lambda al: (al.seg_to.contig.id, al.seg_to.left))
+    als = sorted(als, key= lambda al: (al.seg_to.contig.id, al.seg_to.left, al.seg_to.right))
     res = dict()
+    possible_term = dict()
     for id, it in itertools.groupby(als, lambda al: al.seg_to.contig.id):
         contig_als = list(it)
+        if len(contig_als) == 0:
+            continue
         print contig_als[0].seg_to.contig
         print [al.seg_from.contig.id for al in contig_als]
         print map(str, contig_als)
         for al1, al2 in zip(contig_als[:-1], contig_als[1:]):
-            res[(al1.seg_from.contig.id, al2.seg_from.contig.id)] = (al1, al2)
-            res[(al2.rc.seg_from.contig.id, al1.rc.seg_from.contig.id)] = (al2.rc, al1.rc)
-    return res
+            res[al1.seg_from.contig.id] = (al2.seg_from.contig, al1, al2)
+            res[al2.rc.seg_from.contig.id] = (al1.rc.seg_from.contig, al2.rc, al1.rc)
+        al1 = contig_als[-1]
+        al2 = contig_als[0]
+        if al1.seg_from.contig != al2.seg_from.contig:
+            possible_term[al1.seg_from.contig.id] = (al2.seg_from.contig, al1, al2)
+            possible_term[al2.rc.seg_from.contig.id] = (al1.rc.seg_from.contig, al2.rc, al1.rc)
 
-def main(args):
-    flye_dir = sys.argv[1]
-    graph_file, unique_file, disjointigs_file, rep_dir, tmp, their_file = cl_params.parseFlyeDir(flye_dir)
-    our_file = sys.argv[2]
-    dir = sys.argv[3]
-    min_cov = int(sys.argv[4])
+    return res, possible_term
+
+def main(dir, contigs_file, reference_file, unique_contigs_file):
     CreateLog(dir)
-    unique_ids = [str(val[0]) for val in DotParser(open(graph_file, "r")).parse() if val[4].unique and val[4].cov >= min_cov]
-    unique = ContigCollection()
-    unique.loadFromFasta(open(unique_file, "r"), num_names=True)
-    unique = unique.filter(lambda contig: contig.id in unique_ids)
-    our = ContigCollection().loadFromFasta(open(our_file, "r"), False)
-    their = ContigCollection().loadFromFasta(open(their_file, "r"), False)
+    contigs = ContigCollection().loadFromFasta(open(contigs_file, "r"), False)
+    ref = ContigCollection().loadFromFasta(open(reference_file, "r"), False)
+    unique = ContigCollection().loadFromFasta(open(unique_contigs_file, "r"), False).filter(lambda contig: len(contig) > 5000)
     aligner = Aligner(DirDistributor(os.path.join(dir, "alignments")))
-    our_als = list(aligner.overlapAlign(unique.unique(), our))
-    their_als = list(aligner.overlapAlign(unique.unique(), their))
-    our_transfers = extract_transfers(our, our_als)
-    their_transfers = extract_transfers(their, their_als)
+    ref_als= list(aligner.overlapAlign(unique.unique(), ref))
+    contig_als = list(aligner.overlapAlign(unique.unique(), contigs))
+    ref_transfers, ref_term = extract_transfers(ref, ref_als)
+    contig_transfers, contig_term = extract_transfers(contigs, contig_als)
+    for uid in ref_term:
+        ref_transfers[uid] = ref_term[uid]
 
-    out = open(os.path.join(dir, "res.txt"), "w")
-    for o1, o2 in our_transfers:#type: str, str
-        alo1, alo2 = our_transfers[(o1,o2)]# type: AlignmentPiece, AlignmentPiece
-        if (o1,o2) in their_transfers:
-            print "Common transition:", o1, o2
-            alt1, alt2 = their_transfers[(o1,o2)] # type: AlignmentPiece, AlignmentPiece
-            alot1 = alo1.composeTargetDifference(alt1)
-            alot2 = alo2.composeTargetDifference(alt2)
-            if alot1.seg_from.right < alot2.seg_from.left:
-                copyo = alot1.seg_from.contig.segment(alot1.seg_from.right - 1, alot2.seg_from.left + 1).asContig()
-                copyt = alot1.seg_to.contig.segment(alot1.seg_to.right - 1, alot2.seg_to.left + 1).asContig()
+    missing = 0
+    wrong = 0
+    unresolved = 0
+    correct = 0
+    for uid in ref_transfers:
+        if uid not in contig_transfers and uid not in ref_term:
+            print uid, "missing"
+            missing += 1
+        elif uid in contig_transfers:
+            if ref_transfers[uid][0] == contig_transfers[uid][0]:
+                print uid, "correct"
+                correct += 1
             else:
-                copyo = alot1.seg_from.contig.segment(alot2.seg_from.left, alot1.seg_from.right).asContig()
-                copyt = alot1.seg_to.contig.segment(alot2.seg_to.left, alot2.seg_to.right).asContig()
-            diff = list(aligner.overlapAlign(ContigCollection([copyo]), ContigCollection([copyt])))
-            if len(diff) != 1:
-                print "Bad copy alignments"
-                print map(str, diff)
-            else:
-                diff = diff[0]
-                out.write(str(len(copyo)) + " " + str(len(copyt)) + " " + str(diff.percentIdentity()) + "\n")
-                print [diff.seg_from.left, diff.seg_from.right], diff.seg_to, len(diff), diff.percentIdentity()
-                print "\n".join(diff.asMatchingStrings())
+                print uid, "wrong", ref_transfers[uid][0].id, contig_transfers[uid][0].id
+                wrong += 1
         else:
-            print "Our new transition:", o1, o2, alo1.seg_to.dist(alo2.seg_to)
-    for o1, o2 in their_transfers:#type: str, str
-        if (o1,o2) not in our_transfers:
-            print "Missing transition:", o1, o2
-    out.close()
+            if ref_transfers[uid][0] == contig_term[uid][0]:
+                print uid, "correct"
+                correct += 1
+            else:
+                print uid, "unresolved"
+                unresolved += 1
+    print "Wrong:", wrong
+    print "Unresolved:", unresolved
+    print "Correct:", correct
+    print "Missing:", missing
 
 if __name__ == "__main__":
-    main(sys.argv)
+    dir = sys.argv[1]
+    contigs_file = sys.argv[2]
+    reference_file = sys.argv[3]
+    unique_contigs_file = sys.argv[4]
+    main(dir, contigs_file, reference_file, unique_contigs_file)
