@@ -333,10 +333,10 @@ class Polisher:
                             embedded_alignments.append(None)
                         else:
                             tmp = al2.compose(al1)
-                            if tmp.seg_to.left >= embedding.seg_from.right:
+                            if tmp.seg_to.left > embedding.seg_from.right:
                                 embedded_alignments.append(None)
                             else:
-                                embedded_alignments.append(al2.compose(al1).compose(embedding))
+                                embedded_alignments.append(tmp.compose(embedding))
                     # candidate_alignments = [al2.compose(al1).compose(embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
                     corrected_relevant_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in relevant_als]
                     relevant_als = []

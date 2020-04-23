@@ -270,7 +270,7 @@ class LineExtender:
     def attemptCleanResolution(self, resolved):
         # type: (Segment) -> List[Tuple[Segment, List[AlignmentPiece]]]
         # Find all lines that align to at least k nucls of resolved segment. Since this segment is resolve we get all
-        sys.stdout.info("Attempting recruitment: " + str(resolved) + str(resolved.contig))
+        sys.stdout.info("Attempting recruitment:", resolved, resolved.contig, resolved.contig.correct_segments)
         resolved = resolved.suffix(length = min(len(resolved), params.k * 2))
         print "Considering resolved subsegment:", resolved
         line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k - 30,
@@ -302,10 +302,11 @@ class LineExtender:
                 active_segments.add(new_copy)
             read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
         read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.id)
-        print "Potential alignments:", read_alignments
+        # print "Potential alignments:", read_alignments
         alignments_by_read = itertools.groupby(read_alignments, lambda al: al[0].seg_from.contig.id)
         new_recruits = []
         # TODO: parallel
+        sys.stdout.info("Starting read recruitment to", map(str, line_alignments))
         for name, it in alignments_by_read:
             als = list(it) # type: List[Tuple[AlignmentPiece, Segment]]
             read = als[0][0].seg_from.contig # type: AlignedRead
