@@ -76,6 +76,9 @@ class LineMerger:
                 # assert False, "Ambiguous knotting to the same line" + str(recs[0])
             avg = sum([rec.gap for rec in recs]) / len(recs)
             avg_initial = sum([rec.initial_gap for rec in recs]) / len(recs)
+            if recs[0].other == line.rc:
+                print "WARNING: Ignoring connection to reverse-compliment line"
+                continue
             final_candidates.append((avg, recs[0].other, recs, avg_initial))
         if len(final_candidates) == 0:
             return None
