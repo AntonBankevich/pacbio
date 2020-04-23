@@ -196,6 +196,7 @@ class Aligner:
             cmdline.append("-p0.00")
         elif mode in ["overlap", "local"]:
             cmdline.append("-p0.1")
+            cmdline.append("-DP")
         if mode == "reference":
             cmdline.extend(["-x", "asm5"])
         else:
