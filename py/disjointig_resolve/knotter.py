@@ -122,7 +122,7 @@ class LineMerger:
                         (tmp.seg_from.left < 20 and tmp.rc.seg_to.left < 20):
                     print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
                 else:
-                    assert tmp.seg_to.left < 20 and tmp.rc.seg_from.left < 20, str(line_alignment) + " " + str(tmp)
+                    assert tmp.seg_to.left < 30 and tmp.rc.seg_from.left < 30, str(line_alignment) + " " + str(tmp)
                 print "Switched to line alignment:", tmp
                 line_alignment = tmp
             pref = line_alignment.seg_from.left
