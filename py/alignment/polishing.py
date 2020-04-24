@@ -1,3 +1,4 @@
+import itertools
 import os
 import sys
 
@@ -372,13 +373,22 @@ if __name__ == "__main__":
     reads_file = sys.argv[2]
     consensus_file = sys.argv[3]
     dir = sys.argv[1]
+    extra_params = sys.argv[4:]
     CreateLog(dir)
     dd = DirDistributor(dir)
     aligner = Aligner(dd)
     polisher = Polisher(aligner, dd)
     reads = ContigStorage().loadFromFasta(open(reads_file, "r"), num_names=False)
-    ref = list(ContigStorage().loadFromFasta(open(consensus_file, "r"), num_names=False).unique())
-    res = polisher.polishMany(reads, ref)
+    ref = ContigStorage().loadFromFasta(open(consensus_file, "r"), num_names=False)
+    if "accurate" in extra_params:
+        res = []
+        als = aligner.overlapAlign(reads, ref)
+        for rid, rals in itertools.groupby(als, key = lambda al: al.seg_to.contig.id):
+            if basic.isCanonocal(rid):
+                contig = ref[rid]
+                res.append(polisher.polishSegment(contig.asSegment(), list(rals)))
+    else:
+        res = polisher.polishMany(reads, list(ref.unique()))
     res_file = os.path.join(dir, "res.fasta")
     rf = open(res_file, "w")
     for c in res:
