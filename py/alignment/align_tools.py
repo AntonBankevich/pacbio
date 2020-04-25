@@ -339,10 +339,27 @@ if __name__ == "__main__":
     dir = sys.argv[1]
     query = sys.argv[2]
     target = sys.argv[3]
+    extra_params = sys.argv[4:]
+    contra = "contra" in extra_params
+    long = "long" in extra_params
+    start = "start" in extra_params
+    forward = "forward" in extra_params
     aln = Aligner(DirDistributor(dir))
     basic.CreateLog(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"), False)
     for al in aln.localAlign(ReadCollection().loadFromFile(query), contigs):
+        if start:
+            if al.seg_to.contig.id.startswith("-"):
+                al = al.rc
+            if al.seg_to.left > 50:
+                continue
+        if forward:
+            if al.seg_to.contig.id.startswith("-"):
+                al = al.rc
+        if contra and (len(al) < 8000 or not al.contradictingRTC()):
+            continue
+        if long and len(al) < 8000:
+            continue
         sys.stdout.write(str(len(al)) + " ")
         sys.stdout.write(str(al))
         if len(al) > 40000:

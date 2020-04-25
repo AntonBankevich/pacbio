@@ -116,6 +116,7 @@ def main(dir, contigs_file1, contigs_file2, unique_contigs_file):
     out.write("Contig2 transfers: " + str(transfers2) + "\n")
     out.write("Contig2 term: " + str(term2) + "\n")
     out.close()
+    print contigs_file1, contigs_file2
     print len(different), len(unresolved1), len(unresolved2), len(missing1), len(missing2), len(same)
 
 if __name__ == "__main__":

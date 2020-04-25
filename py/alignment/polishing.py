@@ -382,11 +382,12 @@ if __name__ == "__main__":
     ref = ContigStorage().loadFromFasta(open(consensus_file, "r"), num_names=False)
     if "accurate" in extra_params:
         res = []
-        als = aligner.overlapAlign(reads, ref)
+        als = sorted(aligner.overlapAlign(reads, ref), key = lambda al: al.seg_to.contig.id)
         for rid, rals in itertools.groupby(als, key = lambda al: al.seg_to.contig.id):
             if basic.isCanonocal(rid):
                 contig = ref[rid]
-                res.append(polisher.polishSegment(contig.asSegment(), list(rals)))
+                corrected_seq = polisher.polishSegment(contig.asSegment(), list(rals)).seg_from.Seq()
+                res.append(Contig(corrected_seq, rid))
     else:
         res = polisher.polishMany(reads, list(ref.unique()))
     res_file = os.path.join(dir, "res.fasta")

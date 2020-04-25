@@ -30,6 +30,12 @@ def main(contigs_file, contig_name, reads_file, dir, k):
         tmp.append(al)
     als = tmp
     als = sorted(als, key=lambda al: al.seg_to.left / 50 * 1000000 + al.seg_to.right - al.seg_to.left)
+    counts = dict()
+    for al in als:
+        counts[al.seg_from.contig.id] = 0
+    for al in als:
+        if len(al) > k:
+            counts[al.seg_from.contig.id] += 1
     w = 20
     f = open(os.path.join(dir, "reads.fasta"), "w")
     for al in als:
@@ -69,7 +75,7 @@ def main(contigs_file, contig_name, reads_file, dir, k):
                             sys.stdout.write(str(min(8, max(a, b) + 1 - len(tmp[i]))))
             else:
                 sys.stdout.write("*")
-        print " ", al.seg_from.contig.id
+        print " ", al.seg_from.contig.id, counts[al.seg_from.contig.id], al.contradictingRTC()
         if len(al.seg_to) > len(contig) - 100:
             SeqIO.write(al.seg_from.contig, f, "fasta")
     f.close()
