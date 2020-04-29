@@ -341,6 +341,7 @@ if __name__ == "__main__":
     target = sys.argv[3]
     extra_params = sys.argv[4:]
     contra = "contra" in extra_params
+    over = "over" in extra_params
     long = "long" in extra_params
     start = "start" in extra_params
     forward = "forward" in extra_params
@@ -353,12 +354,14 @@ if __name__ == "__main__":
                 al = al.rc
             if al.seg_to.left > 50:
                 continue
+        if over and al.contradictingRTC():
+            continue
         if forward:
             if al.seg_to.contig.id.startswith("-"):
                 al = al.rc
         if contra and (len(al) < 8000 or not al.contradictingRTC()):
             continue
-        if long and len(al) < 8000:
+        if long and len(al) < 5000:
             continue
         sys.stdout.write(str(len(al)) + " ")
         sys.stdout.write(str(al))

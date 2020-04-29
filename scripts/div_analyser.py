@@ -38,9 +38,14 @@ def main(contigs_file, contig_name, reads_file, dir, k):
             counts[al.seg_from.contig.id] += 1
     w = 20
     f = open(os.path.join(dir, "reads.fasta"), "w")
+    over = set()
+    inter = set()
     for al in als:
         if len(al) < k:
             continue
+        inter.add(basic.Normalize(al.seg_from.contig.id))
+        if not al.contradictingRTC():
+            over.add(basic.Normalize(al.seg_from.contig.id))
         m = al.matchingSequence(True)
         tmp = []
         for i in range(len(contig) / w + 1):
@@ -76,8 +81,14 @@ def main(contigs_file, contig_name, reads_file, dir, k):
             else:
                 sys.stdout.write("*")
         print " ", al.seg_from.contig.id, counts[al.seg_from.contig.id], al.contradictingRTC()
-        if len(al.seg_to) > len(contig) - 100:
-            SeqIO.write(al.seg_from.contig, f, "fasta")
+    print inter
+    for rid in inter:
+        SeqIO.write(reads[rid], f, "fasta")
+        print rid, reads[rid]
+    f.close()
+    f = open(os.path.join(dir, "reads_over.fasta"), "w")
+    for rid in over:
+        SeqIO.write(reads[rid], f, "fasta")
     f.close()
 
 
