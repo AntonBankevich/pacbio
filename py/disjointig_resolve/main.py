@@ -130,16 +130,15 @@ def main(args):
             cl_params.disjointigs_file_list.append(disjointigs_file)
             params.min_contra_for_break = 8
 
+        disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
+
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads, cl_params.force_unique)
 
         if cl_params.autoKL:
             adjustKL(aligner, reads, contigs)
 
-        ExtendShortContigs(contigs, reads, aligner, polisher, cl_params.read_dump)
-
-        disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
-
         if cl_params.init_file is None:
+            ExtendShortContigs(contigs, reads, aligner, polisher, cl_params.read_dump)
             lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split)
         else:
             lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads)

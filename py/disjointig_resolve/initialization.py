@@ -94,12 +94,13 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads):
     print "Initializing lines from init file", lc_file
     lines = NewLineStorage(disjointigs, aligner)
     f = TokenReader(open(lc_file, "r"))
-    for contig in contigs.uniqueSorted():
+    for i in range(len(contigs) / 2):
         id = f.readToken()
+        contig = contigs[id]
         assert contig.id == id
         line = lines.addNew(contig.seq, contig.id)
         read_ids = f.readTokens()
-        for al in aligner.localAlign([reads[rid] for rid in read_ids], ContigStorage([line])):
+        for al in aligner.overlapAlign([reads[rid] for rid in read_ids], ContigStorage([line])):
             if len(al.seg_to) >= params.k:
                 tmp_line = al.seg_to.contig # type: NewLine
                 tmp_line.addReadAlignment(al)
