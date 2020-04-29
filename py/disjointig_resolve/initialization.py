@@ -156,9 +156,9 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     return disjointigs
 
 
-def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher, reads, force_unique):
+def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher, reads, force_unique, all_unique):
     sys.stdout.info("Creating contig collection")
-    if force_unique is None:
+    if force_unique is None and not all_unique:
         graph = SimpleGraph().ReadDot(graph_file)
         graph.FillSeq(contigs_file)
         covs = []
@@ -200,10 +200,14 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
                     contigs.add(Contig(edge.seq, edge.id))
                     sys.stdout.info("Edge added based on length and coverage:", edge.id, edge.cov, edge.len)
 
-    else:
+    elif force_unique is not None:
         print "Using forced unique edge set"
         print force_unique
         contigs = ContigCollection().loadFromFile(contigs_file).filter(lambda contig: contig.id in force_unique)
+    else:
+        print "Considering all contigs unique"
+        print force_unique
+        contigs = ContigCollection().loadFromFile(contigs_file)
     # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
     # contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
     sys.stdout.info("Created", len(contigs), "initial contigs")

@@ -132,7 +132,8 @@ def main(args):
 
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
-        contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads, cl_params.force_unique)
+        all_unique = cl_params.init_file is not None
+        contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads, cl_params.force_unique, all_unique)
 
         if cl_params.autoKL:
             adjustKL(aligner, reads, contigs)
