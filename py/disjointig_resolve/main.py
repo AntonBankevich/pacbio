@@ -142,7 +142,7 @@ def main(args):
             ExtendShortContigs(contigs, reads, aligner, polisher, cl_params.read_dump)
             lines = CreateLineCollection(cl_params.dir, aligner, contigs, disjointigs, reads, cl_params.split)
         else:
-            lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads)
+            lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads, polisher)
 
         sys.stdout.info("Constructing line dot plot")
         dot_plot = LineDotPlot(lines, aligner)

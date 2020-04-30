@@ -89,21 +89,25 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     return lines
 
 
-def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads):
-    # type: (str, str, Aligner, ContigStorage, DisjointigCollection, ReadCollection) -> NewLineStorage
+def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polisher):
+    # type: (str, str, Aligner, ContigStorage, DisjointigCollection, ReadCollection, Polisher) -> NewLineStorage
     print "Initializing lines from init file", lc_file
     lines = NewLineStorage(disjointigs, aligner)
     f = TokenReader(open(lc_file, "r"))
-    for i in range(len(contigs) / 2):
+    n = f.readInt()
+    for i in range(n):
         id = f.readToken()
         contig = contigs[id]
         assert contig.id == id
         line = lines.addNew(contig.seq, contig.id)
         read_ids = f.readTokens()
         for al in aligner.overlapAlign([reads[rid] for rid in read_ids], ContigStorage([line])):
-            if len(al.seg_to) >= params.k:
+            if len(al.seg_to) >= min(params.k, len(line) - 100):
                 tmp_line = al.seg_to.contig # type: NewLine
                 tmp_line.addReadAlignment(al)
+        if len(line) < params.k:
+            new_contig, new_als = polisher.polishEnd(list(line.read_alignments), max_extension=params.k + 100 - len(line))
+            line.extendRight(new_contig.suffix(pos=len(line)).Seq(), new_als)
         line.correct_segments.add(line.asSegment())
         line.completely_resolved.add(line.asSegment())
         line.initial.add(AlignmentPiece.Identical(line.asSegment().asContig().asSegment(), line.asSegment()))
