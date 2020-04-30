@@ -330,7 +330,7 @@ class Polisher:
                         # print al2, al1, embedding
                         # print al2.compose(al1)
                         # print al2.compose(al1).compose(embedding)
-                        if al1.seg_from.right <= len(start) + 5:
+                        if al1.seg_to.right <= len(start) + 10:
                             embedded_alignments.append(None)
                         else:
                             tmp = al2.compose(al1)
