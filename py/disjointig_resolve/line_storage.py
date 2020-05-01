@@ -88,8 +88,9 @@ class NewLineStorage(ContigStorage):
         for line in self:
             line.disjointig_alignments.clean()
         for al in self.aligner.dotplotAlign(self.disjointigs.unique(), self):
-            line = al.seg_to.contig # type: NewLine
-            line.disjointig_alignments.add(al)
+            if len(al) > params.k - 500:
+                line = al.seg_to.contig # type: NewLine
+                line.disjointig_alignments.add(al)
 
     # def fillFromDisjointigs(self):
     #     # type: () -> None
