@@ -115,15 +115,20 @@ class LineMerger:
             if final[0] < -params.k - 100:
                 for al in self.dot_plot.getAlignmentsToFrom(other, line):
                     if len(list(al.matchingSequence().common(line_alignment.matchingSequence()))) > 0:
-                        tmp = al
-                        break
+                        if tmp is None or len(tmp) < len(al):
+                            tmp = al
+                if tmp is None:
+                    sys.stdout.warn("No good line alignment found. Alignment based on reads will be used.")
+                else:
+                    print "Switched to line alignment:", tmp
                 if (tmp.seg_to.left < 20 and tmp.rc.seg_to.left < 20) or \
                         (tmp.seg_from.left < 20 and tmp.rc.seg_from.left < 20) or \
                         (tmp.seg_from.left < 20 and tmp.rc.seg_to.left < 20):
                     print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
-                else:
-                    assert tmp.seg_to.left < 30 and tmp.rc.seg_from.left < 30, str(line_alignment) + " " + str(tmp)
-                print "Switched to line alignment:", tmp
+                elif tmp.seg_to.left < 30 and tmp.rc.seg_from.left < 30:
+                    sys.stdout.warn("Line alignment is not overlap!", tmp)
+                    if params.strict_merging_alignment:
+                        assert tmp.seg_to.left < 30 and tmp.rc.seg_from.left < 30, str(line_alignment) + " " + str(tmp)
                 line_alignment = tmp
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
