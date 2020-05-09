@@ -704,7 +704,7 @@ class LineExtender:
                     #     seg2 = seg2.contig.suffix(seg2.left)
                     #     print "Alignment is inmerging. Marking line suffix as bad:", seg2
                     segs.add(seg2)
-                if al.rc.seg_from.left < 50 and al.seg_to.right >= resolved.right:
+                if al.rc.seg_from.left < 50 and al.seg_to.right >= resolved.right - 100:
                     segs.add(al.seg_to.contig.suffix(pos=al.seg_to.right).expand(inter_size + 100))
                     print "Incoming line:", resolved, seg, al
         segs.mergeSegments(inter_size - 1)

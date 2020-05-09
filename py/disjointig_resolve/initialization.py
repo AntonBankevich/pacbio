@@ -105,11 +105,11 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polis
             if len(al.seg_to) >= min(params.k, len(line) - 100):
                 tmp_line = al.seg_to.contig # type: NewLine
                 tmp_line.addReadAlignment(al)
-        if len(line) < params.k:
+        if len(line) < params.k + 200:
             new_contig, new_als = polisher.polishEnd(list(line.read_alignments), max_extension=params.k + 100 - len(line))
             line.extendRight(new_contig.suffix(pos=len(line)).Seq(), new_als)
-        line.correct_segments.add(line.asSegment())
-        line.completely_resolved.add(line.asSegment())
+        line.correct_segments.add(line.asSegment().shrink(100))
+        line.completely_resolved.add(line.asSegment().shrink(100))
         line.initial.add(AlignmentPiece.Identical(line.asSegment().asContig().asSegment(), line.asSegment()))
     print "Final list of lines:"
     for line in lines.unique():
