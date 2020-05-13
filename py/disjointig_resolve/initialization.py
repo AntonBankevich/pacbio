@@ -214,7 +214,7 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
     # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
     # contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
     sys.stdout.info("Created", len(contigs), "initial contigs")
-    if not force_unique or force_unique is not None:
+    if not all_unique or force_unique is not None:
         sys.stdout.info("Polishing contigs")
         polished_contigs = polisher.polishMany(reads, list(contigs.unique()))
         contigs = ContigCollection().addAll(polished_contigs)
