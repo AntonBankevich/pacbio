@@ -210,14 +210,16 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
         contigs = ContigCollection().loadFromFile(contigs_file).filter(lambda contig: contig.id in force_unique)
     else:
         print "Considering all contigs unique"
-        print force_unique
         contigs = ContigCollection().loadFromFile(contigs_file)
     # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
     # contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
     sys.stdout.info("Created", len(contigs), "initial contigs")
-    sys.stdout.info("Polishing contigs")
-    polished_contigs = polisher.polishMany(reads, list(contigs.unique()))
-    contigs = ContigCollection().addAll(polished_contigs)
+    if not force_unique or force_unique is not None:
+        sys.stdout.info("Polishing contigs")
+        polished_contigs = polisher.polishMany(reads, list(contigs.unique()))
+        contigs = ContigCollection().addAll(polished_contigs)
+    else:
+        sys.stdout.info("Skipping contig polishing step since manual unique contig initialization was used")
     return contigs
 
 
