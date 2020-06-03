@@ -200,7 +200,7 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
                             contigs.add(Contig(edge.seq, edge.id))
                     else:
                         sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
-                elif edge.len > 100000 and edge.cov < 1.5 * avg_cov:
+                elif (edge.len > 100000 and edge.cov < 1.5 * avg_cov) or (edge.len > 40000 and 1.3 * avg_cov > edge.cov > 0.7 * avg_cov):
                     contigs.add(Contig(edge.seq, edge.id))
                     sys.stdout.info("Edge added based on length and coverage:", edge.id, edge.cov, edge.len)
 
