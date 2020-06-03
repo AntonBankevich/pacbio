@@ -72,6 +72,31 @@ class SimpleGraph:
             edge.cov = cov
         return self
 
+    def Merge(self):
+        todel = []
+        for v in self.v.values():
+            if len(v.inc) == 1 and len(v.out) == 1 and v.inc[0].id != v.out[0].id:
+                edge1 = self.e[v.inc[0].id]
+                edge2 = self.e[v.out[0].id]
+                if edge1.seq is None or edge2.seq is None:
+                    seq = None
+                else:
+                    seq = edge1.seq + edge2.seq
+                newEdge = Edge(edge1.id + "," + edge2.id, edge1.start, edge2.end, edge1.len + edge2.len, edge1.label + edge2.label, seq)
+                newEdge.cov = int(float(edge1.cov + edge1.len + edge2.cov * edge2.len) / newEdge.len)
+                self.v[edge1.start].out.remove(edge1)
+                self.v[edge2.end].inc.remove(edge2)
+                del self.e[edge1.id]
+                del self.e[edge2.id]
+                self.e[newEdge.id] = newEdge
+                self.v[newEdge.start].out.append(newEdge)
+                self.v[newEdge.end].inc.append(newEdge)
+                todel.append(v)
+        for v in todel:
+            del self.v[v.id]
+
+
+
     def FillSeq(self, f, numeric = True):
         for s in SeqIO.parse_fasta(open(f, "r")):
             if numeric:
@@ -115,10 +140,10 @@ class SimpleGraph:
     def Find(self, minlen, v):
         self.visited.add(v)
         for e in self.v[v].out:
-            if e.len <= minlen and e.label.find("black") == -1 and e.end not in self.visited:
+            if e.len <= minlen and e.end not in self.visited:
                 self.Find(minlen, e.end)
         for e in self.v[v].inc:
-            if e.len <= minlen and e.label.find("black") == -1 and e.start not in self.visited:
+            if e.len <= minlen and e.start not in self.visited:
                 self.Find(minlen, e.start)
 
     def Split(self, minlen):

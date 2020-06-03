@@ -10,9 +10,12 @@ from common import basic
 g = SimpleGraph()
 g.ReadDot(sys.argv[1])
 basic.ensure_dir_existance(sys.argv[2])
+args = sys.argv[3:]
+if "merge" in args:
+    g.Merge()
 cnt = 0
 oppa = []
-for comp in g.Split(1000000):
+for comp in g.Split(50000):
     if len(comp) < 3:
         if len(g.v[ comp[0]].inc) + len(g.v[comp[0]].out) + len(g.v[comp[-1]].inc) + len(g.v[comp[-1]].out) <= 2:
             pass
