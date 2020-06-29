@@ -14,8 +14,10 @@ import sys
 
 root = os.path.dirname(os.path.abspath(__file__))
 mosaicRoot = os.path.join(root, "py")
+stubRoot = os.path.join(root, "py", "stub")
 sys.path.append(root)
 sys.path.append(mosaicRoot)
+sys.path.append(stubRoot)
 bin_path = os.path.join(root, "bin")
 
 from disjointig_resolve import mosaic_main
