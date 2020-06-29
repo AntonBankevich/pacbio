@@ -20,3 +20,9 @@ class BinaryIO:
     pass
 class Callable:
     pass
+class IO:
+    pass
+class TextIO:
+    pass
+class Any:
+    pass
