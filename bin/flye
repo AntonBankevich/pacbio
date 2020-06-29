@@ -18,6 +18,7 @@ BIN_DIR = "bin"
 flye_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 bin_absolute = os.path.join(flye_root, BIN_DIR)
 sys.path.insert(0, flye_root)
+os.environ["PATH"] = bin_absolute + os.pathsep + os.environ["PATH"]
 
 #Flye entry point
 from flye.main import main
