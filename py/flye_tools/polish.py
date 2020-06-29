@@ -16,11 +16,12 @@ from threading import Thread
 
 import flye_tools.bubbles as bbl
 import flye_tools.fasta_parser as fp
+from common import params
 from flye_tools.utils import which
 import flye_tools.config as config
 
 
-POLISH_BIN = "bin/flye-polish"
+POLISH_BIN = "flye-polish"
 
 logger = logging.getLogger()
 
@@ -35,7 +36,7 @@ def check_binaries():
                               "Did you run 'make'?")
     try:
         devnull = open(os.devnull, "w")
-        subprocess.check_call([POLISH_BIN, "-h"], stderr=devnull)
+        subprocess.check_call([os.path.join(params.bin_path, POLISH_BIN), "-h"], stderr=devnull)
     except subprocess.CalledProcessError as e:
         if e.returncode == -9:
             logger.error("Looks like the system ran out of memory")
@@ -67,7 +68,7 @@ def _run_polish_bin(bubbles_in, subs_matrix, hopo_matrix,
     """
     Invokes polishing binary
     """
-    cmdline = [POLISH_BIN, "--threads", str(num_threads), "--bubbles", bubbles_in, "--subs-mat", subs_matrix, "--hopo-mat",
+    cmdline = [os.path.join(params.bin_path, POLISH_BIN), "--threads", str(num_threads), "--bubbles", bubbles_in, "--subs-mat", subs_matrix, "--hopo-mat",
                hopo_matrix, "--out", consensus_out]
     try:
         subprocess.check_call(cmdline, stdout = open("/dev/null", "w"), stderr = open("/dev/null", "w"))

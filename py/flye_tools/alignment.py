@@ -16,13 +16,14 @@ import multiprocessing
 import ctypes
 
 import flye_tools.fasta_parser as fp
+from common import params
 from flye_tools.utils import which
 import flye_tools.config as config
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-MINIMAP_BIN = "bin/flye-minimap2"
+MINIMAP_BIN = "flye-minimap2"
 
 Alignment = namedtuple("Alignment", ["qry_id", "trg_id", "qry_start", "qry_end",
                                      "qry_sign", "qry_len", "trg_start",
@@ -271,7 +272,7 @@ def shift_gaps(seq_trg, seq_qry):
 
 
 def _run_minimap(reference_file, reads_files, num_proc, platform, out_file):
-    cmdline = [MINIMAP_BIN, reference_file]
+    cmdline = [os.path.join(params.bin_path, MINIMAP_BIN), reference_file]
     cmdline.extend(reads_files)
     cmdline.extend(["-p0.00", "-N1000", "-a", "-Q", "-w5", "-m100", "-g10000", "--max-chain-skip",
                     "25", "-t", str(num_proc)])

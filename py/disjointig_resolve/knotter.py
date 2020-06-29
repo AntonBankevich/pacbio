@@ -125,7 +125,7 @@ class LineMerger:
                         (tmp.seg_from.left < 20 and tmp.rc.seg_from.left < 20) or \
                         (tmp.seg_from.left < 20 and tmp.rc.seg_to.left < 20):
                     print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
-                elif tmp.seg_to.left < 30 and tmp.rc.seg_from.left < 30:
+                elif tmp.seg_to.left > 30 or tmp.rc.seg_from.left > 30:
                     sys.stdout.warn("Line alignment is not overlap!", tmp)
                     if params.strict_merging_alignment:
                         assert tmp.seg_to.left < 30 and tmp.rc.seg_from.left < 30, str(line_alignment) + " " + str(tmp)

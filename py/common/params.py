@@ -1,7 +1,8 @@
 from common.scoring_model import SimpleScores
 
-MINIMAP_BIN = "bin/flye-minimap2"
+MINIMAP_BIN = "flye-minimap2"
 
+bin_path = "bin"
 clean = False
 reliable_coverage = 9
 k_cov = reliable_coverage
@@ -36,7 +37,7 @@ min_alignment_size = 100 # minimal size of alignment that will be considered. Im
 technology = "pacbio"
 expected_size = 5000000
 strict_merging_alignment = True
-
+save_alignments = False
 
 scores = SimpleScores(scoreIns = 8, scoreDel = 7, scoreMM = 10, scoreHomo = 4)
 # class Scores:

@@ -7,9 +7,11 @@ import traceback
 
 from typing import Iterable
 
+
 sys.path.append("py")
 sys.path.append(".")
 
+from common.sequences import ContigStorage
 from disjointig_resolve.dot_plot import LineDotPlot
 from common.basic import CreateLog
 from disjointig_resolve.accurate_line import NewLine
@@ -77,27 +79,39 @@ def countStats(reads, lines, disjointigs, aligner, dir):
     print list(als.calculateWindowedCoverage(500))
 
 
-def main(args):
+def assemble(args, bin_path):
+    params.bin_path = bin_path
     start = time.time()
     cl_params = Params().parse(args)
+    ref = ContigStorage()
+    if cl_params.test:
+        cl_params.reads_file = os.path.dirname(__file__)  + "/../../test_dataset/reads.fasta"
+        cl_params.genome_size = 30000
+        cl_params.dir = os.path.dirname(__file__)  + "/../../test_results"
+        ref.loadFromFile(os.path.dirname(__file__)  + "/../../test_dataset/axbctbdy.fasta", False)
+        # aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
+        # Tester(aligner).testAll("tests/cases.txt")
+        # sys.stdout.write("Finished\n")
+        # print (time.strftime("%d.%m.%Y  %I:%M:%S"))
+        # return
+    if cl_params.debug:
+        params.save_alignments = True
     cl_params.check()
     CreateLog(cl_params.dir)
     print " ".join(cl_params.args)
     sys.stdout.info("Started")
     sys.stdout.info("Params:", " ".join(args))
-    sys.stdout.info("Version:", subprocess.check_output(["git", "rev-parse", "HEAD"]))
-    sys.stdout.info("Modifications:")
-    print subprocess.check_output(["git", "diff"])
-    if cl_params.test:
-        aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
-        Tester(aligner).testAll("tests/cases.txt")
-        sys.stdout.write("Finished\n")
-        print (time.strftime("%d.%m.%Y  %I:%M:%S"))
-        return
+    if cl_params.debug:
+        sys.stdout.info("Version:", subprocess.check_output(["git", "rev-parse", "HEAD"]))
+        sys.stdout.info("Modifications:")
+        print subprocess.check_output(["git", "diff"])
     if cl_params is not None:
         print "Focus:", str(cl_params.focus)
     sys.stdout.info("Preparing initial state")
-    save_handler = SaveHandler(cl_params.save_dir)
+    if cl_params.debug:
+        save_handler = SaveHandler(os.path.join(cl_params.dir, "saves"))
+    else:
+        save_handler = None
     if cl_params.load_from is not None:
         # tmp = cl_params.focus
         sys.stdout.info("Loading initial state from saves")
@@ -119,7 +133,7 @@ def main(args):
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
-            subprocess.check_call(["./bin/flye", "--meta", "-o", assembly_dir, "-t", str(cl_params.threads), "--" + params.technology + "-raw", reads_file, "--genome-size", str(params.expected_size), "--min-overlap", str(params.k)])
+            subprocess.check_call([os.path.join(params.bin_path, "flye"), "--meta", "-o", assembly_dir, "-t", str(cl_params.threads), "--" + params.technology + "-raw", reads_file, "--genome-size", str(cl_params.genome_size), "--min-overlap", str(params.k)])
             cl_params.set_flye_dir(assembly_dir, cl_params.mode)
         elif len(cl_params.disjointigs_file_list) == 0:
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
@@ -157,17 +171,17 @@ def main(args):
             line.completely_resolved.mergeSegments()
             if len(line.completely_resolved) == 0:
                 lines.removeLine(line)
-
-        print "Saving initial state"
-        try:
-            writer = save_handler.getWriter()
-            print "Save details:", writer.info
-            saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
-        except Exception as e:
-            _, _, tb = sys.exc_info()
-            sys.stdout.warn("Could not write save")
-            traceback.print_tb(tb)
-            print "Message:", e.message
+        if cl_params.debug:
+            print "Saving initial state"
+            try:
+                writer = save_handler.getWriter()
+                print "Save details:", writer.info
+                saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
+            except Exception as e:
+                _, _, tb = sys.exc_info()
+                sys.stdout.warn("Could not write save")
+                traceback.print_tb(tb)
+                print "Message:", e.message
 
     print "Disjointig alignments"
     for line in lines:
@@ -180,9 +194,8 @@ def main(args):
 
     print "Final result:"
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
-    lines.printKnottedToFasta(open(os.path.join(cl_params.dir, "lines_knotted.fasta"), "w"))
+    lines.printKnottedToFasta(open(os.path.join(cl_params.dir, "assembly.fasta"), "w"))
     printState(lines)
-
     # print "Disjointig alignments"
     # for line in lines
     sys.stdout.info("Finished")
@@ -191,6 +204,16 @@ def main(args):
     hours = secs / 60 / 60 % 24
     mins = secs / 60 % 60
     sys.stdout.info("Finished in %d days, %d hours, %d minutes" % (days, hours, mins))
+    if cl_params.test:
+        passed = False
+        for al in aligner.dotplotAlign(lines, ref):
+            if len(al) > len(al.seg_to.contig) - 3000:
+                passed = True
+                break
+        if passed:
+            sys.stdout.info("Test passed")
+        else:
+            sys.stdout.info("Test failed")
 
 
 def printState(lines):
@@ -233,13 +256,14 @@ def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, re
                 stop = False
             if cnt > 10:
                 cnt = 0
-                printState(lines)
-                print "Saving current state"
-                writer = save_handler.getWriter()
-                print "Save details:", writer.info
-                saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
+                if save_handler is not None:
+                    printState(lines)
+                    print "Saving current state"
+                    writer = save_handler.getWriter()
+                    print "Save details:", writer.info
+                    saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    assemble(sys.argv)
 # 56 73 77 167 76 12 84 1 78

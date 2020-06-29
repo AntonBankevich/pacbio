@@ -22,7 +22,7 @@ class Params:
         self.threads = 8
         self.test = False
         self.init_file = None
-        self.long_params = "test nostrict stats force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test debug nostrict stats genome-size= force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
@@ -35,14 +35,16 @@ class Params:
         self.autoKL = True
         self.read_dump = None
         self.force_unique = None
+        self.genome_size = None
+        self.debug = False
 
     def check(self):
         if self.dir is None:
-            print "Define output dir"
-            self.print_usage_and_exit(1)
+            self.print_usage_and_exit(1, "Output directory not defined")
         if os.path.exists(self.dir) and os.path.isfile(self.dir):
-            print "Incorrect output dir"
-            self.print_usage_and_exit(1)
+            self.print_usage_and_exit(1, "Incorrect output directory")
+        if self.flye_dir is None and self.genome_size is None and self.contigs_file is None:
+            self.print_usage_and_exit(1, "Please define one of the following: directory with Flye assembly, estimated genome size, file with assembled contigs")
 
     def parse(self, argv):
         # type: (List[str]) -> Params
@@ -50,18 +52,17 @@ class Params:
         try:
             options_list, tmp = getopt.gnu_getopt(argv[1:], self.short_params, self.long_params)
             if len(tmp) != 0:
-                self.print_usage_and_exit(1)
+                self.print_usage_and_exit(1, "could not parse parameters")
         except getopt.GetoptError:
             _, exc, _ = sys.exc_info()
             sys.stderr.write(str(exc) + "\n")
-            self.print_usage_and_exit(1)
+            self.print_usage_and_exit(1, "could not parse parameters")
             return
         late_options = []
         for (key, value) in options_list:
             if key == "--output-dir" or key == "-o":
                 self.dir = value
-                self.save_dir = os.path.join(self.dir, "saves")
-                self.disjointigs_file = os.path.join(self.dir, "disjointigs.fasta")
+                # self.save_dir = os.path.join(self.dir, "saves")
             elif key == "--test":
                 self.test = True
             elif key == "--flye-dir":
@@ -69,6 +70,8 @@ class Params:
             elif key == "--mode":
                 self.mode = value
                 self.set_flye_dir(self.flye_dir, self.mode)
+            elif key == "--debug":
+                self.debug = True
             elif key == "--stats":
                 self.stats = True
             elif key == "--nostrict":
@@ -95,6 +98,8 @@ class Params:
                 self.load_from = value
             elif key == "--force-unique":
                 self.force_unique = value.split(",")
+            elif key == "--genome-size":
+                self.genome_size = int(value)
             elif key == "-t":
                 self.threads = int(value)
                 params.threads = self.threads
@@ -126,8 +131,7 @@ class Params:
                 self.disjointigs_file_list.append(value)
                 self.new_disjointigs = True
             else:
-                print "Unknown option", key, value
-                self.print_usage_and_exit(1)
+                self.print_usage_and_exit(1, "Unknown parameter " + key)
         self.disjointigs_file_list = list(set(self.disjointigs_file_list))
         return self
 
@@ -150,11 +154,14 @@ class Params:
     def saveDir(self):
         return os.path.join(self.dir, "saves")
 
-    def print_usage_and_exit(self, code):
+    def print_usage_and_exit(self, code, message = None):
         # TODO: write usage
-        print "Error in params"
-        print self.long_params
-        print self.short_params
+        if code != 0:
+            if message is not None:
+                print "Error in command line parameters: " + message
+            else:
+                print "Error in command line parameters"
+        print "usage: mosaic --reads <file> -o <dir> (--genome-size <int> | --flye-dir <dir> | --contigs <contigs>) [--threads <int>]"
         sys.exit(code)
 
     def save(self, handler):

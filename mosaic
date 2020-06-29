@@ -1,0 +1,22 @@
+#!/usr/bin/env python2
+
+#(c) 2016 by Authors
+#This file is a part of mosaicFlye program.
+#Released under the GPLv2 license (see LICENSE file)
+
+"""
+This script sets up environment paths
+and runs mosaicFlye without installation.
+"""
+
+import os
+import sys
+
+root = os.path.dirname(os.path.abspath(__file__))
+mosaicRoot = os.path.join(root, "py")
+sys.path.append(root)
+sys.path.append(mosaicRoot)
+bin_path = os.path.join(root, "bin")
+
+from disjointig_resolve import mosaic_main
+mosaic_main.assemble(sys.argv, bin_path)

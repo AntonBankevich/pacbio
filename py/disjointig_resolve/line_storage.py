@@ -256,7 +256,7 @@ class NewLineStorage(ContigStorage):
                 else:
                     seq.append(line.seq)
             print cnt, ":", ";".join(id)
-            SeqIO.write(NamedSequence("".join(seq), str(cnt)), handler, "fasta")
+            SeqIO.write(NamedSequence("".join(seq), "contig_" + str(cnt)), handler, "fasta")
             cnt += 1
 
     def chains(self):
