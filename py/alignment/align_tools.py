@@ -346,9 +346,12 @@ if __name__ == "__main__":
     long = "long" in extra_params
     start = "start" in extra_params
     forward = "forward" in extra_params
+    full = "full" in extra_params
+    sort = "sort" in extra_params
     aln = Aligner(DirDistributor(dir))
     basic.CreateLog(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"), False)
+    res = []
     for al in aln.localAlign(ReadCollection().loadFromFile(query), contigs):
         if start:
             if al.seg_to.contig.id.startswith("-"):
@@ -362,7 +365,12 @@ if __name__ == "__main__":
                 al = al.rc
         if contra and (len(al) < 8000 or not al.contradictingRTC()):
             continue
-        if long and len(al) < 5000:
+        if long and len(al) < 20000:
+            continue
+        if full and len(al.seg_from) < len(al.seg_from.contig) * 9 / 10:
+            continue
+        if sort:
+            res.append(al)
             continue
         sys.stdout.write(str(len(al)) + " ")
         sys.stdout.write(str(al))
@@ -383,6 +391,12 @@ if __name__ == "__main__":
                 sys.stdout.write("|")
         print ""
         print s[1]
-
+    res = sorted(res, key = lambda al: (al.seg_to.contig.id, al.seg_to.left))
+    last = 0
+    for al in res:
+        if al.seg_to.left > last + 100 or al.seg_to.left < last - 100:
+            print "Break"
+        last = al.seg_to.right
+        print len(al), al
 
 
