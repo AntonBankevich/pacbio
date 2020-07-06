@@ -74,11 +74,6 @@ def iter_alignments(filename):
             yield current_chain
 
 
-#TODO:
-#def write_alignments(alignments, filename):
-#    pass
-
-
 def _to_signed_id(unsigned_id):
     return -(unsigned_id + 1) // 2 if unsigned_id % 2 else unsigned_id // 2 + 1
 

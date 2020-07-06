@@ -40,14 +40,6 @@ strict_merging_alignment = True
 save_alignments = False
 
 scores = SimpleScores(scoreIns = 8, scoreDel = 7, scoreMM = 10, scoreHomo = 4)
-# class Scores:
-#     ins_score = 8
-#     del_score = 7
-#     sub_score = 10
-#     homo_score = 4
-#     switch_core = 1
-#     center_score = 20
-#     inf = 10000000
 
 
 downsample = 100000000

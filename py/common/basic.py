@@ -134,7 +134,7 @@ class OStreamWrapper:
         self.log(common.log_params.LogPriority.main_parts, "INFO: " + " ".join(map(str, strings)))
 
     def trace(self, *strings):
-        self.log(common.log_params.LogPriority.main_parts, "TRACE: " + " ".join(map(str, strings)))
+        self.log(common.log_params.LogPriority.trace, "TRACE: " + " ".join(map(str, strings)))
 
     def substage(self, *strings):
         self.log(common.log_params.LogPriority.main_parts, "SUBSTAGE: " + " ".join(map(str, strings)))
@@ -258,7 +258,6 @@ def CreateLog(dir):
     sys.stdout = OStreamWrapper(sys.stdout, log)
     sys.stdout.prefix = lambda s: time.strftime("%y.%m.%d %H:%M:%S") + "  "
     sys.stderr = sys.stdout
-    sys.stdout.write(" ".join(sys.argv))
 
 def letterToIndex(char):
     # type: (str) -> int

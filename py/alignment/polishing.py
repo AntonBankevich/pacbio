@@ -23,16 +23,6 @@ class Polisher:
         self.aligner = aligner
         self.dir_distributor = dir_distributor
 
-    # def polishMany(self, reads, sequences):
-    #     # type: (Iterable[AlignedRead], List[Contig]) -> List[Contig]
-    #     dir, new_files, same = self.dir_distributor.fillNextDir([(sequences, "ref.fasta"), (reads, "reads.fasta")])
-    #     work_dir = os.path.join(dir, "work")
-    #     basic.ensure_dir_existance(work_dir)
-    #     tmp = flye.polishing.polish.polish(new_files[0], [new_files[1]], work_dir, 1, params.threads, "pacbio", True)
-    #     print "TMP:", tmp
-    #     polished_file, stats = tmp
-    #     return map(lambda rec: Contig(rec.seq, rec.id), SeqIO.parse_fasta(open(polished_file, "r")))
-
     def polishMany(self, reads, sequences):
         # type: (Iterable[AlignedRead], List[Contig]) -> List[Contig]
         dir, new_files, same = self.dir_distributor.fillNextDir([(list(sequences), "ref.fasta"), (reads, "reads.fasta")])
@@ -43,12 +33,11 @@ class Polisher:
         job = JobPolishing(args, os.path.join(dir, "work"), os.path.join(dir, "log.info"), [reads_file_name], consensus_file_name, "polish")
         polished_file = job.out_files["contigs"]
         if same and not params.clean and os.path.exists(polished_file):
-            print "Polishing reused:", polished_file
+            sys.stdout.trace("Polishing reused:", polished_file)
         else:
-            print "Running polishing:", polished_file
+            sys.stdout.trace("Running polishing:", polished_file)
             job.run()
         return map(lambda rec: Contig(rec.seq, rec.id), SeqIO.parse_fasta(open(polished_file, "r")))
-        # return SeqIO.parse_fasta(open(polished_file, "r"))
 
     def polish(self, reads, consensus):
         # type: (Iterable[NamedSequence], Contig) -> str
@@ -60,9 +49,9 @@ class Polisher:
         job = JobPolishing(args, os.path.join(dir, "work"), os.path.join(dir, "log.info"), [reads_file_name], consensus_file_name, "polish")
         polished_file = job.out_files["contigs"]
         if same and not params.clean and os.path.exists(polished_file):
-            print "Polishing reused:", polished_file
+            sys.stdout.trace("Polishing reused:", polished_file)
         else:
-            print "Running polishing:", polished_file
+            sys.stdout.trace("Running polishing:", polished_file)
             job.run()
         return list(SeqIO.parse_fasta(open(polished_file, "r")))[0].seq
 
@@ -89,60 +78,23 @@ class Polisher:
                     ok += 1
         for i in range(1, len(res)):
             res[i] += res[i - 1]
-        print "Polyshed and analysed using", len(alignment), "reads. Ok:", ok, "late:", late, "contra:", contra
-        if contra > 10 or contra > ok / 2:
-            for read in alignment:
-                print read
-                for al in read.alignmentsTo(seq.asSegment()):
-                    if al.contradictingRTC(seq.asSegment()):
-                        print "contra_al:", al
-                    elif al.seg_to.left > reliable_start:
-                        print "late_al:", al
-                    else:
-                        print "ok_al:", al
+        sys.stdout.trace("Polyshed and analysed using", len(alignment), "reads. Ok:", ok, "late:", late, "contra:", contra)
+        # if contra > 10 or contra > ok / 2:
+        #     for read in alignment:
+        #         print read
+        #         for al in read.alignmentsTo(seq.asSegment()):
+        #             if al.contradictingRTC(seq.asSegment()):
+        #                 print "contra_al:", al
+        #             elif al.seg_to.left > reliable_start:
+        #                 print "late_al:", al
+        #             else:
+        #                 print "ok_al:", al
         return Consensus(seq.seq, res)
-
-    def polishQuiver(self, reads, base_start, pos_start, min_new_len = 3000):
-        # type: (ReadCollection, str, int, int) -> Optional[Consensus]
-        cc = ContigCollection([Contig(base_start, "base_start")])
-        reads_to_base = ReadCollection().extendClean(reads).fillFromSam(self.aligner.align(reads, cc, "overlap"), cc)
-        # for read in reads:
-        #     print read
-        #     if read.id in reads_to_base.reads:
-        #         print reads_to_base.reads[read.id]
-        #     else:
-        #         print "No alignment"
-        print "Polishing quiver of", len(reads_to_base), "reads."
-        best = None
-        for read in sorted(list(reads_to_base.__iter__()), key = lambda read: len(read))[::-1]:
-            for al in read.alignments:
-                if al.seg_to.contig.id == "base_start" and al.seg_to.right > len(base_start) - 50 and len(read) - al.seg_from.right > 1000:
-                    base_conig = Contig(base_start[pos_start:al.seg_to.right] + read.seq[al.seg_from.right:], "base")
-                    if best is not None and len(base_conig) < len(best.cut()):
-                        continue
-                    candidate = self.polishAndAnalyse(reads, base_conig, al.seg_to.right - pos_start)
-                    if len(candidate.cut()) > len(base_start) - pos_start + min_new_len: #len(candidate.cut()) is too slow
-                        print "Final polishing base alignment:", al
-                        print base_conig.seq
-                        print candidate.seq
-                        return candidate
-                    if best is None and len(candidate.cut()) > len(base_start) - pos_start or best is not None and len(candidate.cut()) > len(best.cut()):
-                        print "Updated best polyshing base alignment:", al
-                        print base_conig.seq
-                        print candidate.seq
-                        best = candidate
-                    break
-        if best is None:
-            if len(base_start) - pos_start > 500:
-                best = self.polishAndAnalyse(reads, Contig(base_start[pos_start:], "base"), len(base_start) - pos_start + 100)
-            else:
-                best = self.polishAndAnalyse(reads, Contig(base_start, "base"), len(base_start) + 100).suffix(pos_start)
-        return best
 
     # Returns alignment of polished sequence to old sequence
     def polishSegment(self, seg, als):
         # type: (Segment, List[AlignmentPiece]) -> AlignmentPiece
-        print "Polishing segment", seg
+        sys.stdout.trace("Polishing segment", seg)
         w = max(900, params.k)
         r = 50
         first = seg.left / w
@@ -161,7 +113,6 @@ class Polisher:
         for seg1, seg_als in zip(segs, als_by_segment):
             if seg1.inter(seg):
                 res_als.append(self.polishSmallSegment(seg1, seg_als))
-        # print "Res als", res_als
         res = AlignmentPiece.GlueOverlappingAlignments(res_als)
         return res.reduce(target=seg)
 
@@ -244,7 +195,7 @@ class Polisher:
         scorer = Scorer()
         contig = als[0].seg_to.contig
         max_len = max_extension + len(contig)
-        print "Polishing end of", als[0].seg_to.contig
+        sys.stdout.trace("Polishing end of", als[0].seg_to.contig)
         new_contig = contig.asSegment().asContig()
         relevant_als = [al.changeTargetContig(new_contig) for al in als if al.rc.seg_to.left < 100]
         finished_als = []
@@ -256,14 +207,12 @@ class Polisher:
                 else:
                     finished_als.append(al)
             relevant_als = tmp
-            # TODO replace with position search in cigar
             if len(relevant_als) < min_cov:
                 break
             start = "ACGTTCGA" + basic.randomSequence(params.flanking_size) + new_contig.asSegment().suffix(length=min(params.flanking_size, len(new_contig))).Seq()
             reduced_read_list = [
                 AlignedRead.new(start + al.seg_from.contig.asSegment().suffix(pos=al.seg_from.right).Seq(), str(i) + "_" + al.seg_from.contig.id)
                 for i, al in enumerate(relevant_als)]
-            # print "RRL:", reduced_read_list
             reduced_reads = ReadCollection(reduced_read_list)
             found = False
             for base_al in relevant_als:
@@ -278,22 +227,14 @@ class Polisher:
                 polished_base = Contig(self.polish(reduced_reads, base), "polished_base")
                 for al in self.aligner.localAlign(reduced_reads, ContigStorage().addAll([polished_base])):
                     reduced_reads.reads[al.seg_from.contig.id].addAlignment(al)
-                # self.aligner.alignReadCollection(reduced_reads, [polished_base])
                 candidate_alignments = []
-                # print "RRL1:", reduced_read_list
                 for read in reduced_read_list:
                     candidate_alignments.append(None)
                     for al in read.alignmentsTo(polished_base.asSegment()):
                         if al.seg_to.left == 0 and ((candidate_alignments[-1] is None or candidate_alignments[-1].seg_to.right < al.seg_to.right)):
                             candidate_alignments[-1] = al
-                # print "CA:", candidate_alignments
                 trimmedAlignments = []
                 for i, al in enumerate(candidate_alignments):
-                    if al is None:
-                        print al, reduced_read_list[i]
-                        print reduced_read_list[i].alignments
-                        print reduced_read_list[i].seq
-                        print polished_base.seq
                     assert al is not None, reduced_read_list[i]
                     trimmedAlignments.append(al.trimByQuality(0.4, 100))
                 contra_index = 0
@@ -309,13 +250,13 @@ class Polisher:
                         if al.contradictingRTCRight():
                             contra.append(al)
                     else:
-                        print "Stopped at:", support, contra_index, (1 - min_cov_frac) * support
+                        sys.stdout.trace("Stopped at:", support, contra_index, (1 - min_cov_frac) * support)
                         break
-                print "Positions:", [al.seg_to.right for al in trimmedAlignments]
-                print "Contra:", contra
+                sys.stdout.trace("Positions:", [al.seg_to.right for al in trimmedAlignments])
+                sys.stdout.trace("Contra:", contra)
                 if cutoff_pos > len(start) + 100:
-                    print "Chose to use read", base_al.__repr__(), "Extended for", cutoff_pos - len(start), "Alignments:"
-                    print map(str, reduced_read_list)
+                    sys.stdout.trace("Chose to use read", base_al.__repr__(), "Extended for", cutoff_pos - len(start), "Alignments:")
+                    sys.stdout.trace(map(str, reduced_read_list))
                     found = True
                     new_contig_candidate = Contig(new_contig.seq + polished_base[len(start):cutoff_pos], "candidate")
                     embedding = AlignmentPiece.Identical(polished_base.segment(len(start), cutoff_pos), new_contig_candidate.asSegment().suffix(pos=len(new_contig)))
@@ -324,12 +265,8 @@ class Polisher:
                         seg_from = al2.seg_from.contig.asSegment().suffix(length = len(al1.seg_from.contig) - len(start))
                         seg_to = al1.seg_from.contig.asSegment().suffix(length = len(al1.seg_from.contig) - len(start))
                         read_mappings.append(AlignmentPiece.Identical(seg_from, seg_to))
-                    # print [(al2, al1, embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
                     embedded_alignments = []
                     for al1, al2 in zip(candidate_alignments, read_mappings):
-                        # print al2, al1, embedding
-                        # print al2.compose(al1)
-                        # print al2.compose(al1).compose(embedding)
                         if al1.seg_to.right <= len(start) + 10:
                             embedded_alignments.append(None)
                         else:
@@ -338,7 +275,6 @@ class Polisher:
                                 embedded_alignments.append(None)
                             else:
                                 embedded_alignments.append(tmp.compose(embedding))
-                    # candidate_alignments = [al2.compose(al1).compose(embedding) for al1, al2 in zip(candidate_alignments, read_mappings)]
                     corrected_relevant_alignments = [al.targetAsSegment(new_contig_candidate.asSegment().prefix(len(new_contig))) for al in relevant_als]
                     relevant_als = []
                     for al1, al2 in zip(corrected_relevant_alignments, embedded_alignments):
@@ -355,8 +291,8 @@ class Polisher:
                     new_contig = new_contig_candidate
                     break
                 else:
-                    print "Could not prolong with read", base_al, "Alignments:"
-                    print map(str, reduced_read_list)
+                    sys.stdout.trace("Could not prolong with read", base_al, "Alignments:")
+                    sys.stdout.trace(map(str, reduced_read_list))
             if len(new_contig) >= max_len:
                 break
             if not found:

@@ -13,7 +13,6 @@ from disjointig_resolve.correction import Correction
 from disjointig_resolve.disjointigs import DisjointigCollection, Disjointig
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage, LineListener, ReadAlignmentStorage
 
-# TODO: Check that it is no longer needed and remove
 class ReadAlignmentListener(LineListener):
     def __init__(self, line, rc = None):
         # type: (NewLine, Optional[ReadAlignmentListener]) -> None
@@ -89,8 +88,6 @@ class ExtensionHandler(LineListener):
         line = line # type: NewLine
         if relevant_als is not None:
             tmp = line.read_alignments.merge(AlignmentStorage().addAll(relevant_als).targetAsSegment(line.asSegment()))
-            print "Prolongations of read alignments:"
-            print relevant_als
             line.read_alignments.clean()
             line.read_alignments.addAll(tmp)
         new_seg = line.asSegment().suffix(length = min(len(line), len(seq) + params.k + 100))
@@ -111,7 +108,6 @@ class NewLine(Contig):
         self.circular = False
         self.name_printer = None
         if rc is None:
-            # TODO: move all these to separate classes
             self.initial = AlignmentStorage()
             self.correct_segments = SegmentStorage()
             self.completely_resolved = SegmentStorage()
@@ -135,9 +131,6 @@ class NewLine(Contig):
 
     def updateCorrectSegments(self, seg, threshold = params.reliable_coverage):
         # type: (Segment, int) -> None
-        # print "seg:", seg
-        # print list(self.read_alignments)
-        # print "als:", list(self.read_alignments.allInter(seg))
         segs = AlignmentStorage().addAll(self.read_alignments.allInter(seg)).filterByCoverage(mi=threshold)
         self.correct_segments.addAll(segs)
         self.correct_segments.mergeSegments()
@@ -173,38 +166,22 @@ class NewLine(Contig):
 
     def getRelevantAlignmentsFor(self, seg):
         # type: (Segment) -> Generator[AlignmentPiece]
-        sys.stdout.info("Requesting read alignments for", seg)
-        # print "Disjointig alignments:", list(self.disjointig_alignments.allInter(seg))
-        # print "All disjointig alignments:", list(self.disjointig_alignments)
+        sys.stdout.trace("Requesting read alignments for", seg)
         result = []
         for alDL in self.disjointig_alignments.allInter(seg):
             if len(alDL.seg_to) < params.k:
                 continue
-            # print "Using disjointig alignment", alDL
             reduced = alDL.reduce(target=seg)
             dt = alDL.seg_from.contig # type: Disjointig
             cnt = 0
             als = filter(lambda al: al.seg_to.interSize(alDL.seg_from) > 8 * params.k / 10, dt.allInter(reduced.seg_from))
-            tmp_als = [al for al in als if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6"]
-            if len(tmp_als) > 0:
-                print "output1 -1b3f79ea-630a-4015-a9cd-c9b147cb50e6", alDL
-                print tmp_als
             compositions = alDL.massComposeBack(als)
-            tmp_als = [al for al in compositions if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6"]
-            if len(tmp_als) > 0:
-                print "output2 -1b3f79ea-630a-4015-a9cd-c9b147cb50e6", alDL
-                print tmp_als
             for al in compositions:
                 if len(al.seg_to) >= params.k:
-                    if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6":
-                        print "result", al
                     result.append(al)
                 cnt += 1
-                # if cnt % 100 == 0:
-                #     print cnt
         sys.stdout.trace("Request for read alignments for", seg, " collecting finished. Started filtering")
         result = sorted(result, key = lambda al: (al.seg_from.contig.id, -len(al.seg_from)))
-        # print "Unfiltered alignments:", result
         for read, iter in itertools.groupby(result, key = lambda al: al.seg_from.contig): # type: AlignedRead, Generator[AlignmentPiece]
             readRes = []
             for al in iter:
@@ -214,8 +191,6 @@ class NewLine(Contig):
                     if len(inter.matches) != 0:
                         found = True
                         break
-                if al.seg_from.contig.id == "-1b3f79ea-630a-4015-a9cd-c9b147cb50e6":
-                    print "filtered", al, found
                 if not found:
                     yield al
                     readRes.append(al)
@@ -227,7 +202,7 @@ class NewLine(Contig):
 
     def extendRight(self, seq, relevant_als = None):
         # type: (str, List[AlignmentPiece]) -> None
-        sys.stdout.info("Line operation Extend:", self, len(seq), relevant_als)
+        sys.stdout.trace("Line operation Extend:", self, len(seq), relevant_als)
         assert self.knot is None
         if relevant_als is None:
             relevant_als = []
@@ -236,7 +211,6 @@ class NewLine(Contig):
         self.seq = self.seq + seq
         self.rc.seq = basic.RC(seq) + self.rc.seq
         self.notifyAfterExtendRight(seq, relevant_als)
-        # TODO: put the handling of read and disjointig alignments to extended sequence into listeners one way or another
 
     def notifyBeforeExtendRight(self, new_seq, seq):
         # type: (Contig, str) -> None
@@ -249,7 +223,7 @@ class NewLine(Contig):
             listener.fireAfterExtendRight(self, seq, relevant_als)
 
     def cutRight(self, pos):
-        sys.stdout.info("Line operation Cut:", self, pos)
+        sys.stdout.trace("Line operation Cut:", self, pos)
         assert pos > 0 and pos <= len(self)
         cut_length = len(self) - pos
         if cut_length == 0:
@@ -272,27 +246,25 @@ class NewLine(Contig):
 
     def correctSequence(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
-        sys.stdout.info("Line operation Correct:", alignments)
+        sys.stdout.trace("Line operation Correct:", alignments)
         alignments = list(alignments)
         new_alignments = []
         for al in alignments:
             if al.seg_from.Seq() == al.seg_to.Seq():
-                sys.stdout.info("Skipping trivial correction alignment", al)
+                sys.stdout.trace("Skipping trivial correction alignment", al)
             else:
                 new_alignments.append(al)
         if len(new_alignments) == 0:
-            sys.stdout.info("Skipping trivial correction operation")
+            sys.stdout.trace("Skipping trivial correction operation")
             return
         assert len(alignments) > 0
         correction = Correction.constructCorrection(alignments)
-        # print "Disjointigs before:", list(self.disjointig_alignments)
         self.notifyBeforeCorrect(correction)
         old = Contig(self.seq, "old")
         self.seq = correction.seq_from.seq
         self.rc.seq = basic.RC(self.seq)
         correction.changeQT(self, old)
         self.notifyAfterCorrect(correction)
-        # print "Disjointigs after:", list(self.disjointig_alignments)
 
     def notifyBeforeCorrect(self, alignments):
         # type: (Correction) -> None
@@ -303,13 +275,6 @@ class NewLine(Contig):
         # type: (Correction) -> None
         for listener in self.listeners:
             listener.fireAfterCorrect(self, alignments)
-
-    # def extendRightWithAlignment(self, alignment):
-    #     # type: (AlignmentPiece) -> None
-    #     assert alignment.seg_from.contig == self
-    #     self.cutRight(alignment.seg_from.right)
-    #     self.correctSequence([alignment])
-    #     self.extendRight(alignment.seg_to.contig.suffix(alignment.seg_to.right))
 
     def addReadAlignment(self, al):
         # type: (AlignmentPiece) -> AlignmentPiece

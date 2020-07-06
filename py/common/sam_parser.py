@@ -1,9 +1,3 @@
-############################################################################
-# Copyright (c) 2015 Saint Petersburg State University
-# All Rights Reserved
-# See file LICENSE for details.
-############################################################################
-
 import sys
 import itertools
 from typing import Generator
@@ -263,15 +257,3 @@ class SamChain:
             if sam.gettid(tname) != None:
                 return sam.gettid(tname)
         return None
-
-############################# test
-
-#sam_file = "example.sam"
-#sam_parser = Samfile(sam_file)
-#sam_parser.PrintStats()
-#i = 0
-#for e in sam_parser:
-#    if i >= 5:
-#        break
-#    e.Print()
-#    i += 1

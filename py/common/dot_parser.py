@@ -1,8 +1,19 @@
-from typing import BinaryIO, Optional, Dict, Generator, Tuple
+from typing import BinaryIO, Optional, Dict, Generator, Tuple, List
 
 from common import basic
-from dag_resolve.repeat_graph import EdgeInfo
 
+class EdgeInfo:
+    def __init__(self, label, unique, cov, len, selfrc = False):
+        # type: (str, bool, int, int, bool) -> EdgeInfo
+        self.label = label
+        self.unique = unique
+        self.misc = []
+        self.cov = cov
+        self.selfrc = selfrc
+        self.len = len
+
+    def __repr__(self):
+        return str([self.label, self.unique, self.cov, self.selfrc])
 
 class DotParser:
     def __init__(self, dot):
@@ -10,7 +21,7 @@ class DotParser:
         self.dot = dot
 
     def parse(self, edge_ids = None):
-        # type: (Optional[Dict[int, list[str]]]) -> Generator[Tuple[int, int, int, int, EdgeInfo]]
+        # type: (Optional[Dict[int, List[str]]]) -> Generator[Tuple[int, int, int, int, EdgeInfo]]
         for s in self.dot.readlines():
             if s.find("->") == -1:
                 continue

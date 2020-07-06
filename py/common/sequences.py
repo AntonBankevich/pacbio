@@ -139,7 +139,6 @@ class ContigStorage:
     def writeToFasta(self, handler):
         for contig in self.unique():
             SeqIO.write(contig, handler, "fasta")
-#TODO: Merge with EasyContigStorage
 
 
 class ContigCollection(ContigStorage):
@@ -361,7 +360,6 @@ class Segment:
         # type: (Segment) -> Segment
         return Segment(seg.contig, self.left + seg.left, self.right + seg.left)
 
-    # TODO: make the same in contigs
     def suffix(self, pos = None, length = None):
         assert (pos is not None) != (length is not None)
         if length is not None:

@@ -92,16 +92,9 @@ class NewLineStorage(ContigStorage):
                 line = al.seg_to.contig # type: NewLine
                 line.disjointig_alignments.add(al)
 
-    # def fillFromDisjointigs(self):
-    #     # type: () -> None
-    #     for seg in UniqueMarker(self.disjointigs).findAllUnique(self.disjointigs):
-    #         line = self.addNew(seg.Seq())
-    #         line.initial.add(AlignmentPiece.Identical(line.asSegment(), seg))
-    #     #TODO Filter all lines already present in the collection
-
     def mergeLines(self, alignment, k):
         # type: (AlignmentPiece, int) -> NewLine
-        sys.stdout.info("Line operation Merge", alignment.seg_from.contig, alignment.seg_to.contig, alignment)
+        sys.stdout.trace("Line operation Merge", alignment.seg_from.contig, alignment.seg_to.contig, alignment)
         line1 = alignment.seg_from.contig #type: NewLine
         line2 = alignment.seg_to.contig #type: NewLine
         assert line1 != line2
@@ -119,16 +112,16 @@ class NewLineStorage(ContigStorage):
         storage.add(alignment)
         if alignment.seg_from.right < len(line1):
             line1.cutRight(alignment.seg_from.right)
-            print "Cut right"
-            print list(storage.content)[0]
-            print "\n".join(list(storage.content)[0].asMatchingStrings())
-            print list(storage.content)[0].cigar
+            sys.stdout.trace( "Cut right")
+            sys.stdout.trace( list(storage.content)[0])
+            sys.stdout.trace( "\n".join(list(storage.content)[0].asMatchingStrings()))
+            sys.stdout.trace( list(storage.content)[0].cigar)
         if alignment.seg_to.left > 0:
             line2.rc.cutRight(len(line2) - alignment.seg_to.left)
-            print "Cut left"
-            print list(storage.content)[0]
-            print "\n".join(list(storage.content)[0].asMatchingStrings())
-            print list(storage.content)[0].cigar
+            sys.stdout.trace( "Cut left")
+            sys.stdout.trace( list(storage.content)[0])
+            sys.stdout.trace( "\n".join(list(storage.content)[0].asMatchingStrings()))
+            sys.stdout.trace( list(storage.content)[0].cigar)
         alignment = list(storage.content)[0] # type: AlignmentPiece
         line2.removeListener(storage)
         line1.removeListener(storage.reverse)
@@ -139,11 +132,11 @@ class NewLineStorage(ContigStorage):
         else:
             new_seq = Contig(line2.seq, "new_seq")
         al2 = AlignmentPiece.Identical(line2.asSegment(), new_seq.asSegment().suffix(length=len(line2)))
-        print "Al2:", al2
+        sys.stdout.trace( "Al2:", al2)
         alignment = alignment.compose(al2).reverse()
-        print "Composed alignment", alignment
-        print "\n".join(alignment.asMatchingStrings())
-        print alignment.cigar
+        sys.stdout.trace( "Composed alignment", alignment)
+        sys.stdout.trace("\n".join(alignment.asMatchingStrings()))
+        sys.stdout.trace( alignment.cigar)
         assert alignment.seg_to.right == len(line1)
         assert alignment.seg_from.left == al2.seg_to.left
         line1.correctSequence([alignment])
@@ -169,9 +162,6 @@ class NewLineStorage(ContigStorage):
         line2.cleanReadAlignments()
 
 
-        # print line1.read_alignments
-        # print line2.read_alignments
-        # print line.read_alignments
         self.notifyMergedLines(al1, al2)
         knot_right = line2.knot
         knot_left = line1.rc.knot
@@ -188,7 +178,7 @@ class NewLineStorage(ContigStorage):
 
     def splitLine(self, seg):
         # type: (Segment) -> Tuple[NewLine, NewLine]
-        sys.stdout.info("Line operation Split", seg)
+        sys.stdout.trace("Line operation Split", seg)
         line = seg.contig # type: NewLine
         seg1 = line.asSegment().prefix(pos=seg.right)
         line1 = self.addNew(seg1.Seq(), line.id + "l")
@@ -255,7 +245,7 @@ class NewLineStorage(ContigStorage):
                         seq.append(line.knot.gap_seq)
                 else:
                     seq.append(line.seq)
-            print cnt, ":", ";".join(id)
+            sys.stdout.trace( cnt, ":", ";".join(id))
             SeqIO.write(NamedSequence("".join(seq), "contig_" + str(cnt)), handler, "fasta")
             cnt += 1
 

@@ -1,3 +1,5 @@
+import sys
+
 from typing import Dict, List, Any, Optional, Generator, BinaryIO
 
 from alignment.align_tools import Aligner
@@ -91,7 +93,6 @@ class DotPlot:
     def construct(self, aligner):
         # type: (Aligner) -> None
         for al in aligner.dotplotAlign(self.lines.unique(), self.lines):
-            # print al, len(al) > params.k, al.percentIdentity() > 0.8, al.seg_from.contig.id < al.seg_to.contig.id, al.seg_from <= al.seg_to
             if len(al) > params.k and al.percentIdentity() > 0.8:
                 if al.seg_from.contig.id == al.seg_to.contig.id:
                     ok = al.seg_from <= al.seg_to
@@ -177,12 +178,12 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
 
     def FireMergedLines(self, al1, al2):
         # type: (AlignmentPiece, AlignmentPiece) -> None
-        print "Fire merged lines", al1, al2
+        sys.stdout.trace("Fire merged lines", al1, al2)
         new_line = al1.seg_to.contig
         line1 = al1.seg_from.contig
         line2 = al2.seg_from.contig
-        print list(self.allInter(line1.asSegment()))
-        print list(self.allInter(line2.asSegment()))
+        sys.stdout.trace(list(self.allInter(line1.asSegment())))
+        sys.stdout.trace(list(self.allInter(line2.asSegment())))
         self.addLine(new_line)
         self.auto_alignments[line1.id].setState(-1)
         self.auto_alignments[line2.id].setState(-1)
@@ -209,11 +210,11 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
             self.addTwoLineStorage(new_line, storage1.line_from).addAll(als1.merge(als2))
         self.removeLine(al1.seg_from.contig)
         self.removeLine(al2.seg_from.contig)
-        print list(self.allInter(new_line.asSegment()))
+        sys.stdout.trace(list(self.allInter(new_line.asSegment())))
 
     def FireSplitLine(self, al1, al2):
         # type: (AlignmentPiece, AlignmentPiece) -> None
-        print "Fire split line", al1, al2
+        sys.stdout.trace("Fire split line", al1, al2)
         line = al1.seg_from.contig
         als_to_add = [] # type: List[AlignmentPiece]
         als_to_add.extend(self.auto_alignments[line.id].content)
@@ -268,7 +269,6 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
     # alignments from new sequence to new sequence
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
-        print "oppa1", alignments.isSubstantial(), alignments.alignments
         if not alignments.isSubstantial():
             line = alignments.seq_to # type: NewLine
             for storage in self.alignmentsToFrom[line.id].values():
@@ -283,12 +283,11 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
         self.auto_alignments[line.id].fireAfterExtendRight(line, seq)
         self.rc_alignments[line.id].fireAfterExtendRight(line, seq)
         new_seg = line.asSegment().suffix(length=min(len(line), len(seq) + params.k + 500))
-        # print "Aligning new extension"
         for al in self.aligner.dotplotAlign([new_seg.asContig()], self.lines):
             if len(al.seg_to) >= params.k:
                 al = al.queryAsSegment(new_seg)
                 self.addAndMergeRight(al)
-        print "Updated line alignments:", map(str, self.allInter(line.asSegment()))
+        sys.stdout.trace("Updated line alignments:", map(str, self.allInter(line.asSegment())))
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None
@@ -299,7 +298,6 @@ class LineDotPlot(LineListener, LineStorageListener, DotPlot):
 
     def fireAfterCorrect(self, line, alignments):
         # type: (Any, Correction) -> None
-        print "oppa1", alignments.isSubstantial(), alignments.alignments
         if alignments.isSubstantial():
             self.realignLine(line)
         else:

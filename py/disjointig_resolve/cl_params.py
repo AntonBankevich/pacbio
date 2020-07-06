@@ -155,7 +155,6 @@ class Params:
         return os.path.join(self.dir, "saves")
 
     def print_usage_and_exit(self, code, message = None):
-        # TODO: write usage
         if code != 0:
             if message is not None:
                 print "Error in command line parameters: " + message

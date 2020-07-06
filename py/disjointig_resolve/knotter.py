@@ -67,8 +67,8 @@ class LineMerger:
         for other_line, iter in itertools.groupby(candidates, lambda rec: rec.other): # type: NewLine, Iterator[LineMerger.Record]
             recs = list(iter)
             if recs[-1].gap - recs[0].gap > min(100, abs(recs[-1].gap) / 8):
-                print "\n".join(map(str, candidates))
-                print "WARNING: Ambiguous knotting to the same line"
+                sys.stdout.trace("\n".join(map(str, candidates)))
+                sys.stdout.warn("WARNING: Ambiguous knotting to the same line")
                 if len(recs) >= 5 and recs[-2].gap - recs[1].gap < min(10, abs(recs[-2].gap) / 10):
                     recs = recs[1:-1]
                 else:
@@ -77,7 +77,7 @@ class LineMerger:
             avg = sum([rec.gap for rec in recs]) / len(recs)
             avg_initial = sum([rec.initial_gap for rec in recs]) / len(recs)
             if recs[0].other == line.rc:
-                print "WARNING: Ignoring connection to reverse-compliment line"
+                sys.stdout.warn( "WARNING: Ignoring connection to reverse-compliment line")
                 continue
             final_candidates.append((avg, recs[0].other, recs, avg_initial))
         if len(final_candidates) == 0:
@@ -85,32 +85,32 @@ class LineMerger:
         final_candidates = sorted(final_candidates, key = lambda candidate: candidate[-1])
         final = final_candidates[0]
         if len(final_candidates) > 1:
-            print "Extra candidates:"
-            print "\n".join(map(str, candidates))
+            sys.stdout.warn("Extra candidates")
+            sys.stdout.trace("\n".join(map(str, candidates)))
         # for candidate in final_candidates[1:]:
         #     if final[0] + len(final[1]) > candidate[0]:
         #         print "\n".join(map(str, candidates))
         #         assert False, "Contradicting candidates" + str(final[0]) + " " + str(final[1]) + " " + str(candidate[0]) + " " + str(candidate[1])
         if final[0] > 0:
-            print "Positive gap. Can not merge line", line
-            print final
+            sys.stdout.trace("Positive gap. Can not merge line", line)
+            sys.stdout.trace(final)
             return None
         elif len(final[2]) <= 1:
-            print "Insufficient support to merge line", line
-            print final
+            sys.stdout.trace("Insufficient support to merge line", line)
+            sys.stdout.trace(final)
             return None
         else:
-            print "Merging", line, "with", final[1], "with gap", final[0]
-            print "Alignments:"
-            print "\n".join(map(str, final[2]))
+            sys.stdout.info("Merging", line, "with", final[1], "with gap", final[0])
+            sys.stdout.trace("Alignments:")
+            sys.stdout.trace("\n".join(map(str, final[2])))
             other = final[1]
             assert line != other.rc
             assert other.rc.knot is None
             line_alignment = final[2][0].al1.composeTargetDifference(final[2][0].al2)
-            print "Alignment:", line_alignment
-            print "\n".join(line_alignment.asMatchingStrings())
-            print line_alignment.cigar
-            print list(self.dot_plot.getAlignmentsToFrom(other, line))
+            sys.stdout.trace( "Alignment:", line_alignment)
+            sys.stdout.trace( "\n".join(line_alignment.asMatchingStrings()))
+            sys.stdout.trace( line_alignment.cigar)
+            sys.stdout.trace( list(self.dot_plot.getAlignmentsToFrom(other, line)))
             tmp = None
             if final[0] < -params.k - 100:
                 for al in self.dot_plot.getAlignmentsToFrom(other, line):
@@ -120,11 +120,11 @@ class LineMerger:
                 if tmp is None:
                     sys.stdout.warn("No good line alignment found. Alignment based on reads will be used.")
                 else:
-                    print "Switched to line alignment:", tmp
+                    sys.stdout.trace("Switched to line alignment:", tmp)
                 if (tmp.seg_to.left < 20 and tmp.rc.seg_to.left < 20) or \
                         (tmp.seg_from.left < 20 and tmp.rc.seg_from.left < 20) or \
                         (tmp.seg_from.left < 20 and tmp.rc.seg_to.left < 20):
-                    print "Warning: one line is substring of another.", str(line_alignment) + " " + str(tmp)
+                    sys.stdout.warn( "One line is substring of another.", str(line_alignment) + " " + str(tmp))
                 elif tmp.seg_to.left > 30 or tmp.rc.seg_from.left > 30:
                     sys.stdout.warn("Line alignment is not overlap!", tmp)
                     if params.strict_merging_alignment:
@@ -133,18 +133,18 @@ class LineMerger:
             pref = line_alignment.seg_from.left
             suff = len(line_alignment.seg_to.contig) - line_alignment.seg_to.right
             line_alignment = Scorer().polyshAlignment(line_alignment, params.alignment_correction_radius)
-            print "Polished alignment:", line_alignment
-            print "\n".join(line_alignment.asMatchingStrings())
-            print line_alignment.cigar
+            sys.stdout.trace("Polished alignment:", line_alignment)
+            sys.stdout.trace("\n".join(line_alignment.asMatchingStrings()))
+            sys.stdout.trace(line_alignment.cigar)
             if line == other:
                 gap = -line_alignment.rc.seg_from.right - line_alignment.seg_to.left + line.correct_segments[0].left + line.rc.correct_segments[0].left
                 if gap > 0:
-                    print "Line is circular but not ready for completion. Skipping."
+                    sys.stdout.trace("Line is circular but not ready for completion. Skipping.")
                     return None
                 line.cutRight(line.correct_segments[-1].right)
                 line.rc.cutRight(line.rc.correct_segments[-1].right)
                 line.tie(line, gap, "")
-                print line, "is circular"
+                sys.stdout.info(line, "is circular")
                 return line
             new_line = self.storage.mergeLines(line_alignment, params.k)
             seg = new_line.segment(pref, len(new_line) - suff)

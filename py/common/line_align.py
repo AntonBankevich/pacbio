@@ -5,8 +5,8 @@ from typing import Optional, Tuple, List, Dict
 from common.scoring_model import ScoringModel
 from common.sequences import Segment
 
+import sys
 if __name__ == "__main__":
-    import sys
     sys.path.append("py")
 from common.alignment_storage import AlignmentPiece, MatchingSequence
 from common import params
@@ -30,7 +30,6 @@ class Scorer:
 
     def accurateScore(self, alignment, radius): #This score is nonsymmetric!!! Insertions and deletions have different cost
         # type: (MatchingSequence, int) -> int
-        # print "Accurate scoring:", alignment[0], alignment[-1]
         prev = Storage(alignment[0][1], alignment[1][1] + radius, self.scores.inf)
         prev.set(alignment[0][1], 0)
         cur_del = 0
@@ -45,7 +44,7 @@ class Scorer:
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
                 cur += 1
                 if alignment[cur + 1][1] - alignment[cur][1] > 10 and alignment[cur + 1][0] - alignment[cur][0] > 10:
-                    print "Long gap:", alignment[cur], alignment[cur + 1]
+                    sys.stdout.trace("Long gap:", alignment[cur], alignment[cur + 1])
             j_max = min(max(bounds[i - alignment[0][0]][1], alignment[cur + 1][1]) + radius, alignment[-1][1])
             total.append(j_max - j_min)
             ne = Storage(j_min, j_max + 1, self.scores.inf)
@@ -212,7 +211,7 @@ class Scorer:
             if alignment[cur + 1][0] == i and cur + 2 < len(alignment):
                 cur += 1
                 if alignment[cur + 1][1] - alignment[cur][1] > 10 and alignment[cur + 1][0] - alignment[cur][0] > 10:
-                    print "Long gap:", alignment[cur], alignment[cur + 1]
+                    sys.stdout.trace("Long gap:", alignment[cur], alignment[cur + 1])
             j_max = min(max(bounds[i - alignment[0][0]][1], alignment[cur + 1][1]) + radius, alignment[-1][1])
             ne = Storage(j_min, j_max + 1, self.scores.inf)
             storage.set(i, Storage(j_min, j_max + 1, None))
@@ -271,7 +270,6 @@ class Scorer:
         # type: (AlignmentPiece, AlignmentPiece) -> Tuple[Optional[int], Optional[int], Optional[int]]
         pid1 = piece1.percentIdentity()
         pid2 = piece2.percentIdentity()
-        # print "Percent identities:", pid1, pid2
         if pid1 < params.min_expected_Pacbio_PI and pid2 < params.min_expected_Pacbio_PI:
             return None, None, None
         # we only consider contradictions with the right part of the line since reads were aligned to line center suffixes
@@ -318,12 +316,6 @@ class Scorer:
         if q1.inter(q2):
             seg = q1.cap(q2)
             correct_scores = self.scoreCommon(al1.reduce(query=seg), al2.reduce(query=seg))
-            if al1.seg_from.contig.id == "-NCTC9002/40629/0_17137_0":
-                print "Reduced:", seg
-                print al1, seg1, q1, al1.reduce(query=seg)
-                print "\n".join(al1.reduce(query=seg).asMatchingStrings2())
-                print al2, seg2, q2, al2.reduce(query=seg)
-                print "\n".join(al2.reduce(query=seg).asMatchingStrings2())
         else:
             correct_scores = full_scores
         if correct_scores[0] > correct_scores[1]:
@@ -333,17 +325,17 @@ class Scorer:
         s1 = (full_scores[0] + correct_scores[0] * 9) / 10 + p1
         s2 = (full_scores[1] + correct_scores[1] * 9) / 10 + p2
         s12 = (full_scores[2] + correct_scores[2] * 9) / 10 + abs(p)
-        print (p1, p2), full_scores, correct_scores, (s1, s2, s12)
+        sys.stdout.trace((p1, p2), full_scores, correct_scores, (s1, s2, s12))
         return s1, s2, s12
 
     def scoreCommon(self, piece1, piece2):
         # type: (AlignmentPiece, AlignmentPiece) -> Tuple[int, int, int]
         if not piece1.seg_from.inter(piece2.seg_from):
-            print "Nonintersecting alignments fighting", piece1, piece2
+            sys.stdout.trace("Nonintersecting alignments fighting", piece1, piece2)
             return 0, 0, 0
         matches1, matches2 = self.cutHomo(piece1.matchingSequence(), piece2.matchingSequence())
         if matches1 is None:
-            print piece1, piece2
+            sys.stdout.info(piece1, piece2)
             assert False
         composite = matches1.composeDifference(matches2)
         matches1 = matches1.reduceTarget(composite.matches[0][0], composite.matches[-1][0] + 1)
@@ -354,25 +346,20 @@ class Scorer:
             composite = composite.reverse()
         accurate12 = self.accurateScore(composite, params.score_counting_radius)
         if not (abs(accurate1 - accurate2) <= accurate12 <= accurate1 + accurate2):
-            print "Triangle inequality failed: " + \
+            sys.stdout.trace("Triangle inequality failed: " + \
                   str(accurate1) + " " + str(accurate2) + " " + \
-                  str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" + str(accurate1 + accurate2)
+                  str(abs(accurate1 - accurate2)) + "<=" + str(accurate12) + "<=" + str(accurate1 + accurate2))
         return accurate1, accurate2, self.accurateScore(composite, params.score_counting_radius)
 
     def cutHomo(self, m1, m2):
         # type: (MatchingSequence, MatchingSequence) -> Tuple[MatchingSequence, MatchingSequence]
         if len(list(m1.common_from(m2))) == 0:
-            print m1.matches
-            print m2.matches
             return None, None
-        # a, b =  m1.common_from(m2).next()
-        # print m1[a], m2[b]
         for a, b in m1.common_from(m2):
             p1 = m1[a][1]
             p2 = m2[b][1]
             p = m1[a][0]
             if m1.seq_to[p1 + 1] != m1.seq_to[p1] and m2.seq_to[p2 + 1] != m2.seq_to[p2] and m1.seq_from[p] != m1.seq_from[p + 1]:
-                # print p1 - m1[0][1], p2 - m2[0][1], p - m1[0][0]
                 m1.matches = m1.matches[a:]
                 m2.matches = m2.matches[b:]
                 break
@@ -381,7 +368,6 @@ class Scorer:
             p2 = m2[b][1]
             p = m1[a][0]
             if m1.seq_to[p1 - 1] != m1.seq_to[p1] and m2.seq_to[p2 - 1] != m2.seq_to[p2] and m1.seq_from[p] != m1.seq_from[p - 1]:
-                # print m1[-1][1] - p1, m2[-1][1] - p2, m1[-1][0] - p
                 m1.matches = m1.matches[:a + 1]
                 m2.matches = m2.matches[:b + 1]
                 break
@@ -422,24 +408,24 @@ class Tournament:
         s1, s2, s12 = self.scorer.oldCompare(c1, c2)
         if s12 is None:
             if s1 is None and s2 is not None:
-                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c2
+                sys.stdout.trace("Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c2)
                 return c2
             elif s1 is not None and s2 is None:
-                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c1
+                sys.stdout.trace( "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "Winner:", c1)
                 return c1
             elif s1 is None and s2 is None:
-                print "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner"
+                sys.stdout.trace( "Fight:", c1, c2, "Comparison results:", None, s12, s1, s2, "No winner")
                 return None
             assert False, "Strange comparison results"
         else:
             if s12 < 25 or (s12 < 100 and abs(s1 - s2) < s12 * 0.8) or abs(s1 - s2) < s12 * 0.65:
-                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "No winner"
+                sys.stdout.trace( "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "No winner")
                 return None
             if s1 > s2:
-                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c2
+                sys.stdout.trace( "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c2)
                 return c2
             else:
-                print "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c1
+                sys.stdout.trace( "Fight:", c1, c2, "Comparison results:", abs(s1 - s2), s12, s1, s2, "Winner:", c1)
                 return c1
 
     def tournament(self, candidates):

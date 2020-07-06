@@ -71,7 +71,6 @@ class DisjointigCollection(ContigStorage):
         if name is None:
             name = "D" + str(self.cnt)
             self.cnt += 1
-        print "New disjointig:", name, len(seq)
         new_disjointig = Disjointig(seq, name)
         self.add(new_disjointig)
         return new_disjointig
@@ -107,8 +106,6 @@ class DisjointigCollection(ContigStorage):
             if al.seg_from.left < 500 and al.rc.seg_from.left < 500 and len(list(al.splitRef())) == 1 and len(al) > params.k:
                 cnt += 1
                 dt.addAlignment(al)
-                if cnt % 10000 == 0:
-                    print cnt, float(cnt) / all
 
     def save(self, handler):
         # type: (TokenWriter) -> None

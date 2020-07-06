@@ -392,7 +392,6 @@ class SegmentStorage(SmartStorage):
             self.add(Segment.load(handler, contig))
 
     #returns the leftmost segment that intersects with seg by at least min_inter (or tockes seg in case min_inter = 0)
-    # TODO rewrite in log time
     def find(self, seg, min_inter = 0):
         # type: (Segment, int) -> Optional[Segment]
         self.sort()
@@ -414,7 +413,6 @@ class SegmentStorage(SmartStorage):
             return self.rc.expand(k).rc
 
 
-# TODO: Extract version without listening to use with disjointigs. Otherwise it is cyclic dependancy.
 class AlignmentStorage(SmartStorage):
     def __init__(self, rc=None):
         # type: (Optional[AlignmentStorage]) -> None
@@ -608,21 +606,15 @@ class AlignmentStorage(SmartStorage):
             als_right = [al for al, side in al_sides if side == 1] # type: List[AlignmentPiece]
             als_right = sorted(als_right, key = lambda al: al.seg_from.left)
             merged = []
-            # print "Merging alignments from", c_from.id, "to", c_to.id
-            # print als_left
-            # print als_right
             for al in als_left:
                 for j in range(len(als_right)): # type: int
                     if als_right[j] is None:
                         continue
                     if als_right[j].seg_from.left >= al.seg_from.right:
                         break
-                    # print "Attempting to merge", al, als_right[j]
                     if als_right[j] is not None and al.canMergeTo(als_right[j]):
-                        # print "Passed first test"
                         tmp = AlignmentPiece.MergeOverlappingAlignments([al, als_right[j]])
                         if tmp is not None:
-                            # print "Passed second test", tmp
                             al = tmp
                             als_right[j] = None
                             break
@@ -670,7 +662,6 @@ class AlignmentStorage(SmartStorage):
         if len(self) == 0:
             return SegmentStorage()
         segs = list(self.calculateCoverage(k))
-        print segs
         last = None
         contig = self[0].seg_to.contig
         res = SegmentStorage()

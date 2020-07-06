@@ -72,7 +72,6 @@ class AutoAlignmentStorage(LineListener):
 
     def fireBeforeExtendRight(self, line, new_seq, seq):
         # type: (Any, Contig, str) -> None
-        # print "BE", self.content
         self.content.fireBeforeExtendRight(line, new_seq, seq)
         self.reverse()
         self.content.fireBeforeExtendRight(line, new_seq, seq)
@@ -80,14 +79,12 @@ class AutoAlignmentStorage(LineListener):
 
     def fireBeforeCutRight(self, line, new_seq, pos):
         # type: (Any, Contig, int) -> None
-        # print "BC", self.content
         self.content.fireBeforeCutRight(line, new_seq, pos)
         self.reverse()
         self.content.fireBeforeCutRight(line, new_seq, pos)
 
     def fireBeforeCorrect(self, alignments):
         # type: (Correction) -> None
-        # print "BCo", self.content
         self.content.fireBeforeCorrect(alignments)
         self.reverse()
         self.content.fireBeforeCorrect(alignments)
@@ -97,21 +94,18 @@ class AutoAlignmentStorage(LineListener):
         self.content.fireAfterExtendRight(line, seq)
         self.reverse()
         self.content.fireAfterExtendRight(line, seq)
-        # print "AE", self.content
 
     def fireAfterCutRight(self, line, pos):
         # type: (Any, int) -> None
         self.content.fireAfterCutRight(line, pos)
         self.reverse()
         self.content.fireAfterCutRight(line, pos)
-        # print "AC", self.content
 
     def fireAfterCorrect(self, line, alignments):
         # type: (Any, Correction) -> None
         self.content.fireAfterCorrect(line, alignments)
         self.reverse()
         self.content.fireAfterCorrect(line, alignments)
-        # print "ACo", self.content
 
     def reverse(self):
         self.state = -self.state

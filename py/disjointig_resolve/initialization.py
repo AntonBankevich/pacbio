@@ -25,7 +25,7 @@ def adjustKL(aligner, reads, contigs):
     analyser = CoverageAnalyser(aligner, reads)
     sys.stdout.info("Analysing k-mer coverage by reads.")
     analyser.analyseSegmentCoverage(contigs)
-    analyser.printAnalysis()
+    # analyser.printAnalysis()
     newK = analyser.chooseK(params.k_cov) - 2 * params.bad_end_length
     newL = analyser.chooseK(params.l_cov) - 2 * params.bad_end_length
     sys.stdout.info("Chosen k and l:", newK, newL)
@@ -53,15 +53,15 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
     sys.stdout.info("Marking unique regions")
     UniqueMarker(aligner).markAllUnique(lines, reads)
     for line in lines.unique():
-        print line, line.completely_resolved
+        sys.stdout.trace(line, line.completely_resolved)
     if not split:
-        print "Splitting lines into parts"
+        sys.stdout.trace("Splitting lines into parts")
         line_list = list(lines.unique()) # type: List[NewLine]
         while len(line_list) > 0:
             line = line_list.pop()
-            print "Splitting line", line
+            sys.stdout.trace("Splitting line", line)
             if len(line.completely_resolved) > 1:
-                print "Splitted line because of two resolved segments:", str(line.completely_resolved)
+                sys.stdout.trace("Splitted line because of two resolved segments:", str(line.completely_resolved))
                 left = line.completely_resolved[1].left
                 right = line.completely_resolved[0].right
                 if left >= right:
@@ -70,28 +70,28 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
                 line_list.extend([line1, line2])
             else:
                 if line.initial[-1].seg_to.right + 5000 < len(line):
-                    print "Cut line on the right because too long unresolved segment:", line, str(line.completely_resolved)
+                    sys.stdout.trace("Cut line on the right because too long unresolved segment:", line, str(line.completely_resolved))
                     line.cutRight(line.initial[-1].seg_to.right + 3000)
                 if line.initial[0].seg_to.left > 5000:
-                    print "Cut line of the left because too long unresolved segment:", line, str(line.completely_resolved)
+                    sys.stdout.trace("Cut line of the left because too long unresolved segment:", line, str(line.completely_resolved))
                     line.rc.cutRight(len(line) - line.initial[0].seg_to.left + 3000)
                 if len(line.completely_resolved[0]) > 40000:
-                    print "Splitted line because it is too long", str(line.completely_resolved)
+                    sys.stdout.trace("Splitted line because it is too long", str(line.completely_resolved))
                     line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=max(10000, params.k + params.bad_end_length)).prefix(length=1000))
                     line1, line2 = lines.splitLine(line12.completely_resolved[0].prefix(length=max(10000, params.k + params.bad_end_length)).suffix(length=1000))
                     line1.tie(line2, -1000, "")
                     line2.tie(line3, -1000, "")
         line_list = sorted(lines.unique(), key=lambda line: line.id)
-        print "Final list of lines:"
+        sys.stdout.trace("Final list of lines:")
         for line in line_list:
-            print line, line.completely_resolved
+            sys.stdout.trace(line, line.completely_resolved)
     lines.writeToFasta(open(os.path.join(dir, "initial_prolonged_lines.fasta"), "w"))
     return lines
 
 
 def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polisher):
     # type: (str, str, Aligner, ContigStorage, DisjointigCollection, ReadCollection, Polisher) -> NewLineStorage
-    print "Initializing lines from init file", lc_file
+    sys.stdout.info("Initializing lines from init file", lc_file)
     lines = NewLineStorage(disjointigs, aligner)
     f = TokenReader(open(lc_file, "r"))
     n = f.readInt()
@@ -111,9 +111,9 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polis
         line.correct_segments.add(line.asSegment().shrink(100))
         line.completely_resolved.add(line.asSegment().shrink(100))
         line.initial.add(AlignmentPiece.Identical(line.asSegment().asContig().asSegment(), line.asSegment()))
-    print "Final list of lines:"
+    sys.stdout.trace("Final list of lines:")
     for line in lines.unique():
-        print line, line.completely_resolved
+        sys.stdout.trace(line, line.completely_resolved)
     lines.writeToFasta(open(os.path.join(dir, "initial_lines.fasta"), "w"))
     lines.alignDisjointigs()
     sys.stdout.info("Constructing line dot plot")
@@ -149,12 +149,12 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
 
     if code == 0:
         disjointigs.loadFromFasta(open(disjointigs_file, "r"))
-        print "Disjointigs:"
+        sys.stdout.trace("Disjointigs:")
         for dis in disjointigs:
-            print dis.id, len(dis)
+            sys.stdout.trace(dis.id, len(dis))
         disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta"), "w"))
     else:
-        print "Could not assemble new disjointigs"
+        sys.stdout.trace("Could not assemble new disjointigs")
     sys.stdout.info("Aligning reads to disjointigs")
     disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
     return disjointigs
@@ -205,11 +205,11 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
                     sys.stdout.info("Edge added based on length and coverage:", edge.id, edge.cov, edge.len)
 
     elif force_unique is not None:
-        print "Using forced unique edge set"
-        print force_unique
+        sys.stdout.info("Using forced unique edge set")
+        sys.stdout.trace(force_unique)
         contigs = ContigCollection().loadFromFile(contigs_file).filter(lambda contig: contig.id in force_unique)
     else:
-        print "Considering all contigs unique"
+        sys.stdout.info("Considering all contigs unique")
         contigs = ContigCollection().loadFromFile(contigs_file)
     # contigs.loadFromFasta(open(contigs_file, "r"), num_names=True)
     # contigs = contigs.filter(lambda contig: contig.id not in nonunique and len(contig) > params.k + 20)
@@ -250,7 +250,6 @@ def RelevantReadsFromDump(read_dump, edges, reads):
             relevant_read_ids[eid].append(reads[rid])
     return relevant_read_ids
 
-# TODO: many short edges are not really unique. Need to address it properly
 def ExtendShortContigs(contigs, reads, aligner, polisher, read_dump):
     # type: (ContigStorage, ReadCollection, Aligner, Polisher, str) -> None
     sys.stdout.info("Extending short lines")
@@ -263,14 +262,14 @@ def ExtendShortContigs(contigs, reads, aligner, polisher, read_dump):
             als[contig.rc.id] = []
 
     if read_dump is not None:
-        print "Using flye read dump file to extend short contigs"
+        sys.stdout.trace("Using flye read dump file to extend short contigs")
         relevant_reads = RelevantReadsFromDump(read_dump, short_contigs, reads)
         for contig in short_contigs:
             for al in aligner.overlapAlign(relevant_reads[contig.id], ContigStorage([contig])):
                 als[al.seg_to.contig.id].append(al)
                 als[al.seg_to.contig.rc.id].append(al.rc)
     else:
-        print "Realigning all reads to extend short contigs"
+        sys.stdout.trace("Realigning all reads to extend short contigs")
         for al in aligner.overlapAlign(reads, short_contigs):
             if al.seg_to.left <= 20 and al.rc.seg_to.left <= 20:
                 added = False

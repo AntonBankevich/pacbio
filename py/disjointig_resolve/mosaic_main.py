@@ -43,42 +43,6 @@ def prepare_disjointigs_file(disjointigs_file, disjointigs_file_list):
     h.close()
 
 
-def printToFile(als, dir, name):
-    # type: (Iterable[AlignmentPiece], str, str) -> None
-    f = open(os.path.join(dir, name + ".txt"), "w")
-    for al in als:
-        f.write(" ".join([str(al.seg_from.contig.id), str(al.seg_to.contig.id), str(al.seg_from.left), str(al.seg_from.right), str(al.seg_to.left), str(al.seg_to.right), str(len(list(al.splitRead())))]) + "\n")
-    f.close()
-
-def printVals(vals, dir, name):
-    # type: (Iterable[int], str, str) -> None
-    f = open(os.path.join(dir, name + ".txt"), "w")
-    for val in vals:
-        f.write(str(val))
-    f.close()
-
-
-def countStats(reads, lines, disjointigs, aligner, dir):
-    # type: (ReadCollection, NewLineStorage, DisjointigCollection, Aligner, str) -> None
-    tmp = AlignmentStorage()
-    cnt = 0
-    for al in aligner.overlapAlign(reads, lines):
-        line = al.seg_to.contig # type: NewLine
-        line.addReadAlignment(al)
-        tmp.addAll(al.splitRead())
-        cnt += 1
-        if cnt % 10000 == 0:
-            print cnt
-    line = lines["1"]
-    als = line.read_alignments
-    print list(als.calculateWindowedCoverage(500))
-    als = line.read_alignments.filter(lambda al: al.contradictingRTC(line.asSegment(), 500))
-    print list(als.calculateWindowedCoverage(500))
-    print list(tmp.calculateWindowedCoverage(500))
-    als = tmp.filter(lambda al: al.contradictingRTC(line.asSegment(), 500))
-    print list(als.calculateWindowedCoverage(500))
-
-
 def assemble(args, bin_path):
     params.bin_path = bin_path
     start = time.time()
@@ -89,24 +53,16 @@ def assemble(args, bin_path):
         cl_params.genome_size = 30000
         cl_params.dir = os.path.dirname(__file__)  + "/../../test_results"
         ref.loadFromFile(os.path.dirname(__file__)  + "/../../test_dataset/axbctbdy.fasta", False)
-        # aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
-        # Tester(aligner).testAll("tests/cases.txt")
-        # sys.stdout.write("Finished\n")
-        # print (time.strftime("%d.%m.%Y  %I:%M:%S"))
-        # return
     if cl_params.debug:
         params.save_alignments = True
     cl_params.check()
     CreateLog(cl_params.dir)
-    print " ".join(cl_params.args)
+    sys.stdout.info("Command line:", " ".join(cl_params.args))
     sys.stdout.info("Started")
-    sys.stdout.info("Params:", " ".join(args))
     if cl_params.debug:
         sys.stdout.info("Version:", subprocess.check_output(["git", "rev-parse", "HEAD"]))
         sys.stdout.info("Modifications:")
         print subprocess.check_output(["git", "diff"])
-    if cl_params is not None:
-        print "Focus:", str(cl_params.focus)
     sys.stdout.info("Preparing initial state")
     if cl_params.debug:
         save_handler = SaveHandler(os.path.join(cl_params.dir, "saves"))
@@ -130,6 +86,7 @@ def assemble(args, bin_path):
 
 
         if cl_params.contigs_file is None:
+            sys.stdout.info("Running Flye")
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
@@ -158,10 +115,10 @@ def assemble(args, bin_path):
         else:
             lines = LoadLineCollection(cl_params.dir, cl_params.init_file, aligner, contigs, disjointigs, reads, polisher)
 
-        sys.stdout.info("Constructing line dot plot")
+        sys.stdout.info("Constructing dot plot")
         dot_plot = LineDotPlot(lines, aligner)
         dot_plot.construct(aligner)
-        dot_plot.printAll(sys.stdout)
+        # dot_plot.printAll(sys.stdout)
 
         sys.stdout.info("Updating sequences and resolved segments.")
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
@@ -172,32 +129,30 @@ def assemble(args, bin_path):
             if len(line.completely_resolved) == 0:
                 lines.removeLine(line)
         if cl_params.debug:
-            print "Saving initial state"
+            sys.stdout.info( "Saving initial state")
             try:
                 writer = save_handler.getWriter()
-                print "Save details:", writer.info
+                sys.stdout.info("Save details:", writer.info)
                 saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
             except Exception as e:
                 _, _, tb = sys.exc_info()
                 sys.stdout.warn("Could not write save")
                 traceback.print_tb(tb)
-                print "Message:", e.message
+                sys.stdout.INFO( "Message:", e.message)
 
-    print "Disjointig alignments"
+    sys.stdout.trace( "Disjointig alignments")
     for line in lines:
-        print line.disjointig_alignments
-    sys.stdout.info("Resolving")
+        sys.stdout.trace( line.disjointig_alignments)
+    sys.stdout.info("Starting expanding alignment-consensus loop")
 
     EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, reads, save_handler)
 
-    dot_plot.printAll(sys.stdout)
+    # dot_plot.printAll(sys.stdout)
 
-    print "Final result:"
+    sys.stdout.trace( "Final result:")
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
     lines.printKnottedToFasta(open(os.path.join(cl_params.dir, "assembly.fasta"), "w"))
-    printState(lines)
-    # print "Disjointig alignments"
-    # for line in lines
+    # printState(lines)
     sys.stdout.info("Finished")
     secs = int(time.time() - start)
     days = secs / 60 / 60 / 24
@@ -258,12 +213,7 @@ def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, re
                 cnt = 0
                 if save_handler is not None:
                     printState(lines)
-                    print "Saving current state"
+                    sys.stdout.trace( "Saving current state")
                     writer = save_handler.getWriter()
-                    print "Save details:", writer.info
+                    sys.stdout.trace( "Save details:", writer.info)
                     saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
-
-
-if __name__ == "__main__":
-    assemble(sys.argv)
-# 56 73 77 167 76 12 84 1 78

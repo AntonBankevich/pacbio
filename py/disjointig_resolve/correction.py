@@ -17,7 +17,6 @@ class Correction:
         self.seq_from = seq_from
         self.seq_to = seq_to
         self.alignments = alignments
-        # TODO: reduce alignment size to essentials
         self.scorer = Scorer()
 
     def changeQT(self, contig_from, contig_to):
@@ -102,7 +101,6 @@ class Correction:
     # This method may change the order of alignments. But they will be sorted by start.
     def composeQueryDifferences(self, als):
         # type: (List[AlignmentPiece]) -> List[AlignmentPiece]
-        # TODO: make parallel
         order = sorted(range(len(als)), key = lambda i: als[i].seg_to.left)
         # Sorting alignments into those that intersect corrections (complex) and those that do not (easy)
         easy = [] # type: List[int]
@@ -132,22 +130,13 @@ class Correction:
         matchings = [als[i].matchingSequence(True) for i in complex]
         positions = map(lambda matching: map(lambda pair: pair[1], matching), matchings)
         generator = self.continuousMapping(func, itertools.chain.from_iterable(positions))
-        # TODO: parallel
         for i, matching in zip(complex, matchings):
             al = als[i]
             new_pairs = []
             for pos_from, pos_to in matching.matches:
                 new_pos = generator.next()
                 if new_pos is not None:
-                    # print pos_to, pos_from, new_pos, al.seg_to.contig[pos_to], al.seg_from.contig[pos_from], self.seq_from[new_pos]
                     new_pairs.append((pos_from, new_pos))
-            if len(new_pairs) == 0:
-                print al
-                print matching
-                print self.alignments
-                for al in self.alignments:
-                    print al
-                    print al.matchingSequence(True)
             new_matching = MatchingSequence(matching.seq_from, self.seq_from.seq, new_pairs)
             corrected_matching = self.scorer.polyshMatching(new_matching, params.alignment_correction_radius)
             res[i] = corrected_matching.asAlignmentPiece(al.seg_from.contig, self.seq_from)
