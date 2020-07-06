@@ -117,8 +117,7 @@ class UniqueMarker:
                 line = al.seg_to.contig # type: NewLine
                 line.addReadAlignment(al)
         sys.stdout.info("Removing bad regions from lines")
-        for line in list(lines.unique()):
-            self.splitBad(line, lines)
+        self.splitBad(lines)
         sys.stdout.info("Marking unique regions in lines")
         for line in lines.unique():
             self.markUniqueInLine(line)
@@ -130,40 +129,45 @@ class UniqueMarker:
             #     for seg in line.completely_resolved:
             #         line.initial.add(AlignmentPiece.Identical(seg.asContig().asSegment(), seg))
 
-    def medianCoverage(self, covs, line):
+    def medianCoverage(self, covs):
+        total = sum(len(seg) for seg, cov in covs)
         clen = 0
         median_cov = 0
         for seg, cov in sorted(covs, key=lambda cov: cov[1]):
             clen += len(seg)
-            if clen * 2 > len(line):
-                median_cov = cov
-                break
-        return median_cov
+            if clen * 2 >= total:
+                return median_cov
 
-    def splitBad(self, line, lines):
-        # type: (NewLine, NewLineStorage) -> None
-        s = AlignmentStorage()
-        s.addAll(al for al in line.read_alignments if not al.contradictingRTC())
-        segs = list(s.filterByCoverage(mi=params.reliable_coverage, k=params.k)) # type: List[Segment]
-        segs = filter(lambda seg: len(seg) >= params.k, segs)
-        if len(segs) == 0:
-            sys.stdout.warn("No part of a unique edge is covered by reads", line.id)
-            lines.removeLine(line)
-            return
-        if len(segs) == 1 and len(segs[0]) > len(line) - 10:
-            sys.stdout.info("Whole line", line.id, "is covered by reads")
-            return
-        sys.stdout.info( "Line", line.id, "has poorly covered regions. Splitting into", len(segs), "parts")
-        sys.stdout.trace( segs)
-        next_left = segs[-1].left
-        line.cutRight(segs[-1].right)
-        for seg in list(segs)[-2::-1]:
-            if next_left < seg.right:
-                line, new_line = lines.splitLine(line.segment(next_left, seg.right))
-            else:
-                line, new_line = lines.splitLine(line.segment(next_left, next_left))
-                line.cutRight(seg.right)
-            next_left = seg.left
-        line.rc.cutRight(len(segs[0]))
-
+    def splitBad(self, lines):
+        # type: (NewLineStorage) -> None
+        all_covs = []
+        for line in lines:
+            for rec in  line.read_alignments.calculateCoverage(params.k):
+                all_covs.append(rec)
+        median = self.medianCoverage(all_covs)
+        sys.stdout.info("Median coverage determined as", median)
+        for line in lines:
+            s = AlignmentStorage()
+            s.addAll(al for al in line.read_alignments if not al.contradictingRTC())
+            segs = list(s.filterByCoverage(mi=params.reliable_coverage, ma=median * 3 /2, k=params.k)) # type: List[Segment]
+            segs = filter(lambda seg: len(seg) >= params.k, segs)
+            if len(segs) == 0:
+                sys.stdout.warn("No part of a unique edge is covered by reads", line.id)
+                lines.removeLine(line)
+                return
+            if len(segs) == 1 and len(segs[0]) > len(line) - 10:
+                sys.stdout.info("Whole line", line.id, "is covered by reads")
+                return
+            sys.stdout.info( "Line", line.id, "has poorly covered regions. Splitting into", len(segs), "parts")
+            sys.stdout.trace(segs)
+            next_left = segs[-1].left
+            line.cutRight(segs[-1].right)
+            for seg in list(segs)[-2::-1]:
+                if next_left < seg.right:
+                    line, new_line = lines.splitLine(line.segment(next_left, seg.right))
+                else:
+                    line, new_line = lines.splitLine(line.segment(next_left, next_left))
+                    line.cutRight(seg.right)
+                next_left = seg.left
+            line.rc.cutRight(len(segs[0]))
 
