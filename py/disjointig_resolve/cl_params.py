@@ -22,13 +22,13 @@ class Params:
         self.threads = 8
         self.test = False
         self.init_file = None
-        self.long_params = "test debug nostrict stats genome-size= force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= nosplit flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "test debug nostrict stats genome-size= force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= split flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
         self.new_disjointigs = False
         self.focus = None
-        self.split = True
+        self.split = False
         self.downsample = 1.
         self.mode = "before"
         self.cut_reads = None
@@ -78,8 +78,8 @@ class Params:
                 params.strict_merging_alignment = False
             elif key == "--init-file":
                 self.init_file = value
-            elif key == "--nosplit":
-                self.split = False
+            elif key == "--split":
+                self.split = True
             elif key == "--cut-reads":
                 self.cut_reads = int(value)
             elif key == "--homo-score":
