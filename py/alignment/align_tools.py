@@ -346,10 +346,12 @@ if __name__ == "__main__":
     forward = "forward" in extra_params
     full = "full" in extra_params
     sort = "sort" in extra_params
+    listreads = "listreads" in extra_params
     aln = Aligner(DirDistributor(dir))
     basic.CreateLog(dir)
     contigs = ContigCollection().loadFromFasta(open(target, "r"), False)
     res = []
+    printed = set()
     for al in aln.localAlign(ReadCollection().loadFromFile(query), contigs):
         if start:
             if al.seg_to.contig.id.startswith("-"):
@@ -363,28 +365,37 @@ if __name__ == "__main__":
                 al = al.rc
         if contra and (len(al) < 8000 or not al.contradictingRTC()):
             continue
-        if long and len(al) < 20000:
+        if long and len(al) < 2000:
             continue
         if full and len(al.seg_from) < len(al.seg_from.contig) * 9 / 10:
             continue
         if sort:
             res.append(al)
             continue
-        sys.stdout.write(str(len(al)) + " ")
-        sys.stdout.write(str(al))
-        if len(al) > 40000:
+        if listreads:
+            if al.seg_from.contig.id.startswith("-"):
+                al = al.rc
+            if al.seg_from.contig.id in printed:
+                continue
+            printed.add(al.seg_from.contig.id)
+            sys.stdout.write(">" + str(al.seg_from.contig.id) + "\n")
+            sys.stdout.write(str(al.seg_from.contig.seq) + "\n")
+        else:
+            sys.stdout.write(str(len(al)) + " ")
+            sys.stdout.write(str(al))
+            if len(al) > 40000:
+                print ""
+                continue
+            sys.stdout.write("\n")
+            s = list(al.asMatchingStrings())
+            print s[0]
+            for a, b in zip(s[0], s[1]):
+                if a != b:
+                    sys.stdout.write("-")
+                else:
+                    sys.stdout.write("|")
             print ""
-            continue
-        sys.stdout.write("\n")
-        s = list(al.asMatchingStrings())
-        print s[0]
-        for a, b in zip(s[0], s[1]):
-            if a != b:
-                sys.stdout.write("-")
-            else:
-                sys.stdout.write("|")
-        print ""
-        print s[1]
+            print s[1]
     res = sorted(res, key = lambda al: (al.seg_to.contig.id, al.seg_to.left))
     last = 0
     for al in res:
