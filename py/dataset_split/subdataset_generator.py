@@ -1,5 +1,8 @@
 import os
 import sys
+
+from common.basic import CreateLog
+
 sys.path.append("py")
 from typing import List, Dict, Generator, Tuple
 
@@ -183,6 +186,8 @@ def FillFlyeNext(componentRecords, log_file):
 
 
 def main(flye_dir, output_dir):
+    basic.ensure_dir_existance(output_dir)
+    CreateLog(output_dir)
     graph_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv")
     edge_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta")
     dump_file = os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
