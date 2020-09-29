@@ -1,13 +1,14 @@
 import os
 import sys
+sys.path.append("py")
 from typing import List, Dict, Generator, Tuple
+
 
 from common import basic
 from common.SimpleGraph import SimpleGraph
 from common.save_load import TokenReader, TokenWriter
 from dataset_split.graph_splitting import SplitGraph
 
-sys.path.append("py")
 
 class ComponentRecord:
     def __init__(self, component, cov):
