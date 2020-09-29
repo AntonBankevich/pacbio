@@ -1,12 +1,12 @@
 import os
 import sys
 
-from common.basic import CreateLog
 
 sys.path.append("py")
 from typing import List, Dict, Generator, Tuple
 
 
+from common.basic import CreateLog
 from common import basic
 from common.SimpleGraph import SimpleGraph
 from common.save_load import TokenReader, TokenWriter
