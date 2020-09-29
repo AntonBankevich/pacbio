@@ -240,17 +240,12 @@ class Aligner:
         # type: (Iterable[Contig], ContigStorage, str) -> Generator[AlignmentPiece]
         filter = self.filters[mode]
         read_storage = ContigStorage(reads, False)
-        cnt = 0
-        cnt_out = 0
         als = []
         for rec in self.align(read_storage, list(ref_storage.unique()), mode):
             if rec.is_unmapped:
                 continue
-            cnt += 1
             if len(als) > 0 and rec.query_name != als[0].seg_from.contig.id:
-                cnt += len(als)
                 res = list(filter(als))
-                cnt_out += len(res)
                 for al in res:
                     yield al
                 als = []
@@ -268,9 +263,7 @@ class Aligner:
                 else:
                     als.append(tmp)
         if len(als) > 0:
-            cnt += len(als)
             res = list(filter(als))
-            cnt_out += len(res)
             for al in res:
                 yield al
 

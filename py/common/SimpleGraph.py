@@ -12,7 +12,8 @@ def toint(s):
     return int(s)
 
 class Edge:
-    def __init__(self, id, start, fin, len, label, seq):
+    def __init__(self, id, start, fin, len, label, cov = None, seq = None):
+        # type: (str, str, str, int, str, int, str) -> None
         self.id = id # type: str
         self.seq = seq # type: str
         self.label = label # type: str
@@ -20,36 +21,67 @@ class Edge:
         self.len = len # type: int
         self.end = fin # type: str
         self.unique = (self.label.find("black") != -1)
-        self.cov = None
+        self.cov = cov
 
-
-class Vertex:
-    def __init__(self, id, label):
-        self.id = id
-        self.inc = [] # type: List[Edge]
-        self.out = [] # type: List[Edge]
-        self.label = label
+    def __len__(self):
+        return self.len
 
 
 class SimpleGraph:
-    def __init__(self):
+    def __init__(self, graph = None):
+        if graph is None:
+            self.g = self
+        else:
+            self.g = graph
         self.v = dict() #type: Dict[str, Vertex]
         self.visited = set()
         self.e = dict() #type: Dict[str, Edge]
+
+    def __len__(self):
+        return len(self.v)
+
+    def isBorder(self, vid):
+        thisv = self.v[vid]
+        otherv = self.g.v[vid]
+        return thisv.inc.__len__() + thisv.out.__len__() == otherv.inc.__len__() + otherv.out.__len__()
+
+    def isHub(self, vid):
+        thisv = self.v[vid]
+        return thisv.inc.__len__() + thisv.out.__len__() > 50
 
     def AddVertex(self, vid, label = ""):
         if vid not in self.v:
             self.v[vid] = Vertex(vid, label)
         return self.v[vid]
 
-    def AddEdge(self, id, start, fin, len, label, seq = None):
+    def AddEdge(self, id, start, fin, len, label, cov = None, seq = None):
         v1 = self.AddVertex(start)
         v2 = self.AddVertex(fin)
-        edge = Edge(id, start, fin, len, label, seq)
+        edge = Edge(id, start, fin, len, label, cov, seq)
         self.e[id] = edge
         v1.out.append(edge)
         v2.inc.append(edge)
         return edge
+
+    def rcEdge(self, edge):
+        # type: (Edge) -> Edge
+        if basic.isCanonocal(edge.id) and basic.Reverse(edge.id) not in self.e:
+            start = self.v[edge.start]
+            end = self.v[edge.end]
+            assert len(start.inc) == len(end.out) and len(start.out) == len(end.inc)
+            return edge
+        return self.e[basic.Reverse(edge.id)]
+
+    def isSelfRc(self, edge):
+        return edge.id == self.rcEdge(edge).id
+
+    def rcVertex(self, vertex):
+        # type: (Vertex) -> Vertex
+        if vertex.out.__len__() > 0:
+            return self.v[self.rcEdge(vertex.out[0]).end]
+        elif vertex.inc.__len__() > 0:
+            return self.v[self.rcEdge(vertex.inc[0]).start]
+        assert False
 
 
     def ReadDot(self, f):
@@ -59,42 +91,49 @@ class SimpleGraph:
                 continue
             s =s.strip().split()
             if len(s) < 2 or s[1] != "->":
-                vid = toint(s[0])
+                vid = s[0][1:-1]
                 self.AddVertex(vid, tmp)
                 continue
-            v_from = toint(s[0])
-            v_to = toint(s[2])
+            v_from = s[0][1:-1]
+            v_to = s[2][1:-1]
             label = tmp
             cov = basic.parseNumber(tmp, tmp.find("k "))
             l = int(float(tmp[tmp.find("\\l") + 2: tmp.find("k ")]) * 1000)
             id = tmp[tmp.find("id ") + 3: tmp.find("\\l")]
-            edge = self.AddEdge(id, v_from, v_to, l, label)
-            edge.cov = cov
+            edge = self.AddEdge(id, v_from, v_to, l, label, cov)
         return self
 
     def Merge(self):
-        todel = []
+        res = SimpleGraph()
         for v in self.v.values():
-            if len(v.inc) == 1 and len(v.out) == 1 and v.inc[0].id != v.out[0].id:
-                edge1 = self.e[v.inc[0].id]
-                edge2 = self.e[v.out[0].id]
-                if edge1.seq is None or edge2.seq is None:
-                    seq = None
-                else:
-                    seq = edge1.seq + edge2.seq
-                newEdge = Edge(edge1.id + "," + edge2.id, edge1.start, edge2.end, edge1.len + edge2.len, edge1.label + edge2.label, seq)
-                newEdge.cov = int(float(edge1.cov + edge1.len + edge2.cov * edge2.len) / newEdge.len)
-                self.v[edge1.start].out.remove(edge1)
-                self.v[edge2.end].inc.remove(edge2)
-                del self.e[edge1.id]
-                del self.e[edge2.id]
-                self.e[newEdge.id] = newEdge
-                self.v[newEdge.start].out.append(newEdge)
-                self.v[newEdge.end].inc.append(newEdge)
-                todel.append(v)
-        for v in todel:
-            del self.v[v.id]
-
+            if len(v.inc) != 1 or len(v.out) != 1:
+                if v.id not in res.v:
+                    res.AddVertex(v.id)
+                for e in v.out:
+                    eids = [e.id]
+                    cov = e.cov * e.len
+                    l = e.len
+                    seqs = [e.seq]
+                    labels = [e.label]
+                    while not self.v[e.end].isJunction():
+                        e = self.v[e.end].out[0]
+                        eids.append(e.id)
+                        cov += e.cov * e.len
+                        l += e.len
+                        seqs.append(e.seq)
+                    endid = self.v[e.end].id
+                    if endid not in res.v:
+                        res.AddVertex(endid)
+                    if len(eids) == 1:
+                        new_id = eids[0]
+                    else:
+                        new_id = "(" + ",".join(eids) + ")"
+                        id_cand = "(" + ",".join(map(basic.Reverse, eids[::-1])) + ")"
+                        if id_cand > new_id:
+                            new_id = basic.Reverse(id_cand)
+                    res.AddEdge(new_id, v.id, endid, l, "".join(labels), int(float(cov) / l),
+                                   None if seqs[0] is None else "".join(seqs))
+        return res
 
 
     def FillSeq(self, f, numeric = True):
@@ -133,8 +172,8 @@ class SimpleGraph:
             ids[vid] = str(cnt)
             cnt += 1
         for eid, seq in seqs.items():
-            self.AddEdge(eid, ids[v.get((True, eid, False))], ids[v.get((True, eid, True))], len(seq), eid, seq)
-            self.AddEdge("-" + eid, ids[v.get((False, eid, False))], ids[v.get((False, eid, True))], len(seq), "-" + eid, basic.RC(seq))
+            self.AddEdge(eid, ids[v.get((True, eid, False))], ids[v.get((True, eid, True))], len(seq), eid, seq=seq)
+            self.AddEdge("-" + eid, ids[v.get((False, eid, False))], ids[v.get((False, eid, True))], len(seq), "-" + eid, seq=basic.RC(seq))
         return self
 
     def Find(self, minlen, v):
@@ -157,6 +196,23 @@ class SimpleGraph:
             visited = visited.union(self.visited)
             yield list(self.visited)
 
+    def Component(self, comp):
+        res = SimpleGraph(self.g)
+        for vid in comp:
+            vert = self.v[vid]
+            res.AddVertex(vid)
+            for e in vert.out: #type: Edge
+                if e.end not in res.v:
+                    res.AddVertex(e.end)
+                res.AddEdge(e.id, e.start, e.end, e.len, e.label, e.cov, e.seq)
+            for e in vert.inc:  # type: Edge
+                if e.start not in comp:
+                    res.AddVertex(e.start)
+                    res.AddEdge(e.id, e.start, e.end, e.len, e.label, e.cov, e.seq)
+        for vert in res.v.values():
+            vert.core = vert.id in comp
+        return res
+
     def Draw(self, comp, out):
         out.write("digraph {\n")
         out.write("nodesep = 0.5;\n")
@@ -169,3 +225,51 @@ class SimpleGraph:
                 if e.start in comp or e.end in comp:
                     out.write(e.label + "\n")
         out.write("}\n")
+
+    def covPerc(self, perc, max = 1000000):
+        edges = []
+        size = 0
+        for vert in self.v:
+            for edge in self.v[vert].out:
+                if edge.cov < max:
+                    edges.append(edge)
+                    size += edge.len
+        if len(edges) == 0:
+            return self.covPerc(perc)
+        edges.sort(key = lambda edge: -edge.cov)
+        tmp = 0
+        for edge in edges:
+            if tmp + edge.len >= size * perc:
+                return edge.cov
+            tmp += edge.len
+
+    def Print(self, out, cov, coloring = lambda v: "white"):
+        out.write("digraph {\n")
+        out.write("nodesep = 0.5;\n")
+        for vid in self.v:
+            v = self.v[vid]
+            out.write(str(vid) + " [style = filled, fillcolor = " + coloring(v) + "];\n")
+        for v in self.v.values():
+            for e in v.out:
+                col = "red"
+                if e.cov <= cov * 1.3 or e.len > 150000:
+                    col = "black"
+                if e.cov <= cov * 0.7:
+                    col = "blue"
+                out.write("\"" + str(e.start) + "\" -> \"" + str(e.end) + "\" [label = \"id " + str(e.id) + "\\n" +
+                          str(e.len /100 * 0.1) + "k " + str(e.cov) + "x\", color = \"" + col + "\"];\n")
+        out.write("}\n")
+
+
+class Vertex:
+    def __init__(self, id, label):
+        self.id = id
+        self.inc = [] # type: List[Edge]
+        self.out = [] # type: List[Edge]
+        self.label = label
+        self.core = True
+
+    def isIsolated(self):
+        return len(self.inc) == 0 and len(self.out) == 0
+    def isJunction(self):
+        return len(self.inc) != 1 or len(self.out) != 1

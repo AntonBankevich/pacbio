@@ -12,7 +12,7 @@ g.ReadDot(sys.argv[1])
 basic.ensure_dir_existance(sys.argv[2])
 args = sys.argv[3:]
 if "merge" in args:
-    g.Merge()
+    g = g.Merge()
 cnt = 0
 oppa = []
 for comp in g.Split(50000):
