@@ -183,8 +183,8 @@ def FillFlyeNext(componentRecords, log_file):
 
 
 def main(flye_dir, output_dir):
-    graph_file = os.path.join(flye_dir, "20-repeat", "graph_after_rr.gv")
-    edge_file = os.path.join(flye_dir, "20-repeat", "graph_after_rr.fasta")
+    graph_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv")
+    edge_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta")
     dump_file = os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
     print "Reading file from", graph_file
     graph = SimpleGraph()
