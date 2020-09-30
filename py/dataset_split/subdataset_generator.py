@@ -132,7 +132,8 @@ class AlignmentDumpParser:
         if rid is not None:
             yield rid, edges
 
-def constructComponentRecords(graph):
+def constructComponentRecords(graph, dir):
+    basic.ensure_dir_existance(dir)
     oppa = []
     simple = 0
     max_cov = graph.covPerc(0.5)
@@ -149,7 +150,7 @@ def constructComponentRecords(graph):
             continue
         print componentRecords.__len__(), len(comp), comp.__len__(), cov, max_cov
         if comp.__len__() < 50:
-            f = open(os.path.join(sys.argv[2], str(componentRecords.__len__()) + ".dot"), "w")
+            f = open(os.path.join(dir, str(componentRecords.__len__()) + ".dot"), "w")
             coloring = lambda v: "white" if len(v.inc) + len(v.out) == len(graph.v[v.id].inc) + len(
                 graph.v[v.id].out) else ("yellow" if len(graph.v[v.id].inc) + len(graph.v[v.id].out) < 50 else "red")
             comp.Print(f, cov, coloring)
@@ -162,7 +163,7 @@ def constructComponentRecords(graph):
                 edgecomp[e.id].append(componentRecords.__len__())
         rec.calcStats()
         componentRecords.append(rec)
-    f = open(os.path.join(sys.argv[2], "small.dot"), "w")
+    f = open(os.path.join(dir, "small.dot"), "w")
     graph.Draw(set(oppa), f)
     f.close()
     return componentRecords, edgecomp
@@ -196,12 +197,14 @@ def main(flye_dir, output_dir):
     graph.ReadDot(graph_file)
     print "Reading sequences from", edge_file
     graph.FillSeq(edge_file, False)
-    componentRecords, edgecomp = constructComponentRecords(graph)
+    componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"))
     print "Reading alignment dump from", dump_file
     rcnt = 0
     for rid, eids in AlignmentDumpParser(dump_file).parse():
         compids = set()
         for eid in eids:
+            if eid not in edgecomp:
+                eid = basic.Normalize(eid)
             for compid in edgecomp[eid]:
                 compids.add(compid)
         for compid in compids:
