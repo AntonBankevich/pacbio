@@ -7,6 +7,60 @@ sys.path.append("py")
 from common.SimpleGraph import SimpleGraph, Edge
 from common import basic
 
+class DipolidCalculator:
+    def __init__(self, edge_length):
+        self.edge_length = edge_length
+
+    def calculateComponentCoverage(self, comp, max_cov):
+        low = []
+        high = []
+        for vid in comp.v:
+            for e in comp.v[vid].out:
+                if e.len >= self.edge_length:
+                    if e.cov < max_cov * 3 / 4 and e.cov >= max_cov / 4:
+                        low.append(e)
+                    elif e.cov < max_cov * 5/4 and e.cov >= max_cov * 3 / 4:
+                        high.append(e)
+        if len(low) == 0 and len(high) == 0:
+            cov = min(comp.covPerc(0.5, max_cov * 1.5), max_cov)
+        elif len(low) == 0:
+            cov = sum([edge.cov for edge in high]) / len(high)
+        elif len(high) == 0:
+            cov = sum([edge.cov for edge in low]) / len(low)
+        else:
+            cov = sum([edge.cov for edge in low]) / len(low)
+        return cov
+
+    def uniqueCondition(self, cov):
+        return lambda edge: edge.cov > cov * 1.4 or edge.cov <= cov * 0.7
+
+    def edgeColoring(self, cov):
+        return lambda edge: "blue" if edge.cov < cov * 0.7 else ("black" if edge.cov < cov * 1.4 else "red")
+
+class HaploidCalculator:
+    def __init__(self, edge_length):
+        self.edge_length = edge_length
+
+    def calculateComponentCoverage(self, comp, max_cov):
+        edges = []
+        for vid in comp.v:
+            for e in comp.v[vid].out:
+                if e.len >= self.edge_length:
+                    if e.cov > max_cov * 0.5 and e.cov < max_cov * 1.4:
+                        edges.append(e)
+        if len(edges) == 0:
+            return max_cov
+        else:
+            return sum([edge.cov for edge in edges]) / len(edges)
+
+
+    def uniqueCondition(self, cov):
+        return lambda edge: edge.cov > cov * 1.4 or edge.cov <= cov * 0.5
+
+    def edgeColoring(self, cov):
+        return lambda edge: "blue" if edge.cov < cov * 0.5 else ("black" if edge.cov < cov * 1.4 else "red")
+
+
 def SplitGraphByCondition(graph, condition):
     # type: (SimpleGraph, Callable[[Edge], bool]) -> Generator[SimpleGraph]
     visited = set()
@@ -34,30 +88,13 @@ def SplitGraphByCondition(graph, condition):
         if len(comp) > 1:
             yield graph.Component(comp)
 
-def SplitGraph(graph, edge_length = 150000):
+def SplitGraph(graph, calculator):
     max_cov = graph.covPerc(0.5)
-    for comp in SplitGraphByCondition(graph, lambda edge: edge.len < edge_length):
-        cov = min(comp.covPerc(0.5, max_cov * 1.5), max_cov)
-        low = []
-        high = []
-        for vid in comp.v:
-            for e in comp.v[vid].out:
-                if e.len >= edge_length:
-                    if e.cov < max_cov * 3 / 4 and e.cov >= max_cov / 4:
-                        low.append(e)
-                    elif e.cov < max_cov * 5/4 and e.cov >= max_cov * 3 / 4:
-                        high.append(e)
-        if len(low) == 0 and len(high) == 0:
-            cov = min(comp.covPerc(0.5, max_cov * 1.5), max_cov)
-        elif len(low) == 0:
-            cov = sum([edge.cov for edge in high]) / len(high)
-        elif len(high) == 0:
-            cov = sum([edge.cov for edge in low]) / len(low)
-        else:
-            cov = sum([edge.cov for edge in low]) / len(low)
+    for comp in SplitGraphByCondition(graph, lambda edge: edge.len < calculator.edge_length or edge.cov > max_cov * 1.8):
+        cov = calculator.calculateComponentCoverage(comp, max_cov)
         if cov == 0:
-            print "Gopa", cov, str([edge.cov for edge in low]), str([edge.cov for edge in high])
-        for comp1 in SplitGraphByCondition(comp, lambda edge: edge.cov > cov * 1.4 or edge.cov <= cov * 0.7):
+            print "Zero component"
+        for comp1 in SplitGraphByCondition(comp, calculator.uniqueCondition(cov)):
             print comp1.v.__len__(), comp1.e.__len__()
             yield comp1, cov
 
@@ -69,26 +106,31 @@ if __name__ == "__main__":
     args = sys.argv[3:]
     if "merge" in args:
         g = g.Merge()
+    diploid = "--diploid" in args
     cnt = 0
     oppa = []
     simple = 0
     complex = 0
     max_cov = g.covPerc(0.5)
-    print g.covPerc(0.1), g.covPerc(0.2), g.covPerc(0.5), g.covPerc(0.6), g.covPerc(0.7),g.covPerc(0.8)
-    for comp, cov in SplitGraph(g, 150000):
-        if len(comp) <= 1:
+    if diploid:
+        calculator = DipolidCalculator(150000)
+    else:
+        calculator = HaploidCalculator(150000)
+    for comp, cov in SplitGraph(g, calculator):
+        if len(comp) <= 2:
             continue
-        if len(comp) < 3:
+        if len(comp) <= 4:
             simple += 1
             oppa.extend(comp.v)
             continue
         if len(comp) > 100:
+            print "Complex", comp.__len__()
             complex += len(comp)
             continue
         print cnt, len(comp), comp.__len__(), cov, max_cov
         f = open(os.path.join(sys.argv[2], str(cnt) + ".dot"), "w")
         coloring = lambda v: "white" if len(v.inc) + len(v.out) == len(g.v[v.id].inc) + len(g.v[v.id].out) else ("yellow" if len(g.v[v.id].inc) + len(g.v[v.id].out) < 50 else "red")
-        comp.Print(f, cov, coloring)
+        comp.Print(f, coloring, calculator.edgeColoring(cov))
         f.close()
         cnt += 1
     f = open(os.path.join(sys.argv[2], "small.dot"), "w")

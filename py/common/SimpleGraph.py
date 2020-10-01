@@ -243,19 +243,15 @@ class SimpleGraph:
                 return edge.cov
             tmp += edge.len
 
-    def Print(self, out, cov, coloring = lambda v: "white"):
+    def Print(self, out, vertex_coloring = lambda v: "white", edge_coloring = lambda e: "black"):
         out.write("digraph {\n")
         out.write("nodesep = 0.5;\n")
         for vid in self.v:
             v = self.v[vid]
-            out.write(str(vid) + " [style = filled, fillcolor = " + coloring(v) + "];\n")
+            out.write(str(vid) + " [style = filled, fillcolor = " + vertex_coloring(v) + "];\n")
         for v in self.v.values():
             for e in v.out:
-                col = "red"
-                if e.cov <= cov * 1.3 or e.len > 150000:
-                    col = "black"
-                if e.cov <= cov * 0.7:
-                    col = "blue"
+                col = edge_coloring(e)
                 out.write("\"" + str(e.start) + "\" -> \"" + str(e.end) + "\" [label = \"id " + str(e.id) + "\\n" +
                           str(e.len /100 * 0.1) + "k " + str(e.cov) + "x\", color = \"" + col + "\"];\n")
         out.write("}\n")

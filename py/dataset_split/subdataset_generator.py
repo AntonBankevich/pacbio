@@ -24,8 +24,24 @@ class ComponentRecord:
         self.zero = 0
         self.bad_border = 0
         self.unresolved_connections = 0
+        self.inc = 0
+        self.out = 0
         self.resolved_connections = []
         self.outside_connections = 0
+
+    def half(self):
+        res = set()
+        tmp = [iter(self.component.v).next()]
+        while tmp.__len__() > 0:
+            vid = tmp.pop()
+            if vid in res:
+                continue
+            res.add(vid)
+            v = self.component.v[vid]
+            for e in v.inc + v.out:
+                tmp.append(e.start)
+                tmp.append(e.end)
+        return res
 
 
     def addUniqueEdge(self, eid):
@@ -99,15 +115,29 @@ class ComponentRecord:
 
     def dump(self, dirname):
         basic.ensure_dir_existance(dirname)
+        edge_file = os.path.join(dirname, "edges.txt")
         stats_file = os.path.join(dirname, "stats.txt")
-        init_file = os.path.join(dirname, "init.txt")
-        reads_file = os.path.join(dirname, "reads.txt")
+        # init_file = os.path.join(dirname, "init.txt")
+        # reads_file = os.path.join(dirname, "reads.txt")
         contigs_file = os.path.join(dirname, "contigs.fasta")
         self.printStats(stats_file)
-        self.printInit(init_file)
-        self.printReads(reads_file)
+        self.printEdges(edge_file)
+        # self.printInit(init_file)
+        # self.printReads(reads_file)
         self.printContigs(contigs_file)
 
+    def printEdges(self, fname):
+        file = open(fname, "w")
+        f = TokenWriter(file)
+        f.writeIntLine(self.component.e.__len__())
+        for eid in self.component.e:
+            f.writeToken(eid)
+        f.newLine()
+        f.writeIntLine(self.unique.__len__())
+        for eid in self.unique:
+            f.writeToken(eid)
+        f.newLine()
+        file.close()
 
 
 class AlignmentDumpParser:
@@ -200,23 +230,29 @@ def main(flye_dir, output_dir):
     componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"))
     print "Reading alignment dump from", dump_file
     rcnt = 0
-    for rid, eids in AlignmentDumpParser(dump_file).parse():
-        compids = set()
-        for eid in eids:
-            if eid not in edgecomp:
-                eid = basic.Normalize(eid)
-            for compid in edgecomp[eid]:
-                compids.add(compid)
-        for compid in compids:
-            componentRecords[compid].addRead(rid, eids)
-            rcnt += 1
-            if rcnt % 100000 == 0:
-                print "Processed", rcnt, "reads"
+    # for rid, eids in AlignmentDumpParser(dump_file).parse():
+    #     compids = set()
+    #     for eid in eids:
+    #         if eid not in edgecomp:
+    #             eid = basic.Normalize(eid)
+    #         for compid in edgecomp[eid]:
+    #             compids.add(compid)
+    #     for compid in compids:
+    #         componentRecords[compid].addRead(rid, eids)
+    #         rcnt += 1
+    #         if rcnt % 100000 == 0:
+    #             print "Processed", rcnt, "reads"
     print "Filling flye repeat resolution results"
     flye_next = FillFlyeNext(componentRecords, os.path.join(flye_dir, "flye.log"))
     for compRec in componentRecords:
+        half = compRec.half()
         for norm_eid in compRec.unique:
             for eid in [norm_eid, basic.Reverse(norm_eid)]:
+                if compRec.component.e[eid].end in half:
+                    if compRec.component.isBorder(compRec.component.e[eid].end):
+                        compRec.out += 1
+                    if compRec.component.isBorder(compRec.component.e[eid].start):
+                        compRec.inc += 1
                 if not compRec.component.isBorder(compRec.component.e[eid].end):
                     if flye_next[eid] is None:
                         compRec.unresolved_connections += 1
@@ -230,10 +266,11 @@ def main(flye_dir, output_dir):
         component.dump(os.path.join(output_dir, str(i)))
     print "Printing table to file"
     f = open(os.path.join(output_dir, "table.txt"))
-    f.write("Id v e unique unresolved resolved outside zero hub badborder")
+    f.write("Id v e unique inc out unresolved resolved outside zero hub badborder")
     for i, compRec in enumerate(componentRecords):
         comp = compRec.component
         f.write(" ".join([str(i), str(comp.v.__len__()), str(comp.e.__len__()), str(compRec.unique.__len__() * 2),
+                          str(compRec.inc), str(compRec.out),
                           str(compRec.unresolved_connections), str(compRec.resolved_connections.__len__()),
                           str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]))
     f.close()
