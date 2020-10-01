@@ -10,7 +10,7 @@ from common.basic import CreateLog
 from common import basic
 from common.SimpleGraph import SimpleGraph
 from common.save_load import TokenReader, TokenWriter
-from dataset_split.graph_splitting import SplitGraph
+from dataset_split.graph_splitting import SplitGraph, DipolidCalculator, HaploidCalculator
 
 
 class ComponentRecord:
@@ -162,7 +162,7 @@ class AlignmentDumpParser:
         if rid is not None:
             yield rid, edges
 
-def constructComponentRecords(graph, dir):
+def constructComponentRecords(graph, dir, calculator):
     basic.ensure_dir_existance(dir)
     oppa = []
     simple = 0
@@ -171,23 +171,25 @@ def constructComponentRecords(graph, dir):
     for eid in graph.e:
         edgecomp[eid] = []
     componentRecords = []  # type: List[ComponentRecord]
-    for comp, cov in SplitGraph(graph, 150000):  # type: SimpleGraph, float
-        if len(comp) <= 1:
+    for comp, cov in SplitGraph(graph, calculator):  # type: SimpleGraph, float
+        if len(comp) <= 2:
             continue
-        if len(comp) < 3:
+        if len(comp) <= 4:
             simple += 1
             oppa.extend(comp.v)
             continue
+        if len(comp) > 100:
+            print "Complex", comp.__len__()
         print componentRecords.__len__(), len(comp), comp.__len__(), cov, max_cov
-        if comp.__len__() < 50:
+        if comp.__len__() <= 100:
             f = open(os.path.join(dir, str(componentRecords.__len__()) + ".dot"), "w")
             coloring = lambda v: "white" if len(v.inc) + len(v.out) == len(graph.v[v.id].inc) + len(
                 graph.v[v.id].out) else ("yellow" if len(graph.v[v.id].inc) + len(graph.v[v.id].out) < 50 else "red")
-            comp.Print(f, cov, coloring)
+            comp.Print(f, coloring, calculator.edgeColoring(cov))
             f.close()
         rec = ComponentRecord(comp, cov)
         for e in comp.e.values():
-            if (e.cov <= cov * 1.4 and e.cov > cov * 0.7) or e.len > 150000:
+            if calculator.uniqueCondition(cov)(e):
                 rec.addUniqueEdge(e.id)
             else:
                 edgecomp[e.id].append(componentRecords.__len__())
@@ -216,18 +218,22 @@ def FillFlyeNext(componentRecords, log_file):
     return flye_next
 
 
-def main(flye_dir, output_dir):
+def main(flye_dir, output_dir, diploid):
     basic.ensure_dir_existance(output_dir)
     CreateLog(output_dir)
     graph_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv")
     edge_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta")
     dump_file = os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
+    if diploid:
+        calculator = DipolidCalculator(150000)
+    else:
+        calculator = HaploidCalculator(150000)
     print "Reading file from", graph_file
     graph = SimpleGraph()
     graph.ReadDot(graph_file)
     print "Reading sequences from", edge_file
     graph.FillSeq(edge_file, False)
-    componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"))
+    componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"), calculator)
     print "Reading alignment dump from", dump_file
     rcnt = 0
     # for rid, eids in AlignmentDumpParser(dump_file).parse():
@@ -277,4 +283,4 @@ def main(flye_dir, output_dir):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], "diploid" in sys.argv)
