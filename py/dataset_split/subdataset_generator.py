@@ -254,6 +254,10 @@ def main(flye_dir, output_dir, diploid):
         half = compRec.half()
         for norm_eid in compRec.unique:
             for eid in [norm_eid, basic.Reverse(norm_eid)]:
+                if eid not in compRec.component.e:
+                    assert not basic.isCanonocal(eid)
+                    assert basic.Reverse(eid) in compRec.component.e
+                    continue
                 if compRec.component.e[eid].end in half:
                     if compRec.component.isBorder(compRec.component.e[eid].end):
                         compRec.out += 1
