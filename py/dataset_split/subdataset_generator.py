@@ -228,14 +228,15 @@ def main(flye_dir, output_dir, diploid):
         calculator = DipolidCalculator(150000)
     else:
         calculator = HaploidCalculator(150000)
-    print "Reading file from", graph_file
+    print "Reading graph from", graph_file
     graph = SimpleGraph()
     graph.ReadDot(graph_file)
     print "Reading sequences from", edge_file
     graph.FillSeq(edge_file, False)
+    print "Splitting graph", edge_file
     componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"), calculator)
-    print "Reading alignment dump from", dump_file
-    rcnt = 0
+    # print "Reading alignment dump from", dump_file
+    # rcnt = 0
     # for rid, eids in AlignmentDumpParser(dump_file).parse():
     #     compids = set()
     #     for eid in eids:

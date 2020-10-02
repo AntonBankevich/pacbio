@@ -143,9 +143,11 @@ class SimpleGraph:
             if s.id in self.e:
                 self.e[s.id].seq = s.seq
                 self.e[s.id].len = len(s.seq)
-            if "-" + s.id in self.e:
-                self.e["-" + s.id].seq = basic.RC(s.seq)
-                self.e["-" + s.id].len = len(s.seq)
+            if basic.Reverse(s.id) in self.e:
+                self.e[basic.Reverse(s.id)].seq = basic.RC(s.seq)
+                self.e[basic.Reverse(s.id)].len = len(s.seq)
+        for edge in self.e.values():
+            assert(edge.seq is not None)
         return self
 
     def ReadGFA(self, f):
