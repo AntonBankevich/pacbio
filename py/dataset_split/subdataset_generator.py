@@ -102,7 +102,7 @@ class ComponentRecord:
 
     def printReads(self, fname):
         f = open(fname, "w")
-        f.write(str(self.reads.__len__()) + " " + str(self.reads.__len__()) + "\n")
+        f.write(str(self.reads.__len__()) + "\n")
         for rid in self.reads:
             f.write(rid + "\n")
         f.close()
