@@ -37,6 +37,9 @@ class DipolidCalculator:
     def edgeColoring(self, cov):
         return lambda edge: "blue" if edge.cov < cov * 0.7 else ("black" if edge.cov < cov * 1.4 else "red")
 
+    def isRepeat(self, edge, cov):
+        return edge.cov >= cov * 1.4
+
 class HaploidCalculator:
     def __init__(self, edge_length):
         self.edge_length = edge_length

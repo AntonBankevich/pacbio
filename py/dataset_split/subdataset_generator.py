@@ -28,6 +28,7 @@ class ComponentRecord:
         self.out = 0
         self.resolved_connections = []
         self.outside_connections = 0
+        self.repeat_edges = 0
 
     def half(self):
         res = set()
@@ -195,6 +196,9 @@ def constructComponentRecords(graph, dir, calculator):
                 rec.addUniqueEdge(e.id)
             else:
                 edgecomp[e.id].append(componentRecords.__len__())
+                if calculator.isRepeat(e, cov):
+                    rec.repeat_edges += 1
+
         rec.calcStats()
         componentRecords.append(rec)
     f = open(os.path.join(dir, "small.dot"), "w")
@@ -275,6 +279,7 @@ def main(flye_dir, output_dir, diploid):
                         compRec.resolved_connections.append((eid, flye_next[eid]))
                         if flye_next[eid] not in compRec.component.e:
                             compRec.outside_connections += 1
+
     basic.ensure_dir_existance(output_dir)
     print "Printing components to disk"
     for i, component in enumerate(componentRecords):
@@ -282,11 +287,11 @@ def main(flye_dir, output_dir, diploid):
     table_file = os.path.join(output_dir, "table.txt")
     print "Printing table to file", table_file
     f = open(table_file, "w")
-    f.write("Id v e unique inc out unresolved resolved outside zero hub badborder\n")
+    f.write("Id v e unique inc out repeats unresolved resolved outside zero hub badborder\n")
     for i, compRec in enumerate(componentRecords):
         comp = compRec.component
         f.write(" ".join([str(i), str(comp.v.__len__()), str(comp.e.__len__()), str(compRec.unique.__len__() * 2),
-                          str(compRec.inc), str(compRec.out),
+                          str(compRec.inc), str(compRec.out), str(compRec.repeat_edges),
                           str(compRec.unresolved_connections), str(compRec.resolved_connections.__len__()),
                           str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]) + "\n")
     f.close()
