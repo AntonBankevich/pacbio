@@ -63,6 +63,9 @@ class HaploidCalculator:
     def edgeColoring(self, cov):
         return lambda edge: "blue" if edge.cov < cov * 0.5 else ("black" if edge.cov < cov * 1.4 else "red")
 
+    def isRepeat(self, edge, cov):
+        return edge.cov >= cov * 1.4
+
 
 def SplitGraphByCondition(graph, unique_condition):
     # type: (SimpleGraph, Callable[[Edge], bool]) -> Generator[SimpleGraph]
