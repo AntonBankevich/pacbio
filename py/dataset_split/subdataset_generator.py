@@ -241,9 +241,8 @@ def main(flye_dir, output_dir, diploid):
     rcnt = 0
     for rid, eids in AlignmentDumpParser(dump_file).parse():
         compids = set()
+        eids = map(basic.Normalize, eids)
         for eid in eids:
-            if eid not in edgecomp:
-                eid = basic.Normalize(eid)
             for compid in edgecomp[eid]:
                 compids.add(compid)
         for compid in compids:
