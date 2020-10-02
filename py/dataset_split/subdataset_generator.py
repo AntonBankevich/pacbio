@@ -44,6 +44,26 @@ class ComponentRecord:
                 tmp.append(e.end)
         return res
 
+    def score(self):
+        score = 0
+        if self.zero != 0:
+            score += 1000
+        if self.repeat_edges == 0:
+            score += 1000
+        if self.inc != self.out:
+            score += 1000
+        if self.inc <= 1 or self.out <= 1:
+            score += 100
+        if self.bad_border != 0:
+            score += 1000
+        if self.red != 0:
+            score += 100
+        if self.unresolved_connections == 0:
+            score += 100000
+        if self.repeat_edges == 0:
+            score += 1000
+        score += self.component.e.__len__() + self.component.v.__len__()
+        return score
 
     def addUniqueEdge(self, eid):
         eid = basic.Normalize(eid)
@@ -294,6 +314,13 @@ def main(flye_dir, output_dir, diploid):
                           str(compRec.inc), str(compRec.out), str(compRec.repeat_edges),
                           str(compRec.unresolved_connections), str(compRec.resolved_connections.__len__()),
                           str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]) + "\n")
+    f.close()
+    order = range(componentRecords.__len__())
+    order = sorted(order, key = lambda i: componentRecords[i].score())
+    table_file = os.path.join(output_dir, "list.txt")
+    f = open(table_file, "w")
+    for a in order:
+        f.write(str(a) + "\n")
     f.close()
 
 
