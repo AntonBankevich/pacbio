@@ -32,7 +32,7 @@ class DipolidCalculator:
         return cov
 
     def uniqueCondition(self, cov):
-        return lambda edge: edge.cov > cov * 1.4 or edge.cov <= cov * 0.7
+        return lambda edge: edge.cov < cov * 1.4 and edge.cov >= cov * 0.7
 
     def edgeColoring(self, cov):
         return lambda edge: "blue" if edge.cov < cov * 0.7 else ("black" if edge.cov < cov * 1.4 else "red")
@@ -55,13 +55,13 @@ class HaploidCalculator:
 
 
     def uniqueCondition(self, cov):
-        return lambda edge: edge.cov > cov * 1.4 or edge.cov <= cov * 0.5
+        return lambda edge: edge.cov < cov * 1.4 and edge.cov >= cov * 0.5
 
     def edgeColoring(self, cov):
         return lambda edge: "blue" if edge.cov < cov * 0.5 else ("black" if edge.cov < cov * 1.4 else "red")
 
 
-def SplitGraphByCondition(graph, condition):
+def SplitGraphByCondition(graph, unique_condition):
     # type: (SimpleGraph, Callable[[Edge], bool]) -> Generator[SimpleGraph]
     visited = set()
     for v in graph.v:
@@ -82,7 +82,7 @@ def SplitGraphByCondition(graph, condition):
             comp.add(rcv)
             next = graph.v[next_id]
             for edge in next.inc + next.out:
-                if condition(edge):
+                if not unique_condition(edge):
                     queue.append(edge.start)
                     queue.append(edge.end)
         if len(comp) > 1:
@@ -90,7 +90,7 @@ def SplitGraphByCondition(graph, condition):
 
 def SplitGraph(graph, calculator):
     max_cov = graph.covPerc(0.5)
-    for comp in SplitGraphByCondition(graph, lambda edge: edge.len < calculator.edge_length or edge.cov > max_cov * 1.8):
+    for comp in SplitGraphByCondition(graph, lambda edge: edge.len >= calculator.edge_length and edge.cov < max_cov * 1.8):
         cov = calculator.calculateComponentCoverage(comp, max_cov)
         if cov == 0:
             print "Zero component"

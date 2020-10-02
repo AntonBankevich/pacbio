@@ -68,7 +68,7 @@ class ComponentRecord:
             if self.component.isHub(v):
                 self.red += 1
         for e in self.component.e.values():
-            if basic.Normalize(e.id) not in self.unique and (self.component.isBorder(e.start) or self.component.isBorder(e.end)):
+            if (basic.Normalize(e.id) not in self.unique) and (self.component.isBorder(e.start) or self.component.isBorder(e.end)):
                 self.bad_border += 1
             if e.cov == 0:
                 self.zero += 1
@@ -117,13 +117,13 @@ class ComponentRecord:
         basic.ensure_dir_existance(dirname)
         edge_file = os.path.join(dirname, "edges.txt")
         stats_file = os.path.join(dirname, "stats.txt")
-        # init_file = os.path.join(dirname, "init.txt")
-        # reads_file = os.path.join(dirname, "reads.txt")
+        init_file = os.path.join(dirname, "init.txt")
+        reads_file = os.path.join(dirname, "reads.txt")
         contigs_file = os.path.join(dirname, "contigs.fasta")
         self.printStats(stats_file)
         self.printEdges(edge_file)
-        # self.printInit(init_file)
-        # self.printReads(reads_file)
+        self.printInit(init_file)
+        self.printReads(reads_file)
         self.printContigs(contigs_file)
 
     def printEdges(self, fname):
@@ -152,6 +152,7 @@ class AlignmentDumpParser:
             if s.startswith("Chain"):
                 if rid is not None:
                     yield rid, edges
+                    edges = []
                 continue
             s = s.split()
             eid = s[6].split("_")[1]
@@ -182,7 +183,8 @@ def constructComponentRecords(graph, dir, calculator):
             print "Complex", comp.__len__()
         print componentRecords.__len__(), len(comp), comp.__len__(), cov, max_cov
         if comp.__len__() <= 100:
-            f = open(os.path.join(dir, str(componentRecords.__len__()) + ".dot"), "w")
+            fig_file = os.path.join(dir, str(componentRecords.__len__()) + ".dot")
+            f = open(fig_file, "w")
             coloring = lambda v: "white" if len(v.inc) + len(v.out) == len(graph.v[v.id].inc) + len(
                 graph.v[v.id].out) else ("yellow" if len(graph.v[v.id].inc) + len(graph.v[v.id].out) < 50 else "red")
             comp.Print(f, coloring, calculator.edgeColoring(cov))
@@ -235,20 +237,20 @@ def main(flye_dir, output_dir, diploid):
     graph.FillSeq(edge_file, True)
     print "Splitting graph", edge_file
     componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"), calculator)
-    # print "Reading alignment dump from", dump_file
-    # rcnt = 0
-    # for rid, eids in AlignmentDumpParser(dump_file).parse():
-    #     compids = set()
-    #     for eid in eids:
-    #         if eid not in edgecomp:
-    #             eid = basic.Normalize(eid)
-    #         for compid in edgecomp[eid]:
-    #             compids.add(compid)
-    #     for compid in compids:
-    #         componentRecords[compid].addRead(rid, eids)
-    #     rcnt += 1
-    #     if rcnt % 100000 == 0:
-    #         print "Processed", rcnt, "reads"
+    print "Reading alignment dump from", dump_file
+    rcnt = 0
+    for rid, eids in AlignmentDumpParser(dump_file).parse():
+        compids = set()
+        for eid in eids:
+            if eid not in edgecomp:
+                eid = basic.Normalize(eid)
+            for compid in edgecomp[eid]:
+                compids.add(compid)
+        for compid in compids:
+            componentRecords[compid].addRead(rid, eids)
+        rcnt += 1
+        if rcnt % 100000 == 0:
+            print "Processed", rcnt, "reads"
     print "Filling flye repeat resolution results"
     flye_next = FillFlyeNext(componentRecords, os.path.join(flye_dir, "flye.log"))
     for compRec in componentRecords:
@@ -275,15 +277,16 @@ def main(flye_dir, output_dir, diploid):
     print "Printing components to disk"
     for i, component in enumerate(componentRecords):
         component.dump(os.path.join(output_dir, str(i)))
-    print "Printing table to file"
-    f = open(os.path.join(output_dir, "table.txt"), "w")
-    f.write("Id v e unique inc out unresolved resolved outside zero hub badborder")
+    table_file = os.path.join(output_dir, "table.txt")
+    print "Printing table to file", table_file
+    f = open(table_file, "w")
+    f.write("Id v e unique inc out unresolved resolved outside zero hub badborder\n")
     for i, compRec in enumerate(componentRecords):
         comp = compRec.component
         f.write(" ".join([str(i), str(comp.v.__len__()), str(comp.e.__len__()), str(compRec.unique.__len__() * 2),
                           str(compRec.inc), str(compRec.out),
                           str(compRec.unresolved_connections), str(compRec.resolved_connections.__len__()),
-                          str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]))
+                          str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]) + "\n")
     f.close()
 
 
