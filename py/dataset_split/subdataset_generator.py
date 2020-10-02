@@ -52,7 +52,7 @@ class ComponentRecord:
     def addRead(self, rid, all_edges):
         # type: (str, List[str]) -> None
         edges = [eid for eid in all_edges if eid in self.component.e]
-        if edges.__len__() < 2 and (basic.Normalize(edges[0]) in self.unique):
+        if edges.__len__() == 1 and (basic.Normalize(edges[0]) in self.unique):
             return
         self.reads.append(rid)
         eset = set()
@@ -247,6 +247,9 @@ def main(flye_dir, output_dir, diploid):
             for compid in edgecomp[eid]:
                 compids.add(compid)
         for compid in compids:
+            comp_eids = [eid for eid in eids if eid in componentRecords[compid].component.e]
+            if comp_eids.__len__() == 0:
+                print "GOPA", compid, compids, rid, eids
             componentRecords[compid].addRead(rid, eids)
         rcnt += 1
         if rcnt % 100000 == 0:
