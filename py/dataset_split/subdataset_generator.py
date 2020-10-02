@@ -232,7 +232,7 @@ def main(flye_dir, output_dir, diploid):
     graph = SimpleGraph()
     graph.ReadDot(graph_file)
     print "Reading sequences from", edge_file
-    graph.FillSeq(edge_file, False)
+    graph.FillSeq(edge_file, True)
     print "Splitting graph", edge_file
     componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"), calculator)
     # print "Reading alignment dump from", dump_file
