@@ -235,20 +235,20 @@ def main(flye_dir, output_dir, diploid):
     graph.FillSeq(edge_file, True)
     print "Splitting graph", edge_file
     componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"), calculator)
-    # print "Reading alignment dump from", dump_file
-    # rcnt = 0
-    # for rid, eids in AlignmentDumpParser(dump_file).parse():
-    #     compids = set()
-    #     for eid in eids:
-    #         if eid not in edgecomp:
-    #             eid = basic.Normalize(eid)
-    #         for compid in edgecomp[eid]:
-    #             compids.add(compid)
-    #     for compid in compids:
-    #         componentRecords[compid].addRead(rid, eids)
-    #         rcnt += 1
-    #         if rcnt % 100000 == 0:
-    #             print "Processed", rcnt, "reads"
+    print "Reading alignment dump from", dump_file
+    rcnt = 0
+    for rid, eids in AlignmentDumpParser(dump_file).parse():
+        compids = set()
+        for eid in eids:
+            if eid not in edgecomp:
+                eid = basic.Normalize(eid)
+            for compid in edgecomp[eid]:
+                compids.add(compid)
+        for compid in compids:
+            componentRecords[compid].addRead(rid, eids)
+        rcnt += 1
+        if rcnt % 100000 == 0:
+            print "Processed", rcnt, "reads"
     print "Filling flye repeat resolution results"
     flye_next = FillFlyeNext(componentRecords, os.path.join(flye_dir, "flye.log"))
     for compRec in componentRecords:
@@ -276,7 +276,7 @@ def main(flye_dir, output_dir, diploid):
     for i, component in enumerate(componentRecords):
         component.dump(os.path.join(output_dir, str(i)))
     print "Printing table to file"
-    f = open(os.path.join(output_dir, "table.txt"))
+    f = open(os.path.join(output_dir, "table.txt"), "w")
     f.write("Id v e unique inc out unresolved resolved outside zero hub badborder")
     for i, compRec in enumerate(componentRecords):
         comp = compRec.component
