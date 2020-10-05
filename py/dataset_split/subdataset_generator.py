@@ -128,9 +128,7 @@ class ComponentRecord:
         f.writeIntLine(self.unique.__len__())
         for eid in self.unique:
             f.writeTokenLine(eid)
-            for rid in self.unique[eid]:
-                f.writeToken(rid)
-            f.newLine()
+            f.writeTokens(self.unique[eid])
         file.close()
 
     def dump(self, dirname):
