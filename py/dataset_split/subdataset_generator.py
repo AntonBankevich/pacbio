@@ -102,14 +102,13 @@ class ComponentRecord:
 
     def printReads(self, fname):
         f = open(fname, "w")
-        f.write(str(self.reads.__len__()) + "\n")
+        f.write(str(self.reads.__len__())    + "\n")
         for rid in self.reads:
             f.write(rid + "\n")
         f.close()
 
     def printContigs(self, fname):
         f = open(fname, "w")
-        f.write(str(self.unique.__len__()) + "\n")
         for eid in self.unique:
             f.write(">" + eid + "\n")
             edge = self.component.e[eid]
