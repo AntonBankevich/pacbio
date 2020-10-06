@@ -73,7 +73,7 @@ class ComponentRecord:
     def addRead(self, rid, all_edges):
         # type: (str, List[str]) -> None
         edges = [eid for eid in all_edges if eid in self.component.e]
-        if edges.__len__() == 1 and (basic.Normalize(edges[0]) in self.unique):
+        if edges.__len__() == 1 and (basic.Normalize(edges[0]) in self.unique) and len(edges[0]) > 20000:
             return
         self.reads.append(rid)
         eset = set()
@@ -212,10 +212,10 @@ def constructComponentRecords(graph, dir, calculator):
             if calculator.uniqueCondition(cov)(e):
                 rec.addUniqueEdge(e.id)
             else:
-                edgecomp[e.id].append(componentRecords.__len__())
                 if calculator.isRepeat(e, cov):
                     rec.repeat_edges += 1
-
+            if calculator.uniqueCondition(cov)(e) or len(e) < 20000:
+                edgecomp[e.id].append(componentRecords.__len__())
         rec.calcStats()
         componentRecords.append(rec)
     f = open(os.path.join(dir, "small.dot"), "w")
