@@ -299,8 +299,10 @@ def main(flye_dir, output_dir, diploid):
 
     basic.ensure_dir_existance(output_dir)
     print "Printing components to disk"
+    subdataset_dir = os.path.join(output_dir, "subdatasets")
+    basic.ensure_dir_existance(subdataset_dir)
     for i, component in enumerate(componentRecords):
-        component.dump(os.path.join(output_dir, str(i)))
+        component.dump(os.path.join(subdataset_dir, str(i)))
     table_file = os.path.join(output_dir, "table.txt")
     print "Printing table to file", table_file
     f = open(table_file, "w")

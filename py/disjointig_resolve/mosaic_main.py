@@ -152,12 +152,12 @@ def assemble(args, bin_path):
     sys.stdout.trace( "Final result:")
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
     lines.printKnottedToFasta(open(os.path.join(cl_params.dir, "assembly.fasta"), "w"))
-    # printState(lines)
-    sys.stdout.info("Finished")
+    printState(lines, open(os.path.join(cl_params.dir, "lines.info")))
     secs = int(time.time() - start)
     days = secs / 60 / 60 / 24
     hours = secs / 60 / 60 % 24
     mins = secs / 60 % 60
+    sys.stdout.info("Results can be found in", os.path.join(cl_params.dir, "assembly.fasta"))
     sys.stdout.info("Finished in %d days, %d hours, %d minutes" % (days, hours, mins))
     if cl_params.test:
         passed = False
@@ -171,16 +171,16 @@ def assemble(args, bin_path):
             sys.stdout.info("Test failed")
 
 
-def printState(lines):
-    print "Lines:"
+def printState(lines, out):
+    out.write("Lines:\n")
     for line in lines:
-        print line
-    print "Chains:"
+        out.write(str(line) + "\n")
+    out.write("Chains:\n")
     for chain in lines.chains():
         if chain[-1].knot is not None:
-            print "->" + "->".join([line.id for line in chain]) + "->"
+            out.write("->" + "->".join([line.id for line in chain]) + "->\n")
         else:
-            print "->".join([line.id for line in chain])
+            out.write("->".join([line.id for line in chain]) + "\n")
 
 
 def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, reads, save_handler):
