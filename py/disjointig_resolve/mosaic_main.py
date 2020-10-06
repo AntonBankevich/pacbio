@@ -152,7 +152,7 @@ def assemble(args, bin_path):
     sys.stdout.trace( "Final result:")
     lines.printToFasta(open(os.path.join(cl_params.dir, "lines.fasta"), "w"))
     lines.printKnottedToFasta(open(os.path.join(cl_params.dir, "assembly.fasta"), "w"))
-    printState(lines, open(os.path.join(cl_params.dir, "lines.info")))
+    printState(lines, open(os.path.join(cl_params.dir, "lines.info", "w")))
     secs = int(time.time() - start)
     days = secs / 60 / 60 / 24
     hours = secs / 60 / 60 % 24
