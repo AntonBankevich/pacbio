@@ -114,7 +114,8 @@ class OStreamWrapper:
         self.streams = list(streams)
         self.active = True
         self.prefix = lambda x: ""
-        self.level = common.log_params.LogPriority.log_level
+        # self.level = common.log_params.LogPriority.log_level
+        self.level = common.log_params.LogPriority.trace
 
     def fileno(self):
         return 1
