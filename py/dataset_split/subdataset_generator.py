@@ -301,6 +301,10 @@ def main(flye_dir, output_dir, diploid):
     print "Printing components to disk"
     subdataset_dir = os.path.join(output_dir, "subdatasets")
     basic.ensure_dir_existance(subdataset_dir)
+    order = range(componentRecords.__len__())
+    order = sorted(order, key = lambda i: componentRecords[i].score())
+    ordered_components = [componentRecords[order[i]] for i in range(len(order))]
+    componentRecords = ordered_components
     for i, component in enumerate(componentRecords):
         component.dump(os.path.join(subdataset_dir, str(i)))
     table_file = os.path.join(output_dir, "table.txt")
@@ -314,11 +318,9 @@ def main(flye_dir, output_dir, diploid):
                           str(compRec.unresolved_connections), str(compRec.resolved_connections.__len__()),
                           str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]) + "\n")
     f.close()
-    order = range(componentRecords.__len__())
-    order = sorted(order, key = lambda i: componentRecords[i].score())
     table_file = os.path.join(output_dir, "list.txt")
     f = open(table_file, "w")
-    for a in order:
+    for a in range(len(componentRecords)):
         f.write(str(a) + "\n")
     f.close()
 
