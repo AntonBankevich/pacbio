@@ -131,6 +131,13 @@ class ComponentRecord:
             f.writeTokens(self.unique[eid])
         file.close()
 
+    def draw(self, fname, calculator):
+        f = open(fname, "w")
+        coloring = lambda v: "white" if self.component.isBorder(v) else \
+            ("yellow" if len(self.component.v[v.id].inc) + len(self.component.v[v.id].out) < 50 else "red")
+        self.component.Print(f, coloring, calculator.edgeColoring(self.cov))
+        f.close()
+
     def dump(self, dirname):
         basic.ensure_dir_existance(dirname)
         edge_file = os.path.join(dirname, "edges.txt")
@@ -306,7 +313,10 @@ def main(flye_dir, output_dir, diploid):
     ordered_components = [componentRecords[order[i]] for i in range(len(order))]
     componentRecords = ordered_components
     for i, component in enumerate(componentRecords):
-        component.dump(os.path.join(subdataset_dir, str(i)))
+        comp_dir = os.path.join(subdataset_dir, str(i))
+        component.dump(comp_dir)
+        fig_name = os.path.join(comp_dir, "graph.dot")
+        component.draw(fig_name, calculator)
     table_file = os.path.join(output_dir, "table.txt")
     print "Printing table to file", table_file
     f = open(table_file, "w")
