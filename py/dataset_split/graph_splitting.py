@@ -135,7 +135,7 @@ if __name__ == "__main__":
             continue
         print cnt, len(comp), comp.__len__(), cov, max_cov
         f = open(os.path.join(sys.argv[2], str(cnt) + ".dot"), "w")
-        coloring = lambda v: "white" if len(v.inc) + len(v.out) == len(g.v[v.id].inc) + len(g.v[v.id].out) else ("yellow" if len(g.v[v.id].inc) + len(g.v[v.id].out) < 50 else "red")
+        coloring = lambda v: "white" if not comp.isBorder(v.id) else ("yellow" if len(g.v[v.id].inc) + len(g.v[v.id].out) < 50 else "red")
         comp.Print(f, coloring, calculator.edgeColoring(cov))
         f.close()
         cnt += 1
