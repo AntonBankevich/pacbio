@@ -98,6 +98,7 @@ class ComponentRecord:
         f = open(fname, "w")
         f.write("Cov " + str(self.cov) + "\n size " + str(self.component.e.__len__()) + "\n")
         f.write("Zero " + str(self.zero) + "\n bad_border " + str(self.bad_border) + "\n hubs " + str(self.red) + "\n")
+        f.write("Unresolved " + str(self.unresolved_connections) + "\n Resolved " + str(self.resolved_connections) + "\n")
         f.close()
 
     def printReads(self, fname):
