@@ -134,7 +134,7 @@ class ComponentRecord:
 
     def draw(self, fname, calculator):
         f = open(fname, "w")
-        coloring = lambda v: "white" if self.component.isBorder(v.id) else \
+        coloring = lambda v: "white" if not self.component.isBorder(v.id) else \
             ("yellow" if len(self.component.v[v.id].inc) + len(self.component.v[v.id].out) < 50 else "red")
         self.component.Print(f, coloring, calculator.edgeColoring(self.cov))
         f.close()
@@ -211,7 +211,7 @@ def constructComponentRecords(graph, dir, calculator):
         if comp.__len__() <= 100:
             fig_file = os.path.join(dir, str(componentRecords.__len__()) + ".dot")
             f = open(fig_file, "w")
-            coloring = lambda v: "white" if comp.isBorder(v.id) else ("yellow" if len(graph.v[v.id].inc) + len(graph.v[v.id].out) < 50 else "red")
+            coloring = lambda v: "white" if not comp.isBorder(v.id) else ("yellow" if len(graph.v[v.id].inc) + len(graph.v[v.id].out) < 50 else "red")
             comp.Print(f, coloring, calculator.edgeColoring(cov))
             f.close()
         rec = ComponentRecord(comp, cov)
