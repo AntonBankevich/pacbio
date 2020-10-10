@@ -77,7 +77,7 @@ def assemble(args, bin_path):
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
         extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
         dot_plot.printAll(sys.stdout)
-        printState(lines)
+        printState(lines, sys.stdout)
     else:
         aligner = Aligner(DirDistributor(cl_params.alignmentDir()))
         polisher = Polisher(aligner, aligner.dir_distributor)
@@ -212,7 +212,7 @@ def EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, re
             if cnt > 10:
                 cnt = 0
                 if save_handler is not None:
-                    printState(lines)
+                    printState(lines, sys.stdout)
                     sys.stdout.trace( "Saving current state")
                     writer = save_handler.getWriter()
                     sys.stdout.trace( "Save details:", writer.info)

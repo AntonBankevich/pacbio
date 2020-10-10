@@ -67,6 +67,9 @@ class Params:
                 self.test = True
             elif key == "--flye-dir":
                 self.set_flye_dir(value, self.mode)
+            elif key == "--reliable-coverage":
+                params.reliable_coverage = int(value)
+                params.k_cov = params.reliable_coverage
             elif key == "--mode":
                 self.mode = value
                 self.set_flye_dir(self.flye_dir, self.mode)
