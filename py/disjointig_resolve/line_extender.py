@@ -369,6 +369,7 @@ class LineExtender:
         sys.stdout.trace( "Extending", line, "for", tmp)
         line.extendRight(new_contig.suffix(pos = len(line)).Seq(), relevant_als)
         sys.stdout.info( "Extended contig", line, "for", tmp)
+        sys.stdout.trace("Correct:", line.correct_segments)
         sys.stdout.trace("Reads:")
         sys.stdout.trace( list(line.read_alignments.allInter(line.asSegment().suffix(length=min(len(line), 2000)))))
         sys.stdout.trace( "Sequence:")
@@ -539,7 +540,7 @@ class LineExtender:
         sys.stdout.trace( "Working on prolonging", rec.resolved)
         res = self.findAndFilterResolvedBound(rec, params.k)
         if res <= rec.resolved.right:
-            sys.stdout.trace( "No luck with", rec.resolved)
+            sys.stdout.trace( "No luck with", rec.resolved, rec.line.correct_segments)
             return False
         sys.stdout.trace( "Prolonged", rec.resolved, "to", res)
         rec.setResolved(rec.resolved.contig.segment(rec.resolved.left, res))
