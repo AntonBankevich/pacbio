@@ -602,6 +602,6 @@ class LineExtender:
                     segs.add(seg2)
                 if al.rc.seg_from.left < 50 and al.seg_to.right >= resolved.right - 100:
                     segs.add(al.seg_to.contig.suffix(pos=al.seg_to.right).expand(inter_size + 100))
-                    sys.stdout.trace( "Incoming line:", resolved, seg, al)
+                    sys.stdout.trace( "Incoming line:", resolved, seg, al, al.seg_to.contig.suffix(pos=al.seg_to.right).expand(inter_size + 100))
         segs.mergeSegments(inter_size - 1)
-        return list(segs.reverse(seg.contig, inter_size - 1 - max(100, inter_size / 10)).reduce(seg))
+        return list(segs.reverse(seg.contig, inter_size - 1 - min(100, inter_size / 10)).reduce(seg))
