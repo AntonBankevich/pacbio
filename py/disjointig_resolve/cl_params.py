@@ -22,7 +22,7 @@ class Params:
         self.threads = 8
         self.test = False
         self.init_file = None
-        self.long_params = "reliable-coverage, test debug nostrict stats genome-size= force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= split flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "reliable-coverage= test debug nostrict stats genome-size= force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= split flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
