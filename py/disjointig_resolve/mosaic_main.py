@@ -65,10 +65,10 @@ def assemble(args, bin_path):
         sys.stdout.info("Modifications:")
         print subprocess.check_output(["git", "diff"])
     sys.stdout.info("Preparing initial state")
-    if cl_params.debug:
-        save_handler = SaveHandler(os.path.join(cl_params.dir, "saves"))
-    else:
-        save_handler = None
+    # if cl_params.debug:
+    #     save_handler = SaveHandler(os.path.join(cl_params.dir, "saves"))
+    # else:
+    save_handler = None
 
     if cl_params.load_from is not None:
         # tmp = cl_params.focus
