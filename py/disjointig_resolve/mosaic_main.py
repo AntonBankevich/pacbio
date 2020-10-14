@@ -130,17 +130,17 @@ def assemble(args, bin_path):
             line.completely_resolved.mergeSegments()
             if len(line.completely_resolved) == 0:
                 lines.removeLine(line)
-        if cl_params.debug:
-            sys.stdout.info( "Saving initial state")
-            try:
-                writer = save_handler.getWriter()
-                sys.stdout.info("Save details:", writer.info)
-                saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
-            except Exception as e:
-                _, _, tb = sys.exc_info()
-                sys.stdout.warn("Could not write save")
-                traceback.print_tb(tb)
-                sys.stdout.INFO( "Message:", e.message)
+        # if cl_params.debug:
+        #     sys.stdout.info( "Saving initial state")
+        #     try:
+        #         writer = save_handler.getWriter()
+        #         sys.stdout.info("Save details:", writer.info)
+        #         saveAll(writer, cl_params, aligner, contigs, reads, disjointigs, lines, dot_plot)
+        #     except Exception as e:
+        #         _, _, tb = sys.exc_info()
+        #         sys.stdout.warn("Could not write save")
+        #         traceback.print_tb(tb)
+        #         sys.stdout.INFO( "Message:", e.message)
 
     sys.stdout.trace( "Disjointig alignments")
     for line in lines:
