@@ -25,9 +25,9 @@ class Debugger:
         print "Dumping state to ", fname
         of = open(fname, "w")
         for line in self.lines:
-            of.write(" ".join(map(str, [line.id, line, line.correct_segments, line.completely_resolved, line.initial])))
+            of.write(" ".join(map(str, [line.id, line, line.correct_segments, line.completely_resolved, line.initial])) + "\n")
         for line in self.lines:
-            of.write(" ".join(map(str, [line.id, line, line.correct_segments, line.completely_resolved, line.initial])))
+            of.write(" ".join(map(str, [line.id, line, line.correct_segments, line.completely_resolved, line.initial])) + "\n")
             for al in line.read_alignments:
                 of.write(str(al) + "\n")
         self.dot_plot.printAll(of)
