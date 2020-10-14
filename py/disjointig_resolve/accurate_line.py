@@ -196,7 +196,7 @@ class NewLine(Contig):
                         break
                 if not found:
                     if params.debug:
-                        print "al"
+                        print al
                     yield al
                     readRes.append(al)
         sys.stdout.trace("Request for read alignments for", seg, "finished")
