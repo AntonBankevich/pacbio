@@ -20,7 +20,8 @@ class AlignmentException(Exception):
 
 class DirDistributor:
     def __init__(self, dir):
-        basic.ensure_dir_existance(dir)
+        # basic.ensure_dir_existance(dir)
+        basic.recreate(dir)
         self.dir = dir
         self.cur_dir = 0
 
@@ -221,7 +222,6 @@ class Aligner:
         # type: (Iterable[NamedSequence], Iterable[Contig], str) -> sam_parser.Samfile
         reference = list(reference)
         dir, new_files, same = self.dir_distributor.fillNextDir([(reference, "contigs.fasta"), (list(reads), "reads.fasta")])
-        same = False
         contigs_file = new_files[0]
         reads_file = new_files[1]
         alignment_dir = os.path.join(dir, "alignment")
