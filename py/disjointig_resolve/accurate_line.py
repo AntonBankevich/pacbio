@@ -168,6 +168,9 @@ class NewLine(Contig):
         # type: (Segment) -> Generator[AlignmentPiece]
         sys.stdout.trace("Requesting read alignments for", seg)
         result = []
+        if params.debug:
+            print self.disjointig_alignments
+            print list(self.disjointig_alignments.allInter(seg))
         for alDL in self.disjointig_alignments.allInter(seg):
             if len(alDL.seg_to) < params.k:
                 continue
@@ -192,6 +195,8 @@ class NewLine(Contig):
                         found = True
                         break
                 if not found:
+                    if params.debug:
+                        print "al"
                     yield al
                     readRes.append(al)
         sys.stdout.trace("Request for read alignments for", seg, "finished")

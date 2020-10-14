@@ -26,10 +26,11 @@ class Debugger:
         of = open(fname, "w")
         for line in self.lines:
             of.write(" ".join(map(str, [line.id, line, line.correct_segments, line.completely_resolved, line.initial])) + "\n")
+            of.write(str(line.disjointig_alignments)  + "\n")
         for line in self.lines:
             of.write(" ".join(map(str, [line.id, line, line.correct_segments, line.completely_resolved, line.initial])) + "\n")
             for al in line.read_alignments:
-                of.write(str(al) + "\n")
+                of.write(line.id + " " + str(al) + "\n")
         self.dot_plot.printAll(of)
         for al in self.aligner.localAlign(self.lines, self.lines):
             of.write(str(al) + "\n")

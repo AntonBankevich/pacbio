@@ -105,6 +105,14 @@ def assemble(args, bin_path):
 
         disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
+        if cl_params.debug:
+            df = open(os.path.join(cl_params.dir, "disjonting_als.txt"), "w")
+            for disjointig in disjointigs:
+                df.write(disjointig.id + "\n")
+                for al in disjointig.read_alignments:
+                    df.write(str(al) + "\n")
+            df.close()
+
         all_unique = cl_params.init_file is not None
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads, cl_params.force_unique, all_unique)
 
