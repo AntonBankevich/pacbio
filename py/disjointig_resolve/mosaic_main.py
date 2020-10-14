@@ -147,7 +147,7 @@ def assemble(args, bin_path):
         sys.stdout.trace( line.disjointig_alignments)
     sys.stdout.info("Starting expanding alignment-consensus loop")
     if cl_params.debug:
-        debugger.debugger = debugger.Debugger(os.path.join(dir, "debug"), lines, dot_plot, reads, aligner)
+        debugger.debugger = debugger.Debugger(os.path.join(cl_params.dir, "debug"), lines, dot_plot, reads, aligner)
         params.debug = True
 
     EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, reads, save_handler)

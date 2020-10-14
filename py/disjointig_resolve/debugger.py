@@ -20,7 +20,7 @@ class Debugger:
         self.cnt = 0
 
     def dump(self):
-        fname = os.path.join(dir, str(self.cnt) + ".txt")
+        fname = os.path.join(self.dir, str(self.cnt) + ".txt")
         self.cnt += 1
         print "Dumping state to ", fname
         of = open(fname, "w")
