@@ -9,6 +9,7 @@ from common import basic, params
 from common.line_align import Scorer
 from common.sequences import Segment, ContigStorage
 from common.alignment_storage import AlignmentPiece, AlignedRead, ReadCollection
+from disjointig_resolve import debugger
 from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
@@ -56,6 +57,8 @@ class LineExtender:
                 continue
             self.updateAllStructures([seg for seg, arr in result])
             new_line = self.knotter.tryMergeRight(line)
+            if debugger.debugger is not None:
+                debugger.debugger.dump()
             if new_line is not None:
                 self.updateAllStructures(list(new_line.completely_resolved))
                 return new_recruits + 1

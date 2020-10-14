@@ -7,6 +7,7 @@ import traceback
 
 from typing import Iterable
 
+from disjointig_resolve import debugger
 
 sys.path.append("py")
 sys.path.append(".")
@@ -68,6 +69,7 @@ def assemble(args, bin_path):
         save_handler = SaveHandler(os.path.join(cl_params.dir, "saves"))
     else:
         save_handler = None
+
     if cl_params.load_from is not None:
         # tmp = cl_params.focus
         sys.stdout.info("Loading initial state from saves")
@@ -144,6 +146,9 @@ def assemble(args, bin_path):
     for line in lines:
         sys.stdout.trace( line.disjointig_alignments)
     sys.stdout.info("Starting expanding alignment-consensus loop")
+    if cl_params.debug:
+        debugger.debugger = debugger.Debugger(os.path.join(dir, "debug"), lines, dot_plot, reads, aligner)
+        params.debug = True
 
     EACL(aligner, cl_params, contigs, disjointigs, dot_plot, extender, lines, reads, save_handler)
 
