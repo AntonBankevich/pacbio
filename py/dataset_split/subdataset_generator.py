@@ -212,7 +212,7 @@ def constructComponentRecords(graph, calculator):
             else:
                 if calculator.isRepeat(e, cov):
                     rec.repeat_edges += 1
-            if not calculator.uniqueCondition(cov)(e) or len(e) < 20000:
+            if not calculator.uniqueCondition(cov)(e) or len(e) < 50000:
                 edgecomp[e.id].append(componentRecords.__len__())
         rec.calcStats()
         componentRecords.append(rec)
