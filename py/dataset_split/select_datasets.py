@@ -16,7 +16,7 @@ def choose_datasets(dir):
             if s.startswith("Line:") and (s.find("(") == -1 or s.find(")") == -1):
                 ok = False
                 break
-        if ok:
+        if not ok:
             print dataset_id
 
 if __name__ == "__main__":
