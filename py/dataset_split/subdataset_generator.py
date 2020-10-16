@@ -306,7 +306,7 @@ def main(flye_dir, output_dir, diploid):
         component.dump(comp_dir)
         fig_name = os.path.join(comp_dir, "graph.dot")
         component.draw(fig_name, calculator)
-        if component.__len__() <= 100:
+        if component.component.__len__() <= 100:
             fig_file = os.path.join(output_dir, "pics", str(i) + ".dot")
             component.draw(fig_file, calculator)
 
