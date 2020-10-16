@@ -131,7 +131,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     tlen0 = sum(map(len, bad_reads))
     good_reads = set()
     for al in aligner.localAlign(reads, disjointigs):
-        if not al.contradictingRTC(al.seg_to.contig.asSegment(), params.bad_end_length) and len(al.seg_from.contig) > len(al) - 2 * params.bad_end_length and len(list(al.splitRef())) == 1:
+        if not al.contradictingRTC(al.seg_to.contig.asSegment(), params.bad_end_length) and al.seg_from.left < params.bad_end_length and al.rc.seg_from.left < params.bad_end_length and len(list(al.splitRef())) == 1:
             good_reads.add(al.seg_from.contig.id)
     sys.stdout.info("Fraction of reads without full alignment to disjointigs:", 1 - float(len(good_reads)) / len(reads))
     rf = os.path.join(dir, "badreads.fasta")

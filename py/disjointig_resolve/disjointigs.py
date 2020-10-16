@@ -103,7 +103,7 @@ class DisjointigCollection(ContigStorage):
         for al in als:
             dt = al.seg_to.contig # type: Disjointig
             all += 1
-            if al.seg_from.left < 500 and al.rc.seg_from.left < 500 and len(list(al.splitRef())) == 1 and len(al) > params.k:
+            if al.seg_from.left < params.bad_end_length and al.rc.seg_from.left < params.bad_end_length and len(list(al.splitRef())) == 1 and len(al) > params.k:
                 cnt += 1
                 dt.addAlignment(al)
 
