@@ -252,7 +252,7 @@ def main(flye_dir, output_dir, diploid):
     print "Reading sequences from", edge_file
     graph.FillSeq(edge_file, True)
     print "Splitting graph", edge_file
-    componentRecords, edgecomp = constructComponentRecords(graph, os.path.join(output_dir, "pics"), calculator)
+    componentRecords, edgecomp = constructComponentRecords(graph, calculator)
     print "Reading alignment dump from", dump_file
     rcnt = 0
     for rid, eids in AlignmentDumpParser(dump_file).parse():
@@ -300,6 +300,7 @@ def main(flye_dir, output_dir, diploid):
     order = sorted(order, key = lambda i: componentRecords[i].score())
     ordered_components = [componentRecords[order[i]] for i in range(len(order))]
     componentRecords = ordered_components
+    basic.ensure_dir_existance(os.path.join(output_dir, "pics"))
     for i, component in enumerate(componentRecords):
         comp_dir = os.path.join(subdataset_dir, str(i))
         component.dump(comp_dir)
