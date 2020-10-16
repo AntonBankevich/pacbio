@@ -189,9 +189,7 @@ class AlignmentDumpParser:
         if rid is not None:
             yield rid, edges
 
-def constructComponentRecords(graph, dir, calculator):
-    basic.ensure_dir_existance(dir)
-    oppa = []
+def constructComponentRecords(graph, calculator):
     simple = 0
     max_cov = graph.covPerc(0.5)
     edgecomp = dict()  # type: Dict[str, List[int]]
@@ -203,17 +201,10 @@ def constructComponentRecords(graph, dir, calculator):
             continue
         if len(comp) <= 4:
             simple += 1
-            oppa.extend(comp.v)
             continue
         if len(comp) > 100:
             print "Complex", comp.__len__()
         print componentRecords.__len__(), len(comp), comp.__len__(), cov, max_cov
-        if comp.__len__() <= 100:
-            fig_file = os.path.join(dir, str(componentRecords.__len__()) + ".dot")
-            f = open(fig_file, "w")
-            coloring = lambda v: "white" if not comp.isBorder(v.id) else ("yellow" if len(graph.v[v.id].inc) + len(graph.v[v.id].out) < 50 else "red")
-            comp.Print(f, coloring, calculator.edgeColoring(cov))
-            f.close()
         rec = ComponentRecord(comp, cov)
         for e in comp.e.values():
             if calculator.uniqueCondition(cov)(e):
@@ -221,13 +212,10 @@ def constructComponentRecords(graph, dir, calculator):
             else:
                 if calculator.isRepeat(e, cov):
                     rec.repeat_edges += 1
-            if calculator.uniqueCondition(cov)(e) or len(e) < 20000:
+            if not calculator.uniqueCondition(cov)(e) or len(e) < 20000:
                 edgecomp[e.id].append(componentRecords.__len__())
         rec.calcStats()
         componentRecords.append(rec)
-    f = open(os.path.join(dir, "small.dot"), "w")
-    graph.Draw(set(oppa), f)
-    f.close()
     return componentRecords, edgecomp
 
 
@@ -317,6 +305,10 @@ def main(flye_dir, output_dir, diploid):
         component.dump(comp_dir)
         fig_name = os.path.join(comp_dir, "graph.dot")
         component.draw(fig_name, calculator)
+        if component.__len__() <= 100:
+            fig_file = os.path.join(output_dir, "pics", str(i) + ".dot")
+            component.draw(fig_file, calculator)
+
     table_file = os.path.join(output_dir, "table.txt")
     print "Printing table to file", table_file
     f = open(table_file, "w")
