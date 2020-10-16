@@ -131,7 +131,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
     tlen0 = sum(map(len, bad_reads))
     good_reads = set()
     for al in aligner.localAlign(reads, disjointigs):
-        if not al.contradictingRTC(al.seg_to.contig.asSegment(), params.bad_end_length) and len(al.seg_from.contig) > len(al) - 2 * params.bad_end_length:
+        if not al.contradictingRTC(al.seg_to.contig.asSegment(), params.bad_end_length) and len(al.seg_from.contig) > len(al) - 2 * params.bad_end_length and len(list(al.splitRef())) == 1:
             good_reads.add(al.seg_from.contig.id)
     sys.stdout.info("Fraction of reads without full alignment to disjointigs:", 1 - float(len(good_reads)) / len(reads))
     rf = os.path.join(dir, "badreads.fasta")
@@ -154,7 +154,7 @@ def CreateDisjointigCollection(d_files, dir, aligner, reads):
             sys.stdout.trace(dis.id, len(dis))
         disjointigs.writeToFasta(open(os.path.join(dir, "disjointigs.fasta"), "w"))
     else:
-        sys.stdout.trace("Could not assemble new disjointigs")
+        sys.stdout.trace("Could not assamble new disjointigs")
     sys.stdout.info("Aligning reads to disjointigs")
     disjointigs.addAlignments(aligner.localAlign(reads, disjointigs))
     return disjointigs
