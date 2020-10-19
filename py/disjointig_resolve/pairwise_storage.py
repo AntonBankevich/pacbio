@@ -33,9 +33,9 @@ class PairwiseStorage:
 
     def getAlignments(self, contigid, min_overlap):
         # type: (str, int) -> Generator[Contig]
-        if id not in self.storage:
+        if contigid not in self.storage:
             return
-        for al in self.storage[id]:
+        for al in self.storage[contigid]:
             yield al.seg_from.contig
 
 class PairwiseReadRecruiter:
