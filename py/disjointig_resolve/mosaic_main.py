@@ -105,7 +105,7 @@ def assemble(args, bin_path):
             params.min_contra_for_break = 8
 
         if cl_params.precruiting:
-            disjointigs = None
+            disjointigs = DisjointigCollection()
         else:
             disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
