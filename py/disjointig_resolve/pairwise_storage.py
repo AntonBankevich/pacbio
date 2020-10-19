@@ -51,8 +51,8 @@ class PairwiseReadRecruiter:
         sys.stdout.trace("Requesting read alignments for", seg, " using palignments")
         line = seg.contig #type: NewLine
         reads = ContigStorage()
-        for base_read in line.read_alignments.allInter(seg, min_overlap):
-            for read in self.als.getAlignments(base_read, params.k):
+        for base_read_al in line.read_alignments.allInter(seg, min_overlap):
+            for read in self.als.getAlignments(base_read_al.seg_from.contig, params.k):
                 reads.add(read)
         for al in self.aligner.localAlign(reads, ContigStorage([seg.contig])):
             if al.seg_to.interSize(seg) > min_overlap and al.__len__() > params.k:
