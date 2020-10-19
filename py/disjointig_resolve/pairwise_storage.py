@@ -52,8 +52,11 @@ class PairwiseReadRecruiter:
         line = seg.contig #type: NewLine
         reads = ContigStorage()
         for base_read_al in line.read_alignments.allInter(seg, min_overlap):
+            sys.stdout.write("Base " + str(base_read_al))
             for read in self.als.getAlignments(base_read_al.seg_from.contig, params.k):
                 reads.add(read)
+                sys.stdout.write(" " + read.id)
+            sys.stdout.write("\n")
         for al in self.aligner.localAlign(reads, ContigStorage([seg.contig])):
             if al.seg_to.interSize(seg) > min_overlap and al.__len__() > params.k:
                 yield al
