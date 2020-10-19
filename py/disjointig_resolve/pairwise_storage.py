@@ -20,16 +20,16 @@ class PairwiseStorage:
 
     def addAlignment(self, seg_from, seg_to):
         # type: (Segment, Segment) -> None
+        self.innerAdd(seg_from, seg_to)
+        self.innerAdd(seg_from.RC(), seg_to.RC())
+        self.innerAdd(seg_to, seg_from)
+        self.innerAdd(seg_to.RC(), seg_from.RC())
+
+    def innerAdd(self, seg_from, seg_to):
         if seg_from.contig.id not in self.storage:
             self.storage[seg_from.contig.id] = [PseudoAlignment(seg_from, seg_to)]
-            self.storage[basic.Reverse(seg_from.contig.id)] = [PseudoAlignment(seg_from.RC(), seg_to.RC())]
         else:
             self.storage[seg_from.contig.id].append(PseudoAlignment(seg_from, seg_to))
-            self.storage[basic.Reverse(seg_from.contig.id)].append(PseudoAlignment(seg_from.RC(), seg_to.RC()))
-        # if al.seg_to.contig.id not in self.storage:
-        #     self.storage[al.seg_to.contig.id] = [PseudoAlignment(al.seg_to, al.seg_from)]
-        # else:
-        #     self.storage[al.seg_from.contig.id].append(PseudoAlignment(al.seg_to, al.seg_from))
 
     def getAlignments(self, contigid, min_overlap):
         # type: (str, int) -> Generator[Contig]
