@@ -259,7 +259,7 @@ class Aligner:
             if tmp is not None:
                 if mode == "dotplot":
                     als.extend(tmp.splitRef())
-                elif (mode == "local") and tmp.indelLength * 8 > tmp.matchingPositionsCount:
+                elif (mode == "local"):
                     als.extend(tmp.splitRead())
                 else:
                     als.append(tmp)
