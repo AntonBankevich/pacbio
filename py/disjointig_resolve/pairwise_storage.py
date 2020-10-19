@@ -26,7 +26,7 @@ class PairwiseStorage:
         self.innerAdd(seg_to.RC(), seg_from.RC())
 
     def innerAdd(self, seg_from, seg_to):
-        if seg_from.contig.id not in self.storage:
+        if seg_to.contig.id not in self.storage:
             self.storage[seg_to.contig.id] = [PseudoAlignment(seg_from, seg_to)]
         else:
             self.storage[seg_to.contig.id].append(PseudoAlignment(seg_from, seg_to))
