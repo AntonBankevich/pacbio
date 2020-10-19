@@ -21,14 +21,22 @@ from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 # LineExtender contains algorithms for resolving repeats by extending lines.
 # The results of its work is reflected in lines themselves as they grow and knot to each other
 class LineExtender:
-    def __init__(self, aligner, knotter, disjointigs, dot_plot):
-        # type: (Aligner, LineMerger, DisjointigCollection, LineDotPlot) -> None
+    def __init__(self, aligner, knotter, disjointigs, dot_plot, reads):
+        # type: (Aligner, LineMerger, DisjointigCollection, LineDotPlot, ReadCollection) -> None
         self.aligner = aligner
         self.polisher = Polisher(aligner, aligner.dir_distributor)
         self.knotter = knotter
         self.disjointigs = disjointigs
         self.dot_plot = dot_plot
         self.scorer = Scorer()
+        self.reads = reads
+
+    def checkAlignments(self, seg, als):
+        # type: (Segment,List[AlignmentPiece]) -> None
+        rids = set([al.seg_from.contig.id for al in als])
+        for al in self.aligner.localAlign(self.reads, ContigStorage([seg.contig])):
+            if al.seg_to.interSize(seg) > params.k and al.seg_from.contig.id not in rids:
+                print "Missing alignment", al
 
     def processLine(self, line):
         # type: (NewLine) -> int
@@ -133,6 +141,8 @@ class LineExtender:
                         focus = line.segment(max(seg_resolved.left, min(seg_resolved.right - params.k, seg1.left)),
                                              min(seg_correct.right, next_start + params.k))
                         als = list(line.getRelevantAlignmentsFor(focus))
+                        if params.check_alignments:
+                            self.checkAlignments(focus, als)
                         reads  = ContigStorage()
                         for al in als:
                             reads.add(al.seg_from.contig)
@@ -242,7 +252,10 @@ class LineExtender:
             correct_segments.append(new_copy)
             if ltl.percentIdentity() > 0.95:
                 active_segments.add(new_copy)
-            read_alignments.extend(zip(line.getRelevantAlignmentsFor(ltl.seg_from), itertools.cycle([correct_segments[-1]])))
+            relevant_alignments = list(line.getRelevantAlignmentsFor(ltl.seg_from))
+            if params.check_alignments:
+                self.checkAlignments(ltl.seg_from, relevant_alignments)
+            read_alignments.extend(zip(relevant_alignments, itertools.cycle([correct_segments[-1]])))
         read_alignments = sorted(read_alignments, key=lambda al: al[0].seg_from.contig.id)
         alignments_by_read = itertools.groupby(read_alignments, lambda al: al[0].seg_from.contig.id)
         new_recruits = []

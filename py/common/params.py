@@ -39,6 +39,7 @@ expected_size = 5000000
 strict_merging_alignment = True
 save_alignments = False
 debug = False
+check_alignments = False
 
 scores = SimpleScores(scoreIns = 8, scoreDel = 7, scoreMM = 10, scoreHomo = 4)
 

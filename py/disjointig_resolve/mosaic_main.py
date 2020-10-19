@@ -77,7 +77,7 @@ def assemble(args, bin_path):
         cl_params.parse(args)
         # cl_params.focus = tmp
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
-        extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
+        extender = LineExtender(aligner, knotter, disjointigs, dot_plot, reads)
         dot_plot.printAll(sys.stdout)
         printState(lines, sys.stdout)
     else:
@@ -132,7 +132,7 @@ def assemble(args, bin_path):
 
         sys.stdout.info("Updating sequences and resolved segments.")
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
-        extender = LineExtender(aligner, knotter, disjointigs, dot_plot)
+        extender = LineExtender(aligner, knotter, disjointigs, dot_plot, reads)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
         for line in list(lines.unique()): # type: NewLine
             line.completely_resolved.mergeSegments()
