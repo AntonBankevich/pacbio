@@ -14,6 +14,7 @@ from disjointig_resolve.accurate_line import NewLine, LinePosition
 from disjointig_resolve.disjointigs import DisjointigCollection
 from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.knotter import LineMerger
+from disjointig_resolve.pairwise_storage import PairwiseReadRecruiter
 from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 
 
@@ -21,8 +22,8 @@ from disjointig_resolve.smart_storage import SegmentStorage, AlignmentStorage
 # LineExtender contains algorithms for resolving repeats by extending lines.
 # The results of its work is reflected in lines themselves as they grow and knot to each other
 class LineExtender:
-    def __init__(self, aligner, knotter, disjointigs, dot_plot, reads):
-        # type: (Aligner, LineMerger, DisjointigCollection, LineDotPlot, ReadCollection) -> None
+    def __init__(self, aligner, knotter, disjointigs, dot_plot, reads, recruiter):
+        # type: (Aligner, LineMerger, DisjointigCollection, LineDotPlot, ReadCollection, PairwiseReadRecruiter) -> None
         self.aligner = aligner
         self.polisher = Polisher(aligner, aligner.dir_distributor)
         self.knotter = knotter
@@ -30,6 +31,7 @@ class LineExtender:
         self.dot_plot = dot_plot
         self.scorer = Scorer()
         self.reads = reads
+        self.recruiter = recruiter
 
     def checkAlignments(self, seg, als):
         # type: (Segment,List[AlignmentPiece]) -> None
@@ -140,7 +142,10 @@ class LineExtender:
                         next_start = min(next_start, len(line) - 200)
                         focus = line.segment(max(seg_resolved.left, min(seg_resolved.right - params.k, seg1.left)),
                                              min(seg_correct.right, next_start + params.k))
-                        als = list(line.getRelevantAlignmentsFor(focus))
+                        if self.recruiter is None:
+                            als = list(line.getRelevantAlignmentsFor(focus))
+                        else:
+                            als = list(self.recruiter.getRelevantAlignments(focus, params.k))
                         if params.check_alignments:
                             self.checkAlignments(focus, als)
                         reads  = ContigStorage()
@@ -252,7 +257,10 @@ class LineExtender:
             correct_segments.append(new_copy)
             if ltl.percentIdentity() > 0.95:
                 active_segments.add(new_copy)
-            relevant_alignments = list(line.getRelevantAlignmentsFor(ltl.seg_from))
+            if self.recruiter is None:
+                relevant_alignments = list(line.getRelevantAlignmentsFor(ltl.seg_from))
+            else:
+                relevant_alignments = list(self.recruiter.getRelevantAlignments(ltl.seg_from, params.k))
             if params.check_alignments:
                 self.checkAlignments(ltl.seg_from, relevant_alignments)
             read_alignments.extend(zip(relevant_alignments, itertools.cycle([correct_segments[-1]])))

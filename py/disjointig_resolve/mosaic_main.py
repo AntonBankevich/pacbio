@@ -8,6 +8,7 @@ import traceback
 from typing import Iterable
 
 from disjointig_resolve import debugger
+from disjointig_resolve.pairwise_storage import PairwiseReadRecruiter
 
 sys.path.append("py")
 sys.path.append(".")
@@ -77,7 +78,7 @@ def assemble(args, bin_path):
         cl_params.parse(args)
         # cl_params.focus = tmp
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
-        extender = LineExtender(aligner, knotter, disjointigs, dot_plot, reads)
+        # extender = LineExtender(aligner, knotter, disjointigs, dot_plot, reads)
         dot_plot.printAll(sys.stdout)
         printState(lines, sys.stdout)
     else:
@@ -129,10 +130,14 @@ def assemble(args, bin_path):
         dot_plot = LineDotPlot(lines, aligner)
         dot_plot.construct(aligner)
         # dot_plot.printAll(sys.stdout)
+        if cl_params.precruiting:
+            recruiter = PairwiseReadRecruiter(aligner, reads)
+        else:
+            recruiter = None
 
         sys.stdout.info("Updating sequences and resolved segments.")
         knotter = LineMerger(lines, Polisher(aligner, aligner.dir_distributor), dot_plot)
-        extender = LineExtender(aligner, knotter, disjointigs, dot_plot, reads)
+        extender = LineExtender(aligner, knotter, disjointigs, dot_plot, reads, recruiter)
         extender.updateAllStructures(itertools.chain.from_iterable(line.completely_resolved for line in lines))
         for line in list(lines.unique()): # type: NewLine
             line.completely_resolved.mergeSegments()

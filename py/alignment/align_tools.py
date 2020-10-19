@@ -124,6 +124,7 @@ class Aligner:
         self.filters["overlap"] = lambda als: self.filterOverlaps(als)
         self.filters["dotplot"] = lambda als: self.filterLocal(als)
         self.filters["local"] = lambda als: als
+        self.filters["ava-pb"] = lambda als: als
         self.filters["reference"] = lambda als: als
 
     def alignReadCollection(self, reads_collection, contigs):
@@ -187,6 +188,13 @@ class Aligner:
     #         res.fillFromSam(self.align(res, [contig]), contigs_collection)
     #     return res
 
+    def pairwiseAlign(self, reads):
+        # type: (Iterable[Contig]) -> Generator[AlignmentPiece]
+        reads = list(reads)
+        contigs = ContigStorage(reads)
+        for al in self.alignAndFilter(reads, contigs, "ava-pb"):
+            yield al
+
     def align_files(self, reference_file, reads_files, threads, platform, mode, out_alignment):
         out_file = out_alignment + "_initial"
         cmdline = [params.MINIMAP_BIN, reference_file]
@@ -199,6 +207,8 @@ class Aligner:
         elif mode in ["overlap", "local"]:
             cmdline.append("-p0.1")
             cmdline.append("-DP")
+        if mode == "ava-pb":
+            cmdline.extend(["-x", "ava-pb"])
         if mode == "reference":
             cmdline.extend(["-x", "asm5"])
         else:
@@ -260,6 +270,8 @@ class Aligner:
                 if mode == "dotplot":
                     als.extend(tmp.splitRef())
                 elif (mode == "local"):
+                    als.extend(tmp.splitRead())
+                elif (mode == "ava-pb"):
                     als.extend(tmp.splitRead())
                 else:
                     als.append(tmp)
