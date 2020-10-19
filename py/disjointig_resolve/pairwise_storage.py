@@ -2,7 +2,7 @@ import sys
 from typing import Dict, List, Generator
 
 from alignment.align_tools import Aligner
-from common import params
+from common import params, basic
 from common.alignment_storage import AlignmentPiece, ReadCollection
 from common.sequences import Segment, Contig, ContigStorage
 from disjointig_resolve.accurate_line import NewLine
@@ -22,18 +22,20 @@ class PairwiseStorage:
         # type: (Segment, Segment) -> None
         if seg_from.contig.id not in self.storage:
             self.storage[seg_from.contig.id] = [PseudoAlignment(seg_from, seg_to)]
+            self.storage[basic.Reverse(seg_from.contig.id)] = [PseudoAlignment(seg_from.RC(), seg_to.RC())]
         else:
             self.storage[seg_from.contig.id].append(PseudoAlignment(seg_from, seg_to))
+            self.storage[basic.Reverse(seg_from.contig.id)].append(PseudoAlignment(seg_from.RC(), seg_to.RC()))
         # if al.seg_to.contig.id not in self.storage:
         #     self.storage[al.seg_to.contig.id] = [PseudoAlignment(al.seg_to, al.seg_from)]
         # else:
         #     self.storage[al.seg_from.contig.id].append(PseudoAlignment(al.seg_to, al.seg_from))
 
-    def getAlignments(self, contig, min_overlap):
-        # type: (Contig, int) -> Generator[Contig]
-        if contig.id not in self.storage:
+    def getAlignments(self, contigid, min_overlap):
+        # type: (str, int) -> Generator[Contig]
+        if id not in self.storage:
             return
-        for al in self.storage[contig.id]:
+        for al in self.storage[id]:
             yield al.seg_from.contig
 
 class PairwiseReadRecruiter:
@@ -53,12 +55,13 @@ class PairwiseReadRecruiter:
         reads = ContigStorage()
         for base_read_al in line.read_alignments.allInter(seg, min_overlap):
             sys.stdout.write("Base " + str(base_read_al))
-            for read in self.als.getAlignments(base_read_al.seg_from.contig, params.k):
+            for read in self.als.getAlignments(base_read_al.seg_from.contig.id, params.k):
                 reads.add(read)
                 sys.stdout.write(" " + read.id)
             sys.stdout.write("\n")
         for al in self.aligner.localAlign(reads, ContigStorage([seg.contig])):
             if al.seg_to.interSize(seg) > min_overlap and al.__len__() > params.k:
+                print "Relevant read", al
                 yield al
         sys.stdout.trace("Request for read alignments for", seg, "finished")
 
