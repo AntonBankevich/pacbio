@@ -313,5 +313,5 @@ def constructDisjointigs(reads, total_length, dir):
     log_file = os.path.join(dir, "log.txt")
     reads.print_fasta(open(reads_file, "w"))
     subprocess.check_call([os.path.join(params.bin_path, "flye-modules"), "assemble", "--reads", reads_file, "--out-asm", disjointigs_file, "--genome-size", str(total_length),
-                           "--config", "flye/config/bin_cfg/asm_raw_reads.cfg", "--min-ovlp", "1500", "--threads", str(params.threads), "--log", log_file])
+                           "--meta", "--config", "flye/config/bin_cfg/asm_raw_reads.cfg", "--min-ovlp", "1500", "--threads", str(params.threads), "--log", log_file])
     return disjointigs_file
