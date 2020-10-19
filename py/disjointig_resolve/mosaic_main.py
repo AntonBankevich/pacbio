@@ -95,7 +95,7 @@ def assemble(args, bin_path):
             reads.print_fasta(open(reads_file, "w"))
             subprocess.check_call([os.path.join(params.bin_path, "flye"), "--meta", "-o", assembly_dir, "-t", str(cl_params.threads), "--" + params.technology + "-raw", reads_file, "--genome-size", str(cl_params.genome_size), "--min-overlap", str(params.k)])
             cl_params.set_flye_dir(assembly_dir, cl_params.mode)
-        elif len(cl_params.disjointigs_file_list) == 0:
+        elif len(cl_params.disjointigs_file_list) == 0 and not cl_params.precruiting:
             assembly_dir = os.path.join(cl_params.dir, "assembly_initial")
             reads_file = os.path.join(cl_params.dir, "actual_reads.fasta")
             reads.print_fasta(open(reads_file, "w"))
@@ -104,9 +104,12 @@ def assemble(args, bin_path):
             cl_params.disjointigs_file_list.append(disjointigs_file)
             params.min_contra_for_break = 8
 
-        disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
+        if cl_params.precruiting:
+            disjointigs = None
+        else:
+            disjointigs = CreateDisjointigCollection(cl_params.disjointigs_file_list, cl_params.dir, aligner, reads)
 
-        if cl_params.debug:
+        if cl_params.debug and not cl_params.precruiting:
             df = open(os.path.join(cl_params.dir, "disjonting_als.txt"), "w")
             for disjointig in disjointigs:
                 df.write(disjointig.id + "\n")
