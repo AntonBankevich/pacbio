@@ -116,7 +116,7 @@ class Params:
                 params.k = int(value)
                 params.l = max(params.l, params.k + 100)
                 self.autoKL = False
-            elif key == "-mink":
+            elif key == "--mink":
                 self.mink = int(value)
             elif key == "-l":
                 params.l = int(value)
