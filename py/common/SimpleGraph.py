@@ -46,8 +46,8 @@ class SimpleGraph:
         return thisv.inc.__len__() + thisv.out.__len__() != otherv.inc.__len__() + otherv.out.__len__()
 
     def isHub(self, vid):
-        thisv = self.v[vid]
-        return thisv.inc.__len__() + thisv.out.__len__() > 50
+        otherv = self.g.v[vid]
+        return otherv.inc.__len__() + otherv.out.__len__() > 50
 
     def AddVertex(self, vid, label = ""):
         if vid not in self.v:
