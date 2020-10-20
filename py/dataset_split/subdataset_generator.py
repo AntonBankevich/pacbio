@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 
 
@@ -99,6 +100,7 @@ class ComponentRecord:
         f.write("Cov " + str(self.cov) + "\n size " + str(self.component.e.__len__()) + "\n")
         f.write("Zero " + str(self.zero) + "\n bad_border " + str(self.bad_border) + "\n hubs " + str(self.red) + "\n")
         f.write("Unresolved " + str(self.unresolved_connections) + "\n Resolved " + str(self.resolved_connections) + "\n")
+        f.write("Score " + str(self.score()) + "\n")
         f.close()
 
     def printReads(self, fname):
@@ -135,7 +137,7 @@ class ComponentRecord:
     def draw(self, fname, calculator):
         f = open(fname, "w")
         coloring = lambda v: "white" if not self.component.isBorder(v.id) else \
-            ("yellow" if len(self.component.v[v.id].inc) + len(self.component.v[v.id].out) < 50 else "red")
+            ("yellow" if len(self.component.g.v[v.id].inc) + len(self.component.g.v[v.id].out) < 50 else "red")
         self.component.Print(f, coloring, calculator.edgeColoring(self.cov))
         f.close()
 
@@ -239,6 +241,9 @@ def FillFlyeNext(componentRecords, log_file):
 def main(flye_dir, output_dir, diploid):
     basic.ensure_dir_existance(output_dir)
     CreateLog(output_dir)
+    print("Version:", subprocess.check_output(["git", "rev-parse", "HEAD"]))
+    print("Modifications:")
+    print subprocess.check_output(["git", "diff"])
     graph_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.gv")
     edge_file = os.path.join(flye_dir, "20-repeat", "graph_before_rr.fasta")
     dump_file = os.path.join(flye_dir, "20-repeat", "read_alignment_dump")
@@ -313,13 +318,14 @@ def main(flye_dir, output_dir, diploid):
     table_file = os.path.join(output_dir, "table.txt")
     print "Printing table to file", table_file
     f = open(table_file, "w")
-    f.write("Id v e unique inc out repeats unresolved resolved outside zero hub badborder\n")
+    f.write("Id v e unique inc out repeats unresolved resolved outside zero hub badborder score\n")
     for i, compRec in enumerate(componentRecords):
         comp = compRec.component
         f.write(" ".join([str(i), str(comp.v.__len__()), str(comp.e.__len__()), str(compRec.unique.__len__() * 2),
                           str(compRec.inc), str(compRec.out), str(compRec.repeat_edges),
                           str(compRec.unresolved_connections), str(compRec.resolved_connections.__len__()),
-                          str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]) + "\n")
+                          str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]) +
+                          str(compRec.score()) + "\n")
     f.close()
     table_file = os.path.join(output_dir, "list.txt")
     f = open(table_file, "w")
