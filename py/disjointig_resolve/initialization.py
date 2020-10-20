@@ -101,10 +101,15 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polis
         assert contig.id == id
         line = lines.addNew(contig.seq, contig.id)
         read_ids = f.readTokens()
+        als = []
         for al in aligner.overlapAlign([reads[rid] for rid in read_ids], ContigStorage([line])):
             if len(al.seg_to) >= min(params.k, len(line) - 100):
-                tmp_line = al.seg_to.contig # type: NewLine
-                tmp_line.addReadAlignment(al)
+                als.append(al)
+        als = sorted(als, key = lambda al: (al.seg_from.contig.id, -int(al.percentIdentity() * 100), -len(al)))
+        for read_als in itertools.groupby(als, key=lambda al: al.seg_from.contig.id)
+            al = list(read_als)[0]
+            tmp_line = al.seg_to.contig # type: NewLine
+            tmp_line.addReadAlignment(al)
         if len(line) < params.k + 200:
             new_contig, new_als = polisher.polishEnd(list(line.read_alignments), max_extension=params.k + 100 - len(line))
             line.extendRight(new_contig.suffix(pos=len(line)).Seq(), new_als)
