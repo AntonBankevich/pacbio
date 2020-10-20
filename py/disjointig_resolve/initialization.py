@@ -20,8 +20,8 @@ from disjointig_resolve.dot_plot import LineDotPlot
 from disjointig_resolve.line_storage import NewLineStorage
 from disjointig_resolve.unique_marker import UniqueMarker
 
-def adjustKL(aligner, reads, contigs):
-    # type: (Aligner, ReadCollection, ContigStorage) -> None
+def adjustKL(aligner, reads, contigs, min_k):
+    # type: (Aligner, ReadCollection, ContigStorage, int) -> None
     analyser = CoverageAnalyser(aligner, reads)
     sys.stdout.info("Analysing k-mer coverage by reads.")
     analyser.analyseSegmentCoverage(contigs)
@@ -32,12 +32,14 @@ def adjustKL(aligner, reads, contigs):
     newK = min(newK, newL - 300)
     newL = min(newL, newK + 1000)
     sys.stdout.info("Adjusted k and l:", newK, newL)
-    if newK > params.k:
+    if newK > min_k:
         sys.stdout.info("k and l adjusted")
         params.k = newK
         params.l = newL
     else:
-        sys.stdout.info("k and l not adjusted since k is too small. Returning to default values")
+        params.k = min_k
+        params.l = min_k + 1000
+        sys.stdout.info("k and l not adjusted since k is too small. Setting k to minimal value ", min_k)
 
 
 def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
@@ -106,7 +108,7 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polis
             if len(al.seg_to) >= min(params.k, len(line) - 100):
                 als.append(al)
         als = sorted(als, key = lambda al: (al.seg_from.contig.id, -int(al.percentIdentity() * 100), -len(al)))
-        for read_als in itertools.groupby(als, key=lambda al: al.seg_from.contig.id):
+        for key, read_als in itertools.groupby(als, key=lambda al: al.seg_from.contig.id):
             al = list(read_als)[0]
             tmp_line = al.seg_to.contig # type: NewLine
             tmp_line.addReadAlignment(al)

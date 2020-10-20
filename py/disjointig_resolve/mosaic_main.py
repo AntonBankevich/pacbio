@@ -121,7 +121,7 @@ def assemble(args, bin_path):
         contigs = CreateContigCollection(cl_params.graph_file, cl_params.contigs_file, cl_params.min_cov, aligner, polisher, reads, cl_params.force_unique, all_unique)
 
         if cl_params.autoKL:
-            adjustKL(aligner, reads, contigs)
+            adjustKL(aligner, reads, contigs, cl_params.mink)
 
         if cl_params.init_file is None:
             ExtendShortContigs(contigs, reads, aligner, polisher, cl_params.read_dump)

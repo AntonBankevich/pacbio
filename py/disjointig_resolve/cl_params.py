@@ -22,7 +22,7 @@ class Params:
         self.threads = 8
         self.test = False
         self.init_file = None
-        self.long_params = "precruiting check-alignments reliable-coverage= test debug nostrict stats genome-size= force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= split flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
+        self.long_params = "mink precruiting check-alignments reliable-coverage= test debug nostrict stats genome-size= force-unique= init-file= size= mode= nano cut-reads= homo-score= clean min-cov= split flye-dir= graph= focus= nofocus downsample= output-dir= reads= contigs= disjointigs= load= help".split(" ")
         self.short_params = "o:t:hk:l:"
         self.min_cov = 0
         self.stats = False
@@ -38,6 +38,7 @@ class Params:
         self.genome_size = None
         self.debug = False
         self.precruiting = False
+        self.mink = 1500
 
     def check(self):
         if self.dir is None:
@@ -115,6 +116,8 @@ class Params:
                 params.k = int(value)
                 params.l = max(params.l, params.k + 100)
                 self.autoKL = False
+            elif key == "-mink":
+                self.mink = int(value)
             elif key == "-l":
                 params.l = int(value)
                 self.autoKL = False
