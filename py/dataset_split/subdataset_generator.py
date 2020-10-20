@@ -30,6 +30,7 @@ class ComponentRecord:
         self.resolved_connections = []
         self.outside_connections = 0
         self.repeat_edges = 0
+        self.overcovered_edges = 0
 
     def half(self):
         res = set()
@@ -63,6 +64,8 @@ class ComponentRecord:
             score += 100000
         if self.repeat_edges == 0:
             score += 1000
+        if self.overcovered_edges > 0:
+            score += 1000
         score += self.component.e.__len__() + self.component.v.__len__()
         return score
 
@@ -94,13 +97,15 @@ class ComponentRecord:
                 self.bad_border += 1
             if e.cov == 0:
                 self.zero += 1
+            if self.cov > 0 and e.cov > 20 * self.cov:
+                self.overcovered_edges += 1
 
     def printStats(self, fname):
         f = open(fname, "w")
-        f.write("Cov " + str(self.cov) + "\n size " + str(self.component.e.__len__()) + "\n")
-        f.write("Zero " + str(self.zero) + "\n bad_border " + str(self.bad_border) + "\n hubs " + str(self.red) + "\n")
-        f.write("Unresolved " + str(self.unresolved_connections) + "\n Resolved " + str(self.resolved_connections) + "\n")
-        f.write("Score " + str(self.score()) + "\n")
+        f.write("Cov " + str(self.cov) + "\nsize " + str(self.component.e.__len__()) + "\n")
+        f.write("Zero " + str(self.zero) + "\nbad_border " + str(self.bad_border) + "\nhubs " + str(self.red) + "\n")
+        f.write("Unresolved " + str(self.unresolved_connections) + "\nResolved " + str(self.resolved_connections) + "\n")
+        f.write("Overcovered " + str(self.overcovered_edges) + "\nScore " + str(self.score()) + "\n")
         f.close()
 
     def printReads(self, fname):
@@ -324,8 +329,8 @@ def main(flye_dir, output_dir, diploid):
         f.write(" ".join([str(i), str(comp.v.__len__()), str(comp.e.__len__()), str(compRec.unique.__len__() * 2),
                           str(compRec.inc), str(compRec.out), str(compRec.repeat_edges),
                           str(compRec.unresolved_connections), str(compRec.resolved_connections.__len__()),
-                          str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border)]) +
-                          str(compRec.score()) + "\n")
+                          str(compRec.outside_connections), str(compRec.zero), str(compRec.red), str(compRec.bad_border),
+                          str(compRec.overcovered_edges), str(compRec.score())]) + "\n")
     f.close()
     table_file = os.path.join(output_dir, "list.txt")
     f = open(table_file, "w")
