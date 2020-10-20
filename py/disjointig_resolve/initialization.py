@@ -106,7 +106,7 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polis
             if len(al.seg_to) >= min(params.k, len(line) - 100):
                 als.append(al)
         als = sorted(als, key = lambda al: (al.seg_from.contig.id, -int(al.percentIdentity() * 100), -len(al)))
-        for read_als in itertools.groupby(als, key=lambda al: al.seg_from.contig.id)
+        for read_als in itertools.groupby(als, key=lambda al: al.seg_from.contig.id):
             al = list(read_als)[0]
             tmp_line = al.seg_to.contig # type: NewLine
             tmp_line.addReadAlignment(al)
