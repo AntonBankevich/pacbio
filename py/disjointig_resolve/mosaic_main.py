@@ -134,7 +134,7 @@ def assemble(args, bin_path):
         dot_plot.construct(aligner)
         # dot_plot.printAll(sys.stdout)
         if cl_params.precruiting:
-            recruiter = PairwiseReadRecruiter(aligner, reads)
+            recruiter = PairwiseReadRecruiter(aligner, reads, lines)
         else:
             recruiter = None
 

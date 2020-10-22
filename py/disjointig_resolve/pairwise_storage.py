@@ -6,6 +6,7 @@ from common import params, basic
 from common.alignment_storage import AlignmentPiece, ReadCollection
 from common.sequences import Segment, Contig, ContigStorage
 from disjointig_resolve.accurate_line import NewLine
+from disjointig_resolve.line_storage import NewLineStorage
 
 
 class PseudoAlignment:
@@ -39,14 +40,24 @@ class PairwiseStorage:
             yield al.seg_from.contig
 
 class PairwiseReadRecruiter:
-    def __init__(self, aligner, reads):
-        # type: (Aligner, ReadCollection) -> None
+    def __init__(self, aligner, reads, lines):
+        # type: (Aligner, ReadCollection, NewLineStorage) -> None
+        sys.stdout.info("Preparing read overlaps for", len(reads), "reads")
         self.aligner = aligner
         self.reads = reads
+        read_set = set()
+        for line in lines:
+            for al in line.read_alignments:
+                seg = al.seg_to.expand(params.k)
+                if line.completely_resolved.interSize(seg) == len(seg):
+                    read_set.add(al.seg_from.contig.id)
+        sys.stdout.info(len(read_set) / 2, "reads filtered out")
+        reads = [read for read in reads if read.id not in read_set]
         self.als = PairwiseStorage()
         for al in self.aligner.pairwiseAlign(reads):
             if al.__len__() > params.k:
                 self.als.addAlignment(al.seg_from, al.seg_to)
+        sys.stdout.info("Finished read overlap collection")
 
     def getRelevantAlignments(self, seg, min_overlap):
         # type: (Segment, int) -> Generator[AlignmentPiece]
