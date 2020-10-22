@@ -109,18 +109,21 @@ def LoadLineCollection(dir, lc_file, aligner, contigs, disjointigs, reads, polis
             sys.stdout.warn("No read alignments in initialization for line", line.id, "Realigning all reads")
             line_reads = reads
         for al in aligner.overlapAlign(line_reads, ContigStorage([line])):
-            if len(al.seg_to) >= min(params.k, len(line) - 100):
+            if len(al.seg_to) >= min(1500, len(line) - 100):
                 als.append(al)
         als = sorted(als, key = lambda al: (al.seg_from.contig.id, -int(al.percentIdentity() * 100), -len(al)))
         for key, read_als in itertools.groupby(als, key=lambda al: al.seg_from.contig.id):
             al = list(read_als)[0]
             tmp_line = al.seg_to.contig # type: NewLine
             tmp_line.addReadAlignment(al)
+        correct_seg = line.asSegment().shrink(100)
         if len(line) < params.k + 200:
             new_contig, new_als = polisher.polishEnd(list(line.read_alignments), max_extension=params.k + 100 - len(line))
             line.extendRight(new_contig.suffix(pos=len(line)).Seq(), new_als)
-        line.correct_segments.add(line.asSegment().shrink(100))
-        line.completely_resolved.add(line.asSegment().shrink(100))
+            if len(correct_seg) < params.k:
+                correct_seg = correct_seg.expandRight(params.k - len(correct_seg))
+        line.correct_segments.add(correct_seg)
+        line.completely_resolved.add(correct_seg)
         line.initial.add(AlignmentPiece.Identical(line.asSegment().asContig().asSegment(), line.asSegment()))
     sys.stdout.trace("Final list of lines:")
     for line in lines.unique():
