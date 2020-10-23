@@ -204,7 +204,7 @@ class SegmentStorage(SmartStorage):
         if self.isCanonical():
             for seg1 in self.items:
                 res = max(res, seg1.interSize(seg))
-            return False
+            return res
         else:
             return self.rc.interSize(seg.RC())
 
