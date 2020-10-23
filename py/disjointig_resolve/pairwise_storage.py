@@ -47,7 +47,9 @@ class PairwiseReadRecruiter:
         self.reads = reads
         read_set = set()
         for line in lines:
+            sys.stdout.trace(line.completely_resolved)
             for al in line.read_alignments:
+                sys.stdout.trace(al, line.completely_resolved.interSize(seg))
                 seg = al.seg_to.expand(params.k)
                 if line.completely_resolved.interSize(seg) == len(seg):
                     read_set.add(al.seg_from.contig.id)
