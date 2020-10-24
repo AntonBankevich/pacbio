@@ -151,8 +151,8 @@ class UniqueMarker:
             line = lines[line_id]
             s = AlignmentStorage()
             s.addAll(al for al in line.read_alignments if not al.contradictingRTC())
-            segs = list(s.filterByCoverage(mi=params.reliable_coverage, ma=median * 3 /2, k=params.k)) # type: List[Segment]
-            segs = filter(lambda seg: len(seg) >= params.k, segs)
+            segs = SegmentStorage().addAll(s.filterByCoverage(mi=params.reliable_coverage, ma=median * 7 /4, k=params.k))
+            segs.mergeSegments(max(params.k - params.bad_end_length * 2, params.k / 2))
             if len(segs) == 0:
                 sys.stdout.warn("No part of a unique edge is covered by reads", line.id)
                 lines.removeLine(line)
