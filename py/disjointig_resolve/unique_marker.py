@@ -113,6 +113,7 @@ class UniqueMarker:
         # type: (NewLineStorage, Iterable[AlignedRead]) -> None
         sys.stdout.info("Aligning reads to contigs")
         for al in self.aligner.localAlign(reads, lines):
+            print "Addeding initial alignment", len(al.seg_to), params.k, al
             if len(al.seg_to) >= params.k:
                 line = al.seg_to.contig # type: NewLine
                 line.addReadAlignment(al)
@@ -136,7 +137,7 @@ class UniqueMarker:
         for seg, cov in sorted(covs, key=lambda cov: cov[1]):
             clen += len(seg)
             if clen * 2 >= total:
-                return median_cov
+                return cov
 
     def splitBad(self, lines):
         # type: (NewLineStorage) -> None
@@ -146,7 +147,9 @@ class UniqueMarker:
                 all_covs.append(rec)
         median = self.medianCoverage(all_covs)
         sys.stdout.info("Median coverage determined as", median)
-        for line in lines:
+        lids = [line.id for line in lines.unique()]
+        for line_id in lids:
+            line = lines[line_id]
             s = AlignmentStorage()
             s.addAll(al for al in line.read_alignments if not al.contradictingRTC())
             segs = list(s.filterByCoverage(mi=params.reliable_coverage, ma=median * 3 /2, k=params.k)) # type: List[Segment]
@@ -154,7 +157,7 @@ class UniqueMarker:
             if len(segs) == 0:
                 sys.stdout.warn("No part of a unique edge is covered by reads", line.id)
                 lines.removeLine(line)
-                return
+                continue
             if len(segs) == 1 and len(segs[0]) > len(line) - 10:
                 sys.stdout.info("Whole line", line.id, "is covered by reads")
                 return
