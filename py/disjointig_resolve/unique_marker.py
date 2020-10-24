@@ -113,7 +113,6 @@ class UniqueMarker:
         # type: (NewLineStorage, Iterable[AlignedRead]) -> None
         sys.stdout.info("Aligning reads to contigs")
         for al in self.aligner.localAlign(reads, lines):
-            print "Addeding initial alignment", len(al.seg_to), params.k, al
             if len(al.seg_to) >= params.k:
                 line = al.seg_to.contig # type: NewLine
                 line.addReadAlignment(al)
