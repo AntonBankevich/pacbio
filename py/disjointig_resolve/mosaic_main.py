@@ -135,6 +135,10 @@ def assemble(args, bin_path):
         # dot_plot.printAll(sys.stdout)
         if cl_params.precruiting:
             recruiter = PairwiseReadRecruiter(aligner, reads, lines)
+            if params.debug:
+                rec_dump = open(os.path.join(dir, "pairwise.info"), "w")
+                recruiter.als.dump(rec_dump)
+                rec_dump.close()
         else:
             recruiter = None
 

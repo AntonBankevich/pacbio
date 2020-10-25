@@ -15,6 +15,9 @@ class PseudoAlignment:
         self.seg_from = seg_from
         self.seg_to = seg_to
 
+    def __str__(self):
+        return str(self.seg_from) + "->" + str(self.seg_to)
+
 class PairwiseStorage:
     def __init__(self):
         self.storage = dict() #type: Dict[str, List[PseudoAlignment]]
@@ -38,6 +41,11 @@ class PairwiseStorage:
             return
         for al in self.storage[contigid]:
             yield al.seg_from.contig
+
+    def dump(self, f):
+        for key in self.storage:
+            for al in self.storage[key]:
+                f.write(str(al) + "\n")
 
 class PairwiseReadRecruiter:
     def __init__(self, aligner, reads, lines):
