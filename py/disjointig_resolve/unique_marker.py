@@ -159,7 +159,7 @@ class UniqueMarker:
                 continue
             if len(segs) == 1 and len(segs[0]) > len(line) - 10:
                 sys.stdout.info("Whole line", line.id, "is covered by reads")
-                return
+                continue
             sys.stdout.info( "Line", line.id, "has poorly covered regions. Splitting into", len(segs), "parts")
             sys.stdout.trace(segs)
             next_left = segs[-1].left

@@ -77,6 +77,7 @@ class LineExtender:
     # input: a collection of segments that had reads recruited to.
     def updateAllStructures(self, interesting_segments):
         # type: (Iterable[Segment]) -> None
+        interesting_segments = list(interesting_segments)
         sys.stdout.trace("Updating structures:", interesting_segments)
         # Correct contig sequences, update correct segment storages. Return segments that were corrected.
         corrected = self.correctSequences(interesting_segments)
