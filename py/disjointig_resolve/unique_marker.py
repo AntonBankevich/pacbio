@@ -44,27 +44,27 @@ class UniqueMarker:
         res.append((line.segment(left, prev), cur))
         return res
 
-    def markUniqueInLine(self, line):
-        # type: (NewLine) -> None
+    def markUniqueInLine(self, line, alter_cov):
+        # type: (NewLine, float) -> None
         sys.stdout.info("Finding unique in", line)
         alignments = list(line.read_alignments) # type: List[AlignmentPiece]
         alignments = sorted(alignments, key=lambda al:al.seg_to.left)
         sys.stdout.trace("Sorting finished")
         inc = self.link(line, [al.seg_to.left for al in alignments if
                                al.seg_from.left > 1000 and al.seg_to.left > 50 and al.percentIdentity() > 0.85], 20)
-        inc.append((line.segment(len(line) - 1, len(line)), params.min_k_mer_cov))
+        inc.append((line.segment(len(line) - 1, len(line)), alter_cov))
         alignments = sorted(alignments, key=lambda al:al.seg_to.right)
         out = self.link(line, [al.seg_to.right for al in alignments if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50 ], 20)
         sys.stdout.trace("Linking finished")
-        out.insert(0, (line.segment(0, 1), params.min_k_mer_cov))
+        out.insert(0, (line.segment(0, 1), alter_cov))
         sys.stdout.trace( "inc:", inc)
         sys.stdout.trace( "out:", out)
         events = []
         for seg, val in inc:
-            if val >= params.min_k_mer_cov:
+            if val >= alter_cov:
                 events.append((seg.left, -1))
         for seg, val in out:
-            if val >= params.min_k_mer_cov:
+            if val >= alter_cov:
                 events.append((seg.right, 1))
         events= sorted(events)
         sys.stdout.trace("Events collected and sorted", len(events))
@@ -117,15 +117,21 @@ class UniqueMarker:
     def markAllUnique(self, lines, reads):
         # type: (NewLineStorage, Iterable[AlignedRead]) -> None
         sys.stdout.info("Aligning reads to contigs")
+        total_al_size = 0
         for al in self.aligner.localAlign(reads, lines):
             if len(al.seg_to) >= params.k:
                 line = al.seg_to.contig # type: NewLine
                 line.addReadAlignment(al)
+                if (len(al.seg_to) > params.k + params.bad_end_length):
+                    total_al_size += len(al.seg_to) - params.k - params.bad_end_length
+        total_line_size = sum([len(line) for line in lines.unique()])
+        alter_cov = max(float(total_al_size) / total_line_size / 2, params.min_k_mer_cov)
+        sys.stdout.info("Average coverage for alternative k-mers calculated as ", alter_cov)
         sys.stdout.info("Removing bad regions from lines")
         self.splitBad(lines)
         sys.stdout.info("Marking unique regions in lines")
         for line in lines.unique():
-            self.markUniqueInLine(line)
+            self.markUniqueInLine(line, alter_cov)
         for line in list(lines.unique()):  # type:NewLine
             if len(line.completely_resolved) == 0:
                 lines.remove(line)
