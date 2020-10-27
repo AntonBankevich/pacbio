@@ -74,10 +74,9 @@ def CreateLineCollection(dir, aligner, contigs, disjointigs, reads, split):
             else:
                 if line.completely_resolved[-1].right + params.k * 2 < len(line):
                     sys.stdout.trace("Cut line on the right because too long unresolved segment:", line, str(line.completely_resolved))
-                    line.cutRight(line.initial[-1].seg_to.right + params.k)
+                    line.cutRight(line.completely_resolved[-1].right + params.k)
                 if line.completely_resolved[0].left > params.k * 2:
                     sys.stdout.trace("Cut line of the left because too long unresolved segment:", line, str(line.completely_resolved))
-                    line.rc.cutRight(len(line) - line.initial[0].seg_to.left + params.k)
                 if len(line.completely_resolved[0]) > 40000:
                     sys.stdout.trace("Splitted line because it is too long", str(line.completely_resolved))
                     line12, line3 = lines.splitLine(line.completely_resolved[0].suffix(length=max(10000, params.k + params.bad_end_length)).prefix(length=1000))

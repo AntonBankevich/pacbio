@@ -104,6 +104,9 @@ class UniqueMarker:
                 else:
                     sys.stdout.trace( "Recruited read:", al)
                     line.addReadAlignment(al)
+            else:
+                sys.stdout.trace("Alignment out of resolved:", al)
+
         sys.stdout.trace("Read recruitment results. All:", all, "In resolved regions:", inter,
                          "Contradicting:", float(contradicting) / inter, "Bad quality", float(bad_quality) / inter)
         line.updateCorrectSegments(line.asSegment())
