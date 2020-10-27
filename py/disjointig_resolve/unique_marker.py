@@ -50,7 +50,8 @@ class UniqueMarker:
         alignments = list(line.read_alignments) # type: List[AlignmentPiece]
         alignments = sorted(alignments, key=lambda al:al.seg_to.left)
         sys.stdout.trace("Sorting finished")
-        inc = self.link(line, [al.seg_to.left for al in alignments if al.seg_from.left > 1000 and al.seg_to.left > 50], 20)
+        inc = self.link(line, [al.seg_to.left for al in alignments if
+                               al.seg_from.left > 1000 and al.seg_to.left > 50 and al.percentIdentity() > 0.85], 20)
         inc.append((line.segment(len(line) - 1, len(line)), params.min_k_mer_cov))
         alignments = sorted(alignments, key=lambda al:al.seg_to.right)
         out = self.link(line, [al.seg_to.right for al in alignments if al.rc.seg_from.left > 1000 and al.rc.seg_to.left > 50 ], 20)
