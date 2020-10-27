@@ -101,6 +101,7 @@ class UniqueMarker:
                     bad_quality += 1
                     sys.stdout.trace( "Read with bad alignment quality:", al)
                 else:
+                    sys.stdout.trace( "Recruited read:", al)
                     line.addReadAlignment(al)
         sys.stdout.trace("Read recruitment results. All:", all, "In resolved regions:", inter,
                          "Contradicting:", float(contradicting) / inter, "Bad quality", float(bad_quality) / inter)
