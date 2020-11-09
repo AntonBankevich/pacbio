@@ -59,10 +59,15 @@ class PairwiseReadRecruiter:
             for al in line.read_alignments:
                 seg = al.seg_to.expand(params.k)
                 sys.stdout.trace(al, line.completely_resolved.interSize(seg))
-                if line.completely_resolved.interSize(seg) == len(seg):
+                if line.completely_resolved.interSize(seg) == len(seg) and \
+                        al.seg_from.left < params.bad_end_length and \
+                        al.rc.seg_from.left < params.bad_end_length and \
+                        al.seg_to.left > params.k and \
+                        al.rc.seg_to.left > params.k:
                     read_set.add(al.seg_from.contig.id)
         sys.stdout.info(len(read_set) / 2, "reads filtered out")
         reads = [read for read in reads if read.id not in read_set]
+        sys.stdout.info(len(reads) / 2, "reads left for pairwise alignment")
         self.als = PairwiseStorage()
         for al in self.aligner.pairwiseAlign(reads):
             if al.__len__() > params.k:
@@ -74,13 +79,16 @@ class PairwiseReadRecruiter:
         sys.stdout.trace("Requesting read alignments for", seg, " using palignments")
         line = seg.contig #type: NewLine
         reads = ContigStorage()
+        print "Using reads ", line.read_alignments.allInter(seg, min_overlap)
         for base_read_al in line.read_alignments.allInter(seg, min_overlap):
             for read in self.als.getAlignments(base_read_al.seg_from.contig.id, params.k):
                 reads.add(read)
+        cnt = 0
         for al in self.aligner.localAlign(reads, ContigStorage([seg.contig])):
             if al.seg_to.interSize(seg) > min_overlap and al.__len__() > params.k:
                 yield al
-        sys.stdout.trace("Request for read alignments for", seg, "finished")
+                cnt += 1
+        sys.stdout.trace("Request for read alignments for", seg, "yielded", cnt, "alignments")
 
 
 
