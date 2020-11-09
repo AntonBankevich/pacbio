@@ -79,8 +79,9 @@ class PairwiseReadRecruiter:
         sys.stdout.trace("Requesting read alignments for", seg, " using palignments")
         line = seg.contig #type: NewLine
         reads = ContigStorage()
-        print "Using reads ", line.read_alignments.allInter(seg, min_overlap)
-        for base_read_al in line.read_alignments.allInter(seg, min_overlap):
+        relevant_reads = line.read_alignments.allInter(seg, min_overlap)
+        sys.stdout.trace("Using reads ", relevant_reads)
+        for base_read_al in relevant_reads:
             for read in self.als.getAlignments(base_read_al.seg_from.contig.id, params.k):
                 reads.add(read)
         cnt = 0
