@@ -209,14 +209,14 @@ def CreateContigCollection(graph_file, contigs_file, min_cov, aligner, polisher,
                 if edge.unique and (edge.len > params.min_isolated_length or len(graph.v[edge.end].out) > 0 or len(graph.v[edge.start].inc) > 0):
                     if edge.cov >= min_cov and (edge.cov < 1.5 * avg_cov or edge.len > 40000):
                         if edge.id in nonunique:
-                            sys.stdout.info("Edge removed based on alignment to alternative:", edge.id, edge.cov, edge.len)
+                            sys.stdout.info("Edge", edge.id, "removed based on alignment to alternative:", edge.len, "(", edge.cov, ")")
                         else:
                             contigs.add(Contig(edge.seq, edge.id))
                     else:
-                        sys.stdout.info("Edge removed based on coverage:", edge.id, edge.cov, edge.len)
+                        sys.stdout.info("Edge", edge.id, "removed based on coverage:", edge.len, "(", edge.cov, ")")
                 elif (edge.len > 100000 and edge.cov < 1.5 * avg_cov) or (edge.len > 40000 and 1.3 * avg_cov > edge.cov > 0.7 * avg_cov):
                     contigs.add(Contig(edge.seq, edge.id))
-                    sys.stdout.info("Edge added based on length and coverage:", edge.id, edge.cov, edge.len)
+                    sys.stdout.info("Edge", edge.id, "added based on length and coverage:", edge.len, "(", edge.cov, ")")
 
     elif force_unique is not None:
         sys.stdout.info("Using forced unique edge set")

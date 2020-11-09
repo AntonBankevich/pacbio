@@ -43,6 +43,31 @@ class AlignmentPiece:
         assert seg_from.contig[seg_from.left] == seg_to.contig[seg_to.left], str(self) + " " + self.seg_from.contig[self.seg_from.left]+ " " + self.seg_to.contig[self.seg_to.left]
         assert seg_from.contig[seg_from.right - 1] == seg_to.contig[seg_to.right - 1], str(self) + " " + self.seg_from.contig[self.seg_from.right - 1]+ " " + self.seg_to.contig[self.seg_to.right - 1]
 
+    def cutIdenticalEnds(self):
+        cigar = list(easy_cigar.CigarToList(self.cigar))
+        left = cigar[0][0]
+        right = cigar[-1][0]
+        assert cigar[0][1] == "M"
+        assert cigar[-1][1] == "M"
+        cut_left = 0
+        cut_right = 0
+        cfrom = self.seg_from.contig
+        cto = self.seg_to.contig
+        while cut_left + 1 < left and cfrom[self.seg_from.left + cut_left] == cto[self.seg_to.left + cut_left]:
+            cut_left += 1
+        if cut_left == len(self.seg_from):
+            return self
+        while cut_right + 1 < right and cfrom[self.seg_from.right - 1 - cut_right] == cto[self.seg_to.right - 1 - cut_right]:
+            cut_right += 1
+        cut_left -= 1
+        cut_right -= 1
+        seg_from = cfrom.segment(self.seg_from.left + cut_left, self.seg_from.right - cut_right)
+        seg_to = cto.segment(self.seg_to.left + cut_left, self.seg_to.right - cut_right)
+        cigar[0] = (cigar[0][0] - cut_left, cigar[0][1])
+        cigar[-1] = (cigar[-1][0] - cut_right, cigar[-1][1])
+        return AlignmentPiece(seg_from, seg_to, "".join([str(a[0]) + a[1] for a in cigar]))
+
+
     @staticmethod
     def FromSamRecord(seq_from, seq_to, rec):
         # type: (Contig, Contig, sam_parser.SAMEntryInfo) -> AlignmentPiece

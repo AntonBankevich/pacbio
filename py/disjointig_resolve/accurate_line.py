@@ -107,6 +107,7 @@ class NewLine(Contig):
         self.id = id # type: str
         self.circular = False
         self.name_printer = None
+        self.max_extension = False
         if rc is None:
             self.initial = AlignmentStorage()
             self.correct_segments = SegmentStorage()
@@ -138,6 +139,7 @@ class NewLine(Contig):
     def addReads(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
         self.read_alignments.addAll(alignments)
+        self.max_extension = False
 
     def getReadAlignmentsTo(self, seg):
         # type: (Segment) -> Iterable[AlignmentPiece]
@@ -216,6 +218,8 @@ class NewLine(Contig):
         self.seq = self.seq + seq
         self.rc.seq = basic.RC(seq) + self.rc.seq
         self.notifyAfterExtendRight(seq, relevant_als)
+        self.updateCorrectSegments(self.asSegment())
+        self.max_extension = True
 
     def notifyBeforeExtendRight(self, new_seq, seq):
         # type: (Contig, str) -> None
@@ -252,14 +256,8 @@ class NewLine(Contig):
     def correctSequence(self, alignments):
         # type: (Iterable[AlignmentPiece]) -> None
         sys.stdout.trace("Line operation Correct:", alignments)
-        alignments = list(alignments)
-        new_alignments = []
-        for al in alignments:
-            if al.seg_from.Seq() == al.seg_to.Seq():
-                sys.stdout.trace("Skipping trivial correction alignment", al)
-            else:
-                new_alignments.append(al)
-        if len(new_alignments) == 0:
+        alignments = [al.cutIdenticalEnds() for al in alignments if al.seg_from.Seq() != al.seg_to.Seq()]
+        if len(alignments) == 0:
             sys.stdout.trace("Skipping trivial correction operation")
             return
         assert len(alignments) > 0
@@ -284,6 +282,7 @@ class NewLine(Contig):
     def addReadAlignment(self, al):
         # type: (AlignmentPiece) -> AlignmentPiece
         self.read_alignments.add(al)
+        self.max_extension = False
         return al
 
     def addListener(self, listener):
@@ -325,6 +324,7 @@ class NewLine(Contig):
         for al in self.read_alignments:
             read = al.seg_from.contig #type: AlignedRead
             read.addAlignment(al)
+        self.max_extension = False
 
     def __str__(self):
         if self.name_printer is not None:
@@ -346,13 +346,6 @@ class NewLine(Contig):
         points = map(str, points)
         return "Line:" + str(self.id) + ":" + "[" + ":".join(points) +"]"
 
-    def removeInter(self, seg):
-        als = self.read_alignments.allInter(seg)
-        for al in als:
-            read = al.seg_from.contig # type: AlignedRead
-            read.alignments.remove(al)
-        self.read_alignments.removeInter(seg)
-
     def setCircular(self):
         self.circular = True
         self.rc.circular = True
@@ -360,6 +353,8 @@ class NewLine(Contig):
     def cleanReadAlignments(self):
         for read in self.read_alignments:
             read.seg_from.contig.removeContig(self)
+        self.read_alignments.clean()
+        self.max_extension = False
 
     def tie(self, other, gap, gap_seq):
         self.knot = Knot(self, other, gap, gap_seq)

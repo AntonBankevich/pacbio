@@ -161,33 +161,6 @@ class Polisher:
                 return al.compose(mapping)
         assert False, "No alignment from polished to base: " + str(als)
 
-    def allEnds(self, als, min_cov = 5):
-        contig = als[0].seg_to.contig
-        res_contigs = []
-        res_als = []
-        undefined = list(als)
-        while True:
-            new_contig, new_als = self.polishEnd(undefined, min_cov, 0)
-            tmp_als = []
-            read_ids = set()
-            for al in new_als:
-                if al.seg_to.right > len(contig) + 500:
-                    tmp_als.append(al)
-                    read_ids.add(al.seg_from.contig.id)
-            if len(tmp_als) == 0:
-                break
-            if len(tmp_als) >= 5:
-                res_contigs.append(new_contig)
-                res_als.append(list(tmp_als))
-            tmp_als = []
-            for al in undefined:
-                if al.seg_from.contig.id not in read_ids:
-                    tmp_als.append(al)
-            undefined = tmp_als
-        for contig, tmp_als in zip(res_contigs, res_als):
-            al = self.polishSmallSegment(contig.asSegment(), tmp_als)
-            yield al.seg_to.contig, [al1.compose(al) for al1 in tmp_als]
-
     def polishEnd(self, als, min_cov = 4, min_cov_frac = 0.8, max_extension = None):
         # type: (List[AlignmentPiece], int, int, int) -> Tuple[Contig, List[AlignmentPiece]]
         if max_extension is None:

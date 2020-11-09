@@ -202,12 +202,12 @@ class LineExtender:
             line.addListener(forward)
             line.rc.addListener(backward)
             sys.stdout.trace( "Polishing:", to_polysh)
-            if to_polysh[-1].RC().left < 200:
+            if (not line.max_extension) and to_polysh[-1].RC().left < 200:
                 l = to_polysh[-1].right
                 if self.attemptExtend(line):
                     to_polysh.add(line.asSegment().suffix(pos=l))
                     forward.add(line.asSegment().suffix(pos=l))
-            if to_polysh[0].left < 200:
+            if (not line.rc.max_extension) and to_polysh[0].left < 200:
                 l = to_polysh[0].RC().right
                 if self.attemptExtend(line.rc):
                     to_polysh.rc.add(line.rc.asSegment().suffix(pos=l))
@@ -221,7 +221,7 @@ class LineExtender:
             line.rc.removeListener(backward)
             corrected.extend(forward)
             corrected.extend(backward)
-            self.updateCorrectSegments(line)
+            line.updateCorrectSegments(line.asSegment())
         return corrected
 
     def attemptCleanResolution(self, resolved):
@@ -383,7 +383,7 @@ class LineExtender:
             sys.stdout.trace( "Blocked by knot")
             return False
         relevant_reads = list(line.read_alignments.allInter(line.asSegment().suffix(length=min(params.k, len(line) - 20))))
-        sys.stdout.trace( "Relevent reads for extending", relevant_reads)
+        sys.stdout.trace( "Relevant reads for extending", relevant_reads)
         if len(relevant_reads) == 0:
             return False
         new_contig, relevant_als = self.polisher.polishEnd(relevant_reads)

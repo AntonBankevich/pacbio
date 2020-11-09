@@ -82,7 +82,6 @@ class UniqueMarker:
                 segs.add(seg.shrink(3000))
         sys.stdout.trace("Unique segments selected")
         line.cleanReadAlignments()
-        line.read_alignments.clean()
         all = 0
         inter = 0
         contradicting = 0
