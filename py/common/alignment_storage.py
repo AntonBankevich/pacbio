@@ -53,12 +53,14 @@ class AlignmentPiece:
         cut_right = 0
         cfrom = self.seg_from.contig
         cto = self.seg_to.contig
-        while cut_left + 1 < left and cfrom[self.seg_from.left + cut_left] == cto[self.seg_to.left + cut_left]:
+        while cut_left < left and cfrom[self.seg_from.left + cut_left] == cto[self.seg_to.left + cut_left]:
             cut_left += 1
         if cut_left == len(self.seg_from):
             return self
-        while cut_right + 1 < right and cfrom[self.seg_from.right - 1 - cut_right] == cto[self.seg_to.right - 1 - cut_right]:
+        while cut_right < right and cfrom[self.seg_from.right - 1 - cut_right] == cto[self.seg_to.right - 1 - cut_right]:
             cut_right += 1
+        assert cut_left > 0
+        assert cut_right > 0
         cut_left -= 1
         cut_right -= 1
         seg_from = cfrom.segment(self.seg_from.left + cut_left, self.seg_from.right - cut_right)
