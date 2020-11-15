@@ -161,7 +161,7 @@ class Polisher:
                 return al.compose(mapping)
         assert False, "No alignment from polished to base: " + str(als)
 
-    def polishEnd(self, als, min_cov = 4, min_cov_frac = 0.8, max_extension = None):
+    def polishEnd(self, als, min_cov = 4, min_cov_frac = 0.7, max_extension = None):
         # type: (List[AlignmentPiece], int, int, int) -> Tuple[Contig, List[AlignmentPiece]]
         if max_extension is None:
             max_extension = 10000000000
