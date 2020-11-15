@@ -233,8 +233,8 @@ class LineExtender:
         line_alignments = filter(lambda al: len(al.seg_to) >= params.k and resolved.interSize(al.seg_to) > params.k - 30,
                                  self.dot_plot.allInter(resolved)) # type: List[AlignmentPiece]
         line_alignments = [al for al in line_alignments if
-                           (al.seg_from.right >= al.seg_from.contig.initial[0].seg_to.left + params.k + 20
-                           and al.seg_to.right >= al.seg_to.contig.initial[0].seg_to.left + params.k + 20)
+                           (al.seg_from.right >= al.seg_from.contig.initial[0].seg_to.right + params.k + 20
+                           and al.seg_to.right >= al.seg_to.contig.initial[0].seg_to.right + params.k + 20)
                            or al.isIdentical()]
         sys.stdout.trace( "Alternative lines:", map(str, line_alignments))
         for al in line_alignments:
@@ -252,7 +252,7 @@ class LineExtender:
             # assert new_copy is not None, str([ltl, line.correct_segments])
             if new_copy is None:
                 return []
-            if not new_copy.contains(ltl.seg_from):
+            if not new_Conscopy.contains(ltl.seg_from):
                 sys.stdout.trace( "Warning: alignment of resolved segment to uncorrected segment")
                 sys.stdout.trace( ltl, new_copy, line.correct_segments)
             correct_segments.append(new_copy)
