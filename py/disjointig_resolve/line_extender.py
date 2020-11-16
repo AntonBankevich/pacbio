@@ -252,7 +252,7 @@ class LineExtender:
             # assert new_copy is not None, str([ltl, line.correct_segments])
             if new_copy is None:
                 return []
-            if not new_Conscopy.contains(ltl.seg_from):
+            if not new_copy.contains(ltl.seg_from):
                 sys.stdout.trace( "Warning: alignment of resolved segment to uncorrected segment")
                 sys.stdout.trace( ltl, new_copy, line.correct_segments)
             correct_segments.append(new_copy)
