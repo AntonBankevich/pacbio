@@ -258,6 +258,10 @@ class SimpleGraph:
                           str(e.len /100 * 0.1) + "k " + str(e.cov) + "x\", color = \"" + col + "\"];\n")
         out.write("}\n")
 
+    def PrintFasta(self, out):
+        for e in self.e.values():
+            SeqIO.write(e, out, "fasta")
+
 
 class Vertex:
     def __init__(self, id, label):
